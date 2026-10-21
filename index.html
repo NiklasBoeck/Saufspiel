@@ -12,8 +12,10 @@
   <main id="app">
     <!-- Menü: Spiel auswählen -->
     <section id="screen-menu" class="screen active">
-      <h1>🍻 Saufspiel</h1>
-      <h2 class="section-title">Spiele</h2>
+      <header class="menu-head">
+        <h1>🍻 Saufspiel</h1>
+        <p class="hint">Such dir ein Spiel aus.</p>
+      </header>
       <div id="game-list" class="game-list"></div>
       <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>
     </section>
@@ -35,7 +37,7 @@
       <button id="start-btn" class="btn" disabled>Los geht’s</button>
     </section>
 
-    <!-- Spielbildschirm: Karten -->
+    <!-- Kartenspiele -->
     <section id="screen-game" class="screen">
       <header class="game-bar">
         <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
@@ -49,9 +51,21 @@
 
       <button id="next-btn" class="btn">Nächste Karte</button>
     </section>
+
+    <!-- Spiele mit eigener Oberfläche (z. B. Busfahrer) -->
+    <section id="screen-custom" class="screen">
+      <header class="game-bar">
+        <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
+        <span id="custom-title"></span>
+      </header>
+      <div id="custom-root" class="custom-root"></div>
+    </section>
   </main>
 
+  <script src="games.js"></script>
   <script src="cards.js"></script>
+  <script src="busfahrer.js"></script>
+  <script src="flunky.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

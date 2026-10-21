@@ -15,12 +15,18 @@ python3 -m http.server 8000
 
 ## Aufbau
 
-- `index.html`: Menü (Spiele), Spielereingabe und Spielbildschirm
-- `cards.js`: alle Spiele mit ihren Karten. `{p}` und `{p2}` werden durch zufällige Spieler ersetzt.
-- `app.js`: Spiellogik (Spieler, Deck mischen, nächste Karte). Die Spieler werden im Browser gespeichert.
+- `index.html`: Menü, Spielereingabe, Bildschirm für Kartenspiele und einer für Spiele mit eigener Oberfläche
+- `games.js`: Spiele-Register (`registerGame`) und gemeinsame Helfer wie `shuffle`
+- `cards.js`: die einfachen Kartenspiele (Ich hab noch nie, Pflicht, Neue Regel). `{p}` und `{p2}` werden durch zufällige Spieler ersetzt.
+- `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt
+- `app.js`: Menü, Spielerverwaltung und Ablauf. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
 
-## Neue Karten und Spiele
+## Neues Spiel hinzufügen
 
-In `cards.js` einfach Text in das `cards`-Array des passenden Spiels schreiben, oder ein neues Spiel mit `label`, `color` und `cards` anlegen.
+Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, tag, color, ... })` aufruft, und sie in `index.html` vor `app.js` einbinden. Je nach Art des Spiels:
+
+- `cards: [...]`: einfaches Kartenspiel, die App zieht zufällige Karten
+- `start(root, { players, exit })`: eigenes Spiel nach der Namenseingabe, zeichnet sich in `root`
+- `open()`: eigenes Spiel ohne Namenseingabe, z. B. eine eigene Seite

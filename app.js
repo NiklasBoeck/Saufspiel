@@ -26,6 +26,7 @@ function save() {
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $(`screen-${name}`).classList.add("active");
+  window.scrollTo(0, 0);
 }
 
 // --- Menü ---
@@ -36,7 +37,13 @@ function renderGames() {
     const tile = document.createElement("button");
     tile.className = "game-tile";
     tile.style.setProperty("--accent", game.color);
-    tile.textContent = game.label;
+    tile.innerHTML = `
+      <span class="game-emoji">${game.emoji ?? "🎲"}</span>
+      <span class="game-info">
+        <span class="game-name">${escapeHtml(game.label)}</span>
+        <span class="game-desc">${escapeHtml(game.description ?? "")}</span>
+      </span>
+      ${game.tag ? `<span class="game-tag">${escapeHtml(game.tag)}</span>` : ""}`;
     tile.onclick = () => openGame(key);
     list.appendChild(tile);
   }
@@ -44,7 +51,9 @@ function renderGames() {
 
 function openGame(key) {
   currentGame = key;
-  $("players-title").textContent = GAMES[key].label;
+  const game = GAMES[key];
+  if (game.open) return game.open();
+  $("players-title").textContent = game.label;
   renderPlayers();
   showScreen("players");
 }
@@ -85,15 +94,7 @@ $("player-form").onsubmit = (e) => {
   input.focus();
 };
 
-// --- Spiel ---
-
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
+// --- Kartenspiele ---
 
 function fillPlayers(text) {
   const [p, p2] = shuffle([...state.players]);
@@ -111,6 +112,16 @@ function nextCard() {
 }
 
 $("start-btn").onclick = () => {
+  const game = GAMES[currentGame];
+  if (game.start) {
+    $("custom-title").textContent = game.label;
+    showScreen("custom");
+    game.start($("custom-root"), {
+      players: [...state.players],
+      exit: () => showScreen("menu"),
+    });
+    return;
+  }
   deck = [];
   round = 0;
   nextCard();
@@ -119,7 +130,7 @@ $("start-btn").onclick = () => {
 $("next-btn").onclick = nextCard;
 $("card").onclick = nextCard;
 document.querySelectorAll(".back-btn").forEach((btn) => {
-  btn.onclick = () => showScreen(btn.closest("#screen-game") ? "players" : "menu");
+  btn.onclick = () => showScreen(btn.closest("#screen-players") ? "menu" : "players");
 });
 
 renderGames();
