@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b1033">
+  <title>Saufspiel</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- Startbildschirm: Spieler eintragen -->
+    <section id="screen-setup" class="screen active">
+      <h1>🍻 Saufspiel</h1>
+      <p class="hint">Trag alle Mitspieler ein und leg los.</p>
+
+      <form id="player-form" autocomplete="off">
+        <input id="player-input" type="text" maxlength="20" placeholder="Name" aria-label="Spielername">
+        <button type="submit" class="btn small">+</button>
+      </form>
+      <ul id="player-list"></ul>
+
+      <fieldset id="category-select">
+        <legend>Kategorien</legend>
+      </fieldset>
+
+      <button id="start-btn" class="btn" disabled>Spiel starten</button>
+      <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>
+    </section>
+
+    <!-- Spielbildschirm: Karten -->
+    <section id="screen-game" class="screen">
+      <header class="game-bar">
+        <button id="back-btn" class="btn ghost small" aria-label="Zurück">←</button>
+        <span id="round-label"></span>
+      </header>
+
+      <article id="card" class="card">
+        <span id="card-category" class="card-category"></span>
+        <p id="card-text" class="card-text"></p>
+      </article>
+
+      <button id="next-btn" class="btn">Nächste Karte</button>
+    </section>
+  </main>
+
+  <script src="cards.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
