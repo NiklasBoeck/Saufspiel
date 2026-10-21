@@ -21,7 +21,7 @@ python3 -m http.server 8000
 - `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt
 - `triade.js`: Triade, reihum Karten ziehen (7 bis Ass), der Bube startet die Busfahrt aus `busfahrer.js`
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
-- `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4)
+- `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4, three.js r159)
 - `app.js`: Menü, Spielerverwaltung und Ablauf. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
@@ -38,6 +38,6 @@ Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, t
 
 Jeder spielt am eigenen Handy. Ein Handy erstellt den Raum und ist damit Host: Es hält den Spielstand und verteilt ihn über einen kostenlosen, öffentlichen MQTT-Broker (HiveMQ, falls nicht erreichbar EMQX) an die anderen. Dafür braucht es kein Konto und keinen eigenen Server. Die Nachrichten sind nicht verschlüsselt, jeder mit dem Raumcode könnte mitlesen, für ein Partyspiel reicht das.
 
-Das Spielfeld wird in 3D gezeichnet (Canvas, ohne Bibliothek): Jeder schaut von hinter der eigenen Linie auf die Flasche. Jeder Wurf hat zufälligen Wind und etwas Streuung.
+Das Spielfeld ist echtes 3D mit three.js (WebGL, Licht und Schatten): Jeder schaut von hinter der eigenen Linie auf die Flasche. Jeder Wurf hat zufälligen Wind und etwas Streuung.
 
 Lokal testen geht mit einem eigenen Broker über `flunky.html?broker=ws://localhost:8888`.

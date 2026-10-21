@@ -136,7 +136,8 @@ h2 { margin: 0; font-size: 1.1rem; }
   user-select: none;
   -webkit-user-select: none;
 }
-#fb-field { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#fb-3d, #fb-field { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fb-field { touch-action: none; }
 
 .fb-hud {
   position: absolute; top: 0; left: 0; right: 0;
