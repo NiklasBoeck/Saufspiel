@@ -20,7 +20,7 @@ python3 -m http.server 8000
 - `cards.js`: die einfachen Kartenspiele (Ich hab noch nie, Pflicht, Neue Regel). `{p}` und `{p2}` werden durch zufällige Spieler ersetzt.
 - `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt (die Busfahrt gibt es auch als `Busfahrt` für Triade)
 - `triade.js`: Triade, reihum Karten ziehen (7 bis Ass), der Bube startet die Busfahrt
-- `dealer.js`: F*ck den Dealer, die App ist der Stapel: oberste Karte raten (2 bis Ass), beim Fehlversuch sagt sie höher oder niedriger, nach 3 Fehlschlägen in Folge wechselt der Dealer
+- `dealer.js`: F*ck den Dealer, die App ist der Stapel: oberste Karte raten (2 bis Ass), beim Fehlversuch sagt sie höher oder niedriger, nach 3 Fehlschlägen in Folge wechselt der Dealer. Gespielte Karten liegen gestapelt auf einem Tisch. Mit einem Handy hält der Dealer beim Raten das Handy, mit mehreren sieht nur der Dealer die oberste Karte
 - `room.js`: Jeder sein Handy, Raum mit Code und QR-Code, Sync über MQTT wie bei Flunky Ball
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
 - `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4)
