@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#1b1033">
+  <title>Flunky Ball · Saufspiel</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="flunky.css">
+</head>
+<body>
+  <!-- Start: Name, Raum erstellen oder beitreten -->
+  <section id="fb-start" class="fb-screen active">
+    <header class="fb-bar">
+      <a class="fb-back" href="index.html" aria-label="Zurück zum Menü">←</a>
+      <span>Saufspiel</span>
+    </header>
+    <h1>🍺 Flunky Ball</h1>
+    <p class="fb-hint">Jeder spielt am eigenen Handy. Bier bereithalten!</p>
+
+    <label class="fb-label" for="fb-name">Dein Name</label>
+    <input id="fb-name" class="fb-input" type="text" maxlength="16" placeholder="Name" autocomplete="off">
+
+    <button id="fb-resume" class="fb-btn secondary" hidden></button>
+
+    <div class="fb-card">
+      <h2>Neues Spiel</h2>
+      <div class="fb-stepper">
+        <span>Spieler</span>
+        <button id="fb-max-minus" class="fb-step" aria-label="Weniger Spieler">−</button>
+        <strong id="fb-max">4</strong>
+        <button id="fb-max-plus" class="fb-step" aria-label="Mehr Spieler">+</button>
+      </div>
+      <button id="fb-create" class="fb-btn">Raum erstellen</button>
+    </div>
+
+    <div class="fb-card">
+      <h2>Mitspielen</h2>
+      <input id="fb-code" class="fb-input code" type="text" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters">
+      <button id="fb-join" class="fb-btn">Beitreten</button>
+    </div>
+
+    <details class="fb-rules">
+      <summary>So geht’s</summary>
+      <ol>
+        <li>Einer erstellt einen Raum und legt die Spieleranzahl fest, die anderen treten mit dem Code oder QR-Code bei.</li>
+        <li>Die Teams werden zufällig gelost. Jedes Team steht hinter seiner Linie, in der Mitte steht die Flasche.</li>
+        <li>Wer dran ist, zieht den Finger nach hinten und lässt los. Je weiter du ziehst, desto weiter fliegt der Ball.</li>
+        <li>Treffer: Dein ganzes Team trinkt, bis das andere Team die Flasche aufgestellt hat und zurück hinter der Linie ist.</li>
+        <li>Bier in echt leer? Unten links auf „Fertig“ tippen. Das Team, das zuerst alle Biere leer hat, gewinnt.</li>
+      </ol>
+    </details>
+    <p id="fb-start-error" class="fb-error" hidden></p>
+  </section>
+
+  <!-- Lobby: warten, Teams losen -->
+  <section id="fb-lobby" class="fb-screen">
+    <header class="fb-bar">
+      <button id="fb-lobby-leave" class="fb-back" aria-label="Verlassen">←</button>
+      <span id="fb-conn" class="fb-conn">Verbinde…</span>
+    </header>
+    <div class="fb-roomcode">
+      <span>Raumcode</span>
+      <strong id="fb-room"></strong>
+    </div>
+    <div id="fb-qr" class="fb-qr"></div>
+    <button id="fb-share" class="fb-btn secondary small">Link teilen</button>
+
+    <div id="fb-waiting">
+      <h2 id="fb-count" class="fb-section"></h2>
+      <ul id="fb-players" class="fb-players"></ul>
+      <div id="fb-host-max" class="fb-stepper" hidden>
+        <span>Spieler</span>
+        <button id="fb-lmax-minus" class="fb-step" aria-label="Weniger Spieler">−</button>
+        <strong id="fb-lmax"></strong>
+        <button id="fb-lmax-plus" class="fb-step" aria-label="Mehr Spieler">+</button>
+      </div>
+    </div>
+
+    <div id="fb-teams" class="fb-teams" hidden>
+      <div class="fb-team t0"><h3>Team Rot</h3><ul id="fb-team0"></ul></div>
+      <div class="fb-team t1"><h3>Team Blau</h3><ul id="fb-team1"></ul></div>
+    </div>
+
+    <div class="fb-lobby-actions">
+      <button id="fb-draw" class="fb-btn" hidden>Teams auslosen</button>
+      <button id="fb-start-game" class="fb-btn" hidden>Spiel starten</button>
+      <p id="fb-lobby-hint" class="fb-hint"></p>
+    </div>
+  </section>
+
+  <!-- Spielfeld -->
+  <section id="fb-game" class="fb-screen game">
+    <canvas id="fb-field"></canvas>
+    <header class="fb-hud">
+      <button id="fb-game-leave" class="fb-round" aria-label="Spiel verlassen">✕</button>
+      <p id="fb-status" class="fb-status"></p>
+      <span id="fb-conn2" class="fb-dot" title="Verbindung"></span>
+    </header>
+
+    <div id="fb-drink" class="fb-overlay drink" hidden>
+      <div class="fb-big">🍺 TRINKEN!</div>
+      <p id="fb-drink-task" class="fb-task"></p>
+      <p id="fb-drink-sub" class="fb-sub"></p>
+    </div>
+
+    <div id="fb-run" class="fb-overlay run" hidden>
+      <div id="fb-run-balance">
+        <div class="fb-big small">🏃 Lauf zur Flasche!</div>
+        <p class="fb-sub">Stell die Flasche auf: Halt sie mit dem Finger im Gleichgewicht, bis der Balken voll ist.</p>
+        <canvas id="fb-balance"></canvas>
+        <div class="fb-progress"><div id="fb-balance-bar"></div></div>
+      </div>
+      <div id="fb-run-back" hidden>
+        <div class="fb-big small">🏃 Zurück hinter die Linie!</div>
+        <p class="fb-sub">Tipp abwechselnd links und rechts, so schnell du kannst.</p>
+        <div class="fb-feet">
+          <button id="fb-foot-l" class="fb-foot">👟<br>Links</button>
+          <button id="fb-foot-r" class="fb-foot">👟<br>Rechts</button>
+        </div>
+        <div class="fb-progress"><div id="fb-run-bar"></div></div>
+      </div>
+    </div>
+
+    <div id="fb-stop" class="fb-overlay stop" hidden>
+      <div class="fb-big">✋ STOPP!</div>
+      <p class="fb-sub">Absetzen, nicht mehr trinken.</p>
+    </div>
+
+    <div id="fb-over" class="fb-overlay over" hidden>
+      <div class="fb-big" id="fb-over-title"></div>
+      <p class="fb-sub" id="fb-over-sub"></p>
+      <button id="fb-again" class="fb-btn" hidden>Nochmal</button>
+      <a class="fb-btn secondary" href="index.html">Zum Menü</a>
+    </div>
+
+    <footer class="fb-foot-bar">
+      <button id="fb-done" class="fb-btn done">Fertig 🍺</button>
+      <button id="fb-skip" class="fb-btn secondary small" hidden>Überspringen</button>
+      <div id="fb-score" class="fb-score"></div>
+    </footer>
+  </section>
+
+  <script src="vendor/mqtt.min.js"></script>
+  <script src="vendor/qrcode.js"></script>
+  <script src="flunky-game.js"></script>
+</body>
+</html>
