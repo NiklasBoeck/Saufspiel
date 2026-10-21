@@ -2,7 +2,7 @@
 
 Ein Partyspiel als Web-App fürs Handy. Spieler eintragen, Kategorien wählen, dann Karte für Karte durchs Deck.
 
-**Spielen:** https://niklasboeck.github.io/saufspiel/
+**Spielen:** https://niklasboeck.github.io/Saufspiel/
 
 ## Starten
 
