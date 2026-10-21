@@ -93,7 +93,6 @@
     label: "Triade",
     emoji: "🃏",
     description: "Reihum Karten ziehen, jede Karte hat ihre Aufgabe.",
-    tag: "Kartenspiel",
     color: "#ea580c",
 
     setup(players) {

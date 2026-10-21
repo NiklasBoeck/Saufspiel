@@ -9,12 +9,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
   <main id="app">
     <!-- Menü: Spiel auswählen -->
     <section id="screen-menu" class="screen active">
       <header class="menu-head">
-        <h1>🍻 Saufspiel</h1>
-        <p class="hint">Such dir ein Spiel aus.</p>
+        <span class="menu-logo" aria-hidden="true">🍻</span>
+        <h1>Saufspiel</h1>
+        <p class="hint">Such dir ein Spiel aus</p>
       </header>
       <div id="game-list" class="game-list"></div>
       <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>

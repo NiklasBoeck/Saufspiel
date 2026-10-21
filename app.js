@@ -52,20 +52,21 @@ function vibrate(pattern) {
 
 function renderGames() {
   const list = $("game-list");
-  for (const [key, game] of Object.entries(GAMES)) {
+  Object.entries(GAMES).forEach(([key, game], i) => {
     const tile = document.createElement("button");
     tile.className = "game-tile";
     tile.style.setProperty("--accent", game.color);
+    tile.style.setProperty("--i", i);
     tile.innerHTML = `
       <span class="game-emoji">${game.emoji ?? "🎲"}</span>
       <span class="game-info">
         <span class="game-name">${escapeHtml(game.label)}</span>
         <span class="game-desc">${escapeHtml(game.description ?? "")}</span>
       </span>
-      ${game.tag ? `<span class="game-tag">${escapeHtml(game.tag)}</span>` : ""}`;
+      <span class="game-arrow" aria-hidden="true">›</span>`;
     tile.onclick = () => openGame(key);
     list.appendChild(tile);
-  }
+  });
 }
 
 function openGame(key) {

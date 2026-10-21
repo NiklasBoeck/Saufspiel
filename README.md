@@ -29,7 +29,7 @@ python3 -m http.server 8000
 
 ## Neues Spiel hinzufügen
 
-Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, tag, color, ... })` aufruft, und sie in `index.html` vor `app.js` einbinden. Je nach Art des Spiels:
+Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, color, ... })` aufruft, und sie in `index.html` vor `app.js` einbinden. Je nach Art des Spiels:
 
 - `registerCardGame(key, { ..., cards: [...] })` in `cards.js`: einfaches Kartenspiel, die App zieht zufällige Karten
 - `setup(players)`, `view(s)`, `act(s, action, by)`: eigenes Spiel. Der ganze Spielstand ist ein JSON-Objekt, `view` sagt, was zu sehen ist und wer welchen Knopf drücken darf, `act` ändert den Stand. Damit läuft das Spiel automatisch auf einem Handy und mit jedem am eigenen Handy. Muss jemand trinken, `drink(s, [{ who, n }])` aufrufen.

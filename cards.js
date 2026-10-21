@@ -49,7 +49,6 @@ registerCardGame("niewieder", {
   label: "Ich hab noch nie",
   emoji: "🙊",
   description: "Wer’s schon mal gemacht hat, trinkt.",
-  tag: "Karten",
   color: "#7c3aed",
   note: "Wer’s schon mal gemacht hat, trinkt!",
   cards: [
@@ -65,7 +64,6 @@ registerCardGame("pflicht", {
   label: "Pflicht",
   emoji: "🎯",
   description: "Aufgabe erfüllen oder trinken.",
-  tag: "Karten",
   color: "#db2777",
   cards: [
     { text: "{p}, erzähl einen Witz.", drink: "Wenn keiner lacht, trinkt {p} 2 Schlucke." },
@@ -80,7 +78,6 @@ registerCardGame("regel", {
   label: "Neue Regel",
   emoji: "📜",
   description: "Regeln, die bis zum Ende gelten.",
-  tag: "Karten",
   color: "#0891b2",
   cards: [
     { text: "Neue Regel: Niemand darf mehr „trinken“ sagen.", drink: "Wer’s trotzdem sagt, trinkt." },

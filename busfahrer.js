@@ -259,7 +259,6 @@
     label: "Busfahrer",
     emoji: "🚌",
     description: "Raten, Pyramide, und wer verliert, fährt Bus.",
-    tag: "Kartenspiel",
     color: "#16a34a",
 
     setup(players) {
