@@ -158,7 +158,7 @@ function canPress(a) {
 function playGame(r) {
   run = r;
   setGame(r.key);
-  const v = GAMES[r.key].view(r.s);
+  const v = GAMES[r.key].view(r.s, r.me);
   const actions = v.actions.filter(canPress);
   const myTurn = r.me && v.actions.some((a) => a.by === r.me);
   const waitFor = v.actions.find((a) => a.by)?.by;
@@ -170,13 +170,15 @@ function playGame(r) {
       ${myTurn ? `<p class="your-turn">Du bist dran!</p>` : ""}
       ${v.title ? `<h2 class="bf-title">${v.title}</h2>` : ""}
       <div class="bf-body">${v.body}</div>
-      <div class="bf-actions"></div>
+      <div class="bf-actions ${v.actionsClass ?? ""}"></div>
     </div>`;
   const box = root.querySelector(".bf-actions");
   for (const a of actions) {
     const btn = document.createElement("button");
     btn.className = a.ghost ? "btn ghost" : "btn";
     btn.textContent = a.label;
+    if (a.sub) btn.insertAdjacentHTML("beforeend", `<small>${escapeHtml(a.sub)}</small>`);
+    btn.disabled = !!a.disabled;
     btn.onclick = () => (a.exit ? run.exit() : run.send(a.act));
     box.appendChild(btn);
   }
