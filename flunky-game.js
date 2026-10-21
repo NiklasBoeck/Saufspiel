@@ -18,9 +18,12 @@
   const LINE_Y = [FIELD_L - 0.15, 0.15];
   const BOTTLE = { x: 0.5, y: FIELD_L / 2 };
   const RANGE = 1.3; // Wurfweite bei voller Spannung
-  const HIT_R = 0.045; // so nah muss der Ball an die Flasche
-  const LOW_FROM = 0.8; // ab hier (Anteil der Flugbahn) ist der Ball tief genug für einen Treffer
-  const ROLL = 0.15; // nach der Landung rollt der Ball noch so weit
+  const HIT_R = 0.032; // so nah muss der Ball an die Flasche
+  const LOW_FROM = 0.86; // ab hier (Anteil der Flugbahn) ist der Ball tief genug für einen Treffer
+  const ROLL = 0.1; // nach der Landung rollt der Ball noch so weit
+  const WIND_DRIFT = 0.09; // seitliche Abdrift bei vollem Wind
+  const SPREAD_ANGLE = 0.09; // Streuung der Wurfrichtung (rad, gesamt)
+  const SPREAD_POWER = 0.12; // Streuung der Wurfkraft (Anteil, gesamt)
   const FLIGHT_MS = 900;
   const ROLL_MS = 500;
   const STOP_MS = 2500;
@@ -265,6 +268,7 @@
       max,
       players: [{ id: session.id, name: session.name, team: null, done: false, online: true }],
       turnTeam: 0,
+      wind: 0,
       rot: [0, 0],
       throwerId: null,
       shot: null,
@@ -392,6 +396,7 @@
         break;
       }
     }
+    S.wind = Math.round((Math.random() * 2 - 1) * 3) / 3; // -1 … 1 in Dritteln
     S.phase = "aim";
   }
 
@@ -402,13 +407,12 @@
     if (!len || !isFinite(len)) return;
     const thrower = S.players.find((p) => p.id === S.throwerId);
     // Ein bisschen Zufall, wie in echt.
-    const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.07;
-    const power = Math.min(1, Math.max(0.05, Number(a.power) || 0)) * (1 + (Math.random() - 0.5) * 0.08);
+    const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * SPREAD_ANGLE;
+    const power = Math.min(1, Math.max(0.05, Number(a.power) || 0)) * (1 + (Math.random() - 0.5) * SPREAD_POWER);
     dx = Math.cos(angle);
     dy = Math.sin(angle);
     const start = ballStart(thrower);
     const range = power * RANGE;
-    const sim = simulate(start.x, start.y, dx, dy, range);
     S.shot = {
       id: `${S.seq}-${randomString("abc123", 4)}`,
       team: thrower.team,
@@ -418,9 +422,11 @@
       dy,
       range,
       power,
-      hit: sim.hit,
-      uEnd: sim.uEnd,
+      wind: S.wind || 0,
     };
+    const sim = simulate(S.shot);
+    S.shot.hit = sim.hit;
+    S.shot.uEnd = sim.uEnd;
     S.phase = "flying";
     later(resolveShot, uToMs(sim.uEnd) + 800);
   }
@@ -489,16 +495,11 @@
   }
 
   // Der Ball läuft entlang u: 0 = Abwurf, 1 = Landung, 1 + ROLL = liegt.
-  function simulate(x0, y0, dx, dy, range) {
-    const bx = BOTTLE.x - x0;
-    const by = BOTTLE.y - y0;
-    const along = (bx * dx + by * dy) / range;
-    const perp = Math.abs(bx * dy - by * dx);
-    if (perp < HIT_R) {
-      const half = Math.sqrt(HIT_R * HIT_R - perp * perp) / range;
-      const entry = along - half;
-      const exit = along + half;
-      if (exit >= LOW_FROM && entry <= 1 + ROLL) return { hit: true, uEnd: Math.max(LOW_FROM, entry) };
+  // Getroffen ist, wenn er im tiefen Teil der Flugbahn oder beim Rollen die Flasche berührt.
+  function simulate(shot) {
+    for (let u = LOW_FROM; u <= 1 + ROLL + 1e-9; u += 0.002) {
+      const b = ballAt(shot, u);
+      if (Math.hypot(b.x - BOTTLE.x, b.y - BOTTLE.y) < HIT_R) return { hit: true, uEnd: u };
     }
     return { hit: false, uEnd: 1 + ROLL };
   }
@@ -515,8 +516,9 @@
   }
 
   function ballAt(shot, u) {
+    const drift = (shot.wind || 0) * WIND_DRIFT * Math.min(u, 1) ** 2; // Wind wirkt nur in der Luft
     return {
-      x: shot.x0 + shot.dx * shot.range * u,
+      x: shot.x0 + shot.dx * shot.range * u + drift,
       y: shot.y0 + shot.dy * shot.range * u,
       h: u < 1 ? Math.sin(Math.PI * u) * (0.12 + 0.25 * shot.power) : 0,
     };
@@ -742,12 +744,21 @@
     }
   }
 
-  // --- Spielfeld zeichnen ---
+  // --- Spielfeld in 3D: Die Kamera steht hinter der eigenen Linie und schaut auf die Flasche ---
 
   const canvas = $("fb-field");
   const ctx = canvas.getContext("2d");
-  let view = { s: 1, ox: 0, oy: 0, flip: false, w: 0, h: 0 };
-  let aim = null; // { x, y } Fingerposition beim Zielen relativ zum Startpunkt
+  const CAM_BACK = 0.32; // so weit hinter der Linie steht die Kamera
+  const CAM_H = 0.34; // Kamerahöhe
+  const CAM_PITCH = 0.45; // Blick schräg nach unten
+  const BOTTLE_H = 0.1;
+  const BOTTLE_R = 0.02;
+  const BALL_R = 0.014;
+  const PERSON_H = 0.17;
+  const HOLD_H = 0.1; // Höhe des Balls in der Hand
+  let view = { w: 0, h: 0, team: 0, camX: 0.5, camY: 0, focal: 1, cx: 0, cy: 0 };
+  let camX = 0.5;
+  let aim = null; // { sx, sy, x, y } Finger beim Zielen relativ zum Startpunkt
 
   function layout() {
     const dpr = window.devicePixelRatio || 1;
@@ -758,51 +769,83 @@
       canvas.height = Math.round(h * dpr);
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const top = 58;
-    const bottom = 84;
-    const availW = w - 16;
-    const availH = h - top - bottom;
-    const s = Math.max(50, Math.min(availW, availH / FIELD_L));
-    const m = me();
-    view = { s, ox: (w - s) / 2, oy: top + (availH - s * FIELD_L) / 2, flip: m?.team === 1, w, h };
+    const team = me()?.team ?? 0;
+    // Wirft jemand aus dem eigenen Team, steht die Kamera hinter ihm.
+    const thrower = S.players.find((p) => p.id === S.throwerId);
+    const targetX = S.phase === "aim" && thrower?.team === team ? ballStart(thrower).x : 0.5;
+    camX += (targetX - camX) * 0.08;
+    view = {
+      w,
+      h,
+      team,
+      camX,
+      camY: LINE_Y[team] + (team === 0 ? CAM_BACK : -CAM_BACK),
+      focal: Math.min(w * 1.0, h * 0.6),
+      cx: w / 2,
+      cy: h * 0.46,
+    };
   }
 
-  function toScreen(x, y) {
-    const vx = view.flip ? 1 - x : x;
-    const vy = view.flip ? FIELD_L - y : y;
-    return [view.ox + vx * view.s, view.oy + vy * view.s];
+  // Weltpunkt (x quer, y längs, z Höhe) → Bildschirm. null, wenn er hinter der Kamera liegt.
+  function project(x, y, z) {
+    const fwd = view.team === 0 ? view.camY - y : y - view.camY;
+    const right = view.team === 0 ? x - view.camX : view.camX - x;
+    const up = z - CAM_H;
+    const c = Math.cos(CAM_PITCH);
+    const sn = Math.sin(CAM_PITCH);
+    const depth = fwd * c - up * sn;
+    if (depth < 0.03) return null;
+    const k = view.focal / depth;
+    return { x: view.cx + right * k, y: view.cy - (fwd * sn + up * c) * k, k, depth };
+  }
+
+  function polygon(points, fill) {
+    const pts = points.map(([x, y, z]) => project(x, y, z ?? 0));
+    if (pts.some((p) => !p)) return;
+    ctx.beginPath();
+    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+  }
+
+  function groundEllipse(x, y, rx, ry, fill) {
+    const pts = [];
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      pts.push([x + Math.cos(a) * rx, y + Math.sin(a) * ry, 0]);
+    }
+    polygon(pts, fill);
   }
 
   function draw(now) {
     layout();
-    const { s, ox, oy, w, h } = view;
+    const { w, h } = view;
     ctx.clearRect(0, 0, w, h);
 
-    // Rasen mit Streifen
-    const stripes = 10;
-    for (let i = 0; i < stripes; i++) {
-      ctx.fillStyle = i % 2 ? "#2f7a3a" : "#348a41";
-      ctx.fillRect(ox, oy + (i * s * FIELD_L) / stripes, s, (s * FIELD_L) / stripes + 1);
-    }
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(ox, oy, s, s * FIELD_L);
-    const [bxs, bys] = toScreen(BOTTLE.x, BOTTLE.y);
-    ctx.beginPath();
-    ctx.arc(bxs, bys, s * 0.12, 0, Math.PI * 2);
-    ctx.stroke();
+    // Himmel und Boden
+    const horizon = view.cy - Math.tan(CAM_PITCH) * view.focal;
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, "#1e1b4b");
+    sky.addColorStop(1, "#f59e0b");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, horizon + 1);
+    ctx.fillStyle = "#1f5129";
+    ctx.fillRect(0, horizon, w, h - horizon);
 
-    // Teamlinien
-    for (const t of [0, 1]) {
-      const [x1, y1] = toScreen(0, LINE_Y[t]);
-      const [x2] = toScreen(1, LINE_Y[t]);
-      ctx.strokeStyle = TEAM_COLORS[t];
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y1);
-      ctx.stroke();
+    // Spielfeld mit Mähstreifen
+    const stripes = 12;
+    for (let i = 0; i < stripes; i++) {
+      const y0 = (i * FIELD_L) / stripes;
+      const y1 = ((i + 1) * FIELD_L) / stripes;
+      polygon([[0, y0], [1, y0], [1, y1], [0, y1]], i % 2 ? "#2f7a3a" : "#368d43");
     }
+    for (const t of [0, 1]) {
+      const y = LINE_Y[t];
+      polygon([[0, y - 0.006], [1, y - 0.006], [1, y + 0.006], [0, y + 0.006]], TEAM_COLORS[t]);
+    }
+    groundEllipse(BOTTLE.x, BOTTLE.y, 0.12, 0.12, "rgba(255,255,255,0.12)");
+    groundEllipse(BOTTLE.x, BOTTLE.y, 0.112, 0.112, "#33833f");
 
     const shot = S.shot;
     let u = null;
@@ -813,37 +856,51 @@
     // Bierpfütze
     if (S.phase === "drink" && shot) {
       const grow = Math.min(1, (now - drinkTaskAt) / 4000);
-      ctx.fillStyle = "rgba(250, 204, 21, 0.45)";
-      ctx.beginPath();
-      ctx.ellipse(bxs, bys, s * (0.04 + 0.06 * grow), s * (0.03 + 0.04 * grow), 0.4, 0, Math.PI * 2);
-      ctx.fill();
+      const tip = { x: BOTTLE.x + shot.dx * BOTTLE_H, y: BOTTLE.y + shot.dy * BOTTLE_H };
+      groundEllipse(tip.x, tip.y, 0.02 + 0.05 * grow, 0.02 + 0.05 * grow, "rgba(250, 204, 21, 0.5)");
     }
 
-    drawBottle(bxs, bys, bottleDown, shot);
+    // Alles mit Tiefe sammeln und von hinten nach vorne zeichnen.
+    const sprites = [];
+    const bp = project(BOTTLE.x, BOTTLE.y, 0);
+    if (bp) sprites.push({ depth: bp.depth, draw: () => drawBottle(bottleDown, shot) });
 
-    // Spieler
     for (const p of S.players) {
       if (p.team == null) continue;
       let spot = playerSpot(p);
       if (S.phase === "drink" && p.id === S.runnerId && S.runStage === "aufstellen") {
-        spot = { x: BOTTLE.x + 0.07, y: BOTTLE.y + (p.team === 0 ? 0.04 : -0.04) };
+        spot = { x: BOTTLE.x + 0.08, y: BOTTLE.y };
       }
-      drawPlayer(p, spot, now);
+      const pp = project(spot.x, spot.y, 0);
+      if (!pp || pp.depth < 0.4) continue; // wer direkt neben der Kamera steht, verdeckt nur die Sicht
+      sprites.push({ depth: pp.depth, draw: () => drawPerson(p, spot, now) });
     }
 
-    // Ball
     const thrower = S.players.find((p) => p.id === S.throwerId);
     if (S.phase === "aim" && thrower) {
       const st = ballStart(thrower);
-      let [x, y] = toScreen(st.x, st.y);
-      if (aim && S.throwerId === session.id) drawAim(x, y);
-      if (aim && S.throwerId === session.id) [x, y] = pulledBall(x, y);
-      drawBall(x, y, 0);
+      const bp2 = project(st.x, st.y, HOLD_H);
+      if (bp2) {
+        const mine = aim && S.throwerId === session.id;
+        sprites.push({
+          depth: bp2.depth - 0.001,
+          draw: () => {
+            if (mine) drawAim(st, bp2);
+            const off = mine ? pullVector() : { x: 0, y: 0 };
+            drawBallAt(bp2.x + off.x, bp2.y + off.y, BALL_R * bp2.k, null);
+          },
+        });
+      }
     } else if (u != null && (S.phase === "flying" || !shot.hit)) {
       const b = ballAt(shot, u);
-      const [x, y] = toScreen(b.x, b.y);
-      drawBall(x, y, b.h);
+      const bp3 = project(b.x, b.y, b.h + BALL_R);
+      const sh = project(b.x, b.y, 0);
+      if (bp3) sprites.push({ depth: bp3.depth - 0.001, draw: () => drawBallAt(bp3.x, bp3.y, BALL_R * bp3.k, sh) });
     }
+
+    sprites.sort((a, b) => b.depth - a.depth).forEach((sp) => sp.draw());
+
+    drawWind();
 
     if (S.phase === "drink" && now - drinkTaskAt > 8000) {
       newDrinkTask();
@@ -851,102 +908,135 @@
     }
   }
 
-  function drawBottle(x, y, down, shot) {
-    const s = view.s;
-    ctx.save();
-    ctx.translate(x, y);
-    if (down) {
-      let ang = shot ? Math.atan2(shot.dy, shot.dx) : 0;
-      if (view.flip) ang += Math.PI;
-      ctx.rotate(ang);
-      ctx.fillStyle = "#166534";
-      roundRect(-s * 0.02, -s * 0.024, s * 0.075, s * 0.048, s * 0.015);
-      ctx.fill();
-      ctx.fillRect(s * 0.05, -s * 0.011, s * 0.045, s * 0.022);
-      ctx.fillStyle = "#facc15";
-      ctx.fillRect(s * 0.09, -s * 0.013, s * 0.012, s * 0.026);
-    } else {
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
+  function drawBottle(down, shot) {
+    if (down && shot) {
+      // liegt in Wurfrichtung
+      const a = project(BOTTLE.x, BOTTLE.y, BOTTLE_R);
+      const mid = project(BOTTLE.x + shot.dx * BOTTLE_H * 0.62, BOTTLE.y + shot.dy * BOTTLE_H * 0.62, BOTTLE_R);
+      const tip = project(BOTTLE.x + shot.dx * BOTTLE_H, BOTTLE.y + shot.dy * BOTTLE_H, BOTTLE_R * 0.6);
+      if (!a || !mid || !tip) return;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#14532d";
+      ctx.lineWidth = BOTTLE_R * 2 * a.k;
       ctx.beginPath();
-      ctx.arc(s * 0.006, s * 0.008, s * 0.03, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#166534";
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(mid.x, mid.y);
+      ctx.stroke();
+      ctx.lineWidth = BOTTLE_R * 0.9 * mid.k;
       ctx.beginPath();
-      ctx.arc(0, 0, s * 0.03, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#22c55e";
-      ctx.beginPath();
-      ctx.arc(0, 0, s * 0.019, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#facc15";
-      ctx.beginPath();
-      ctx.arc(0, 0, s * 0.011, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(mid.x, mid.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+      ctx.lineCap = "butt";
+      return;
     }
-    ctx.restore();
-  }
-
-  function roundRect(x, y, w, h, r) {
+    groundEllipse(BOTTLE.x + 0.01, BOTTLE.y + (view.team === 0 ? -0.01 : 0.01), BOTTLE_R * 1.3, BOTTLE_R * 1.3, "rgba(0,0,0,0.3)");
+    const base = project(BOTTLE.x, BOTTLE.y, 0);
+    const top = project(BOTTLE.x, BOTTLE.y, BOTTLE_H);
+    if (!base || !top) return;
+    const r = BOTTLE_R * base.k;
+    const H = base.y - top.y;
+    const x = base.x;
+    const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
+    g.addColorStop(0, "#14532d");
+    g.addColorStop(0.35, "#22c55e");
+    g.addColorStop(1, "#14532d");
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
+    ctx.moveTo(x - r, base.y);
+    ctx.lineTo(x - r, base.y - H * 0.55);
+    ctx.quadraticCurveTo(x - r, base.y - H * 0.72, x - r * 0.4, base.y - H * 0.8);
+    ctx.lineTo(x - r * 0.4, top.y);
+    ctx.lineTo(x + r * 0.4, top.y);
+    ctx.lineTo(x + r * 0.4, base.y - H * 0.8);
+    ctx.quadraticCurveTo(x + r, base.y - H * 0.72, x + r, base.y - H * 0.55);
+    ctx.lineTo(x + r, base.y);
     ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#f5f0ff";
+    ctx.fillRect(x - r, base.y - H * 0.42, r * 2, H * 0.18);
+    ctx.fillStyle = "#facc15";
+    ctx.fillRect(x - r * 0.45, top.y - H * 0.05, r * 0.9, H * 0.06);
   }
 
-  function drawPlayer(p, spot, now) {
-    const s = view.s;
-    const [x, y] = toScreen(spot.x, spot.y);
-    const r = Math.max(13, s * 0.042);
+  function drawPerson(p, spot, now) {
+    const feet = project(spot.x, spot.y, 0);
+    const head = project(spot.x, spot.y, PERSON_H);
+    if (!feet || !head) return;
+    const k = feet.k;
     const active = (S.phase === "aim" && p.id === S.throwerId) || (S.phase === "drink" && p.id === S.runnerId);
+    const bob = S.phase === "drink" && p.id === S.runnerId ? Math.abs(Math.sin(now / 90)) * 0.012 * k : 0;
+    const color = p.done ? "#6b7280" : TEAM_COLORS[p.team];
+    const hr = 0.022 * k;
+    const bw = 0.022 * k;
     ctx.globalAlpha = p.online ? 1 : 0.45;
+    groundEllipse(spot.x, spot.y, 0.025, 0.015, "rgba(0,0,0,0.3)");
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect?.(feet.x - bw, head.y + hr * 1.6 - bob, bw * 2, feet.y - head.y - hr * 1.6, bw * 0.8);
+    if (!ctx.roundRect) ctx.rect(feet.x - bw, head.y + hr * 1.6 - bob, bw * 2, feet.y - head.y - hr * 1.6);
+    ctx.fill();
+    ctx.fillStyle = "#fcd9b6";
+    ctx.beginPath();
+    ctx.arc(head.x, head.y + hr - bob, hr, 0, Math.PI * 2);
+    ctx.fill();
     if (active) {
       ctx.strokeStyle = "#facc15";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(x, y, r + 4 + Math.sin(now / 150) * 2, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.fillStyle = p.done ? "#6b7280" : TEAM_COLORS[p.team];
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (p.id === session.id) {
-      ctx.strokeStyle = "#fff";
       ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(head.x, head.y + hr - bob, hr + 3 + Math.sin(now / 150) * 1.5, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = `700 ${Math.round(r * 0.95)}px system-ui, sans-serif`;
-    ctx.fillText(p.done ? "✓" : p.name.slice(0, 1).toUpperCase(), x, y + 1);
-    ctx.font = `600 ${Math.max(10, Math.round(r * 0.62))}px system-ui, sans-serif`;
-    const below = y > view.oy + (view.s * FIELD_L) / 2;
-    ctx.fillText(p.name.length > 9 ? p.name.slice(0, 8) + "…" : p.name, x, below ? y + r + 10 : y - r - 10);
+    ctx.textBaseline = "bottom";
+    ctx.font = `700 ${Math.max(10, Math.min(16, Math.round(hr * 1.1)))}px system-ui, sans-serif`;
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 3;
+    const name = p.name.length > 9 ? p.name.slice(0, 8) + "…" : p.name;
+    ctx.fillText(p.done ? `✓ ${name}` : name, head.x, head.y - 4 - bob);
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   }
 
-  function drawBall(x, y, h) {
-    const s = view.s;
-    const r = s * 0.018 * (1 + h * 1.5);
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.beginPath();
-    ctx.ellipse(x, y, s * 0.018, s * 0.012, 0, 0, Math.PI * 2);
-    ctx.fill();
+  function drawBallAt(x, y, r, shadow) {
+    if (shadow) {
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.beginPath();
+      ctx.ellipse(shadow.x, shadow.y, BALL_R * shadow.k, BALL_R * shadow.k * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = "#fff";
     ctx.beginPath();
-    ctx.arc(x, y - h * s * 0.5, r, 0, Math.PI * 2);
+    ctx.arc(x, y, Math.max(2, r), 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "#f97316";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = Math.max(1, r * 0.25);
     ctx.stroke();
   }
 
+  function drawWind() {
+    const wind = S.phase === "aim" ? S.wind || 0 : S.phase === "flying" ? S.shot?.wind || 0 : null;
+    if (wind == null) return;
+    const strength = Math.round(Math.abs(wind) * 3);
+    const toRight = (wind > 0) === (view.team === 0);
+    const text = strength ? `💨 Wind ${(toRight ? "→" : "←").repeat(strength)}` : "💨 Windstill";
+    ctx.font = "700 16px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const tw = ctx.measureText(text).width + 24;
+    const y = 92;
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
+    ctx.beginPath();
+    ctx.roundRect?.(view.w / 2 - tw / 2, y - 15, tw, 30, 15);
+    if (!ctx.roundRect) ctx.rect(view.w / 2 - tw / 2, y - 15, tw, 30);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(text, view.w / 2, y);
+  }
+
   function maxPull() {
-    return view.s * 0.5;
+    return view.h * 0.3;
   }
 
   function pullVector() {
@@ -955,33 +1045,39 @@
     return { x: aim.x * k, y: aim.y * k, power: Math.min(1, len / maxPull()), len };
   }
 
-  function pulledBall(x, y) {
-    const v = pullVector();
-    return [x + v.x, y + v.y];
+  // Zug nach unten = Kraft, seitlich ziehen lenkt in die Gegenrichtung (wie eine Schleuder).
+  function aimDirection(v) {
+    if (v.y <= 0) return null;
+    const a = Math.max(-1, Math.min(1, Math.atan2(-v.x * 0.5, v.y)));
+    const fwd = view.team === 0 ? -1 : 1;
+    return { dx: Math.sin(a) * -fwd, dy: Math.cos(a) * fwd };
   }
 
-  function drawAim(x, y) {
+  function drawAim(st, rest) {
     const v = pullVector();
     if (v.len < 4) return;
-    const [px, py] = [x + v.x, y + v.y];
-    // Gummiband
-    ctx.strokeStyle = "rgba(255,255,255,0.8)";
+    const px = rest.x + v.x;
+    const py = rest.y + v.y;
+    const arm = BALL_R * rest.k * 2.5;
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(x - 14, y);
+    ctx.moveTo(rest.x - arm, rest.y);
     ctx.lineTo(px, py);
-    ctx.lineTo(x + 14, y);
+    ctx.lineTo(rest.x + arm, rest.y);
     ctx.stroke();
-    // Richtung (ohne Weite zu verraten)
-    const ux = -v.x / v.len;
-    const uy = -v.y / v.len;
-    const L = view.s * (0.08 + 0.18 * v.power);
-    ctx.strokeStyle = `hsl(${120 - 120 * v.power}, 90%, 60%)`;
-    ctx.setLineDash([8, 6]);
-    ctx.lineWidth = 4;
+    // nur die Richtung am Boden, nicht die Weite
+    const dir = aimDirection(v);
+    if (!dir) return;
+    const a = project(st.x, st.y, 0);
+    const b = project(st.x + dir.dx * 0.22, st.y + dir.dy * 0.22, 0);
+    if (!a || !b) return;
+    ctx.strokeStyle = "rgba(255,255,255,0.6)";
+    ctx.setLineDash([6, 6]);
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + ux * L, y + uy * L);
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
     ctx.stroke();
     ctx.setLineDash([]);
   }
@@ -1004,15 +1100,10 @@
     if (!aim) return;
     const v = pullVector();
     aim = null;
-    if (e.type !== "pointerup" || v.power < 0.08 || !canThrow()) return;
-    let dx = -v.x / v.len;
-    let dy = -v.y / v.len;
-    if (view.flip) {
-      dx = -dx;
-      dy = -dy;
-    }
+    const dir = aimDirection(v);
+    if (e.type !== "pointerup" || !dir || v.power < 0.08 || !canThrow()) return;
     pendingThrowSeq = S.seq;
-    send({ type: "throw", dx, dy, power: v.power });
+    send({ type: "throw", dx: dir.dx, dy: dir.dy, power: v.power });
   };
   canvas.addEventListener("pointerup", release);
   canvas.addEventListener("pointercancel", release);
@@ -1032,7 +1123,7 @@
   let runKey = null;
   let B = null; // Balance-Zustand
   let feet = { count: 0, next: "l" };
-  const FEET_NEEDED = 14;
+  const FEET_NEEDED = 18;
 
   function startRunner() {
     const key = `${S.shot?.id}-${S.runStage}`;
@@ -1056,13 +1147,13 @@
     B.last = now;
     B.t += dt;
     const w = bal.clientWidth;
-    const wind = 1.3 * Math.sin(1.3 * B.t) + 0.9 * Math.sin(2.9 * B.t + 1.7);
+    const wind = 1.7 * Math.sin(1.4 * B.t) + 1.2 * Math.sin(3.1 * B.t + 1.7);
     const push = B.finger == null ? 0 : Math.max(-1, Math.min(1, (B.finger - w / 2) / (w * 0.35)));
-    const alpha = 4 * Math.sin(B.theta) + wind + 8 * push - 1.8 * B.omega;
+    const alpha = 4.5 * Math.sin(B.theta) + wind + 8 * push - 1.5 * B.omega;
     B.omega += alpha * dt;
     B.theta += B.omega * dt;
-    if (Math.abs(B.theta) < 0.25) B.progress = Math.min(1, B.progress + dt / 2.5);
-    else B.progress = Math.max(0, B.progress - dt * 0.15);
+    if (Math.abs(B.theta) < 0.2) B.progress = Math.min(1, B.progress + dt / 3.5);
+    else B.progress = Math.max(0, B.progress - dt * 0.25);
     if (Math.abs(B.theta) > 1.25) {
       B.theta = Math.sign(B.theta) * 0.5;
       B.omega = 0;
@@ -1094,7 +1185,7 @@
     bctx.fillStyle = "rgba(34,197,94,0.18)";
     bctx.beginPath();
     bctx.moveTo(bx, by);
-    bctx.arc(bx, by, h - 40, -Math.PI / 2 - 0.25, -Math.PI / 2 + 0.25);
+    bctx.arc(bx, by, h - 40, -Math.PI / 2 - 0.2, -Math.PI / 2 + 0.2);
     bctx.closePath();
     bctx.fill();
     // Boden
@@ -1340,5 +1431,5 @@
   if (urlCode && !parseSaved()) setTimeout(() => ($("fb-name").value ? $("fb-join") : $("fb-name")).focus(), 50);
 
   // Für automatische Tests: flunky.html?debug
-  if (params.has("debug")) window.fbDebug = { state: () => S, balance: () => B, view: () => view, toScreen, ballStart, BOTTLE, RANGE };
+  if (params.has("debug")) window.fbDebug = { state: () => S, balance: () => B, view: () => view, project, ballStart, send, BOTTLE, RANGE };
 })();
