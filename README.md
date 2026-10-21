@@ -1,6 +1,6 @@
 # Saufspiel
 
-Ein Partyspiel als Web-App fürs Handy. Spiel im Menü antippen, Spieler eintragen, dann Karte für Karte durchs Deck.
+Ein Partyspiel als Web-App fürs Handy. Spiel im Menü antippen, dann aussuchen: **Ein Handy** (Spieler eintragen, das Handy geht reihum) oder **Jeder sein Handy** (ein Handy macht einen Raum auf, die anderen treten mit Code oder QR-Code bei). Muss jemand trinken, kommt eine große Trink-Meldung.
 
 **Spielen:** https://niklasboeck.github.io/Saufspiel/
 
@@ -15,14 +15,15 @@ python3 -m http.server 8000
 
 ## Aufbau
 
-- `index.html`: Menü, Spielereingabe, Bildschirm für Kartenspiele und einer für Spiele mit eigener Oberfläche
-- `games.js`: Spiele-Register (`registerGame`) und gemeinsame Helfer wie `shuffle`
+- `index.html`: Menü, Auswahl Ein Handy / Jeder sein Handy, Spielereingabe, Raum, Spielbildschirm und Trink-Meldung
+- `games.js`: Spiele-Register (`registerGame`), `drink()` für Trink-Meldungen und gemeinsame Helfer wie `shuffle`
 - `cards.js`: die einfachen Kartenspiele (Ich hab noch nie, Pflicht, Neue Regel). `{p}` und `{p2}` werden durch zufällige Spieler ersetzt.
-- `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt
-- `triade.js`: Triade, reihum Karten ziehen (7 bis Ass), der Bube startet die Busfahrt aus `busfahrer.js`
+- `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt (die Busfahrt gibt es auch als `Busfahrt` für Triade)
+- `triade.js`: Triade, reihum Karten ziehen (7 bis Ass), der Bube startet die Busfahrt
+- `room.js`: Jeder sein Handy, Raum mit Code und QR-Code, Sync über MQTT wie bei Flunky Ball
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
 - `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4, three.js r159)
-- `app.js`: Menü, Spielerverwaltung und Ablauf. Die Spieler werden im Browser gespeichert.
+- `app.js`: Menü, Spielerverwaltung, zeichnet das laufende Spiel und die Trink-Meldung. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
 
@@ -30,9 +31,13 @@ python3 -m http.server 8000
 
 Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, tag, color, ... })` aufruft, und sie in `index.html` vor `app.js` einbinden. Je nach Art des Spiels:
 
-- `cards: [...]`: einfaches Kartenspiel, die App zieht zufällige Karten
-- `start(root, { players, exit })`: eigenes Spiel nach der Namenseingabe, zeichnet sich in `root`
+- `registerCardGame(key, { ..., cards: [...] })` in `cards.js`: einfaches Kartenspiel, die App zieht zufällige Karten
+- `setup(players)`, `view(s)`, `act(s, action, by)`: eigenes Spiel. Der ganze Spielstand ist ein JSON-Objekt, `view` sagt, was zu sehen ist und wer welchen Knopf drücken darf, `act` ändert den Stand. Damit läuft das Spiel automatisch auf einem Handy und mit jedem am eigenen Handy. Muss jemand trinken, `drink(s, [{ who, n }])` aufrufen.
 - `open()`: eigenes Spiel ohne Namenseingabe, z. B. eine eigene Seite
+
+## Jeder sein Handy
+
+Funktioniert wie bei Flunky Ball: Das Handy, das den Raum erstellt, ist Host und hält den Spielstand, die anderen schicken nur ihre Knopfdrücke. Jeder sieht dasselbe, drücken darf nur, wer dran ist (bei „Weiter“ jeder). Ist jemand ohne Verbindung, darf der Host für ihn drücken. Nach dem Neuladen kommt man automatisch zurück in den Raum. Lokal testen: `index.html?broker=ws://localhost:8888`.
 
 ## Flunky Ball
 

@@ -2,14 +2,38 @@
 //
 // registerGame(key, {
 //   label, emoji, description, tag, color,
-//   cards: [...]          // Kartenspiel: zufällige Karten, {p}/{p2} = Spieler
-//   start(root, ctx)      // eigenes Spiel nach der Namenseingabe; ctx = { players, exit }
-//   open()                // eigenes Spiel ohne Namenseingabe (z. B. eigene Lobby)
+//   setup(players)        // neuer Spielstand (reines JSON, damit er an andere Handys geht)
+//   view(s)               // was gerade zu sehen ist: { phase, title, body, actions }
+//                         //   actions: [{ label, act, by, ghost, exit }]
+//                         //   by = Spieler, der drücken darf (fehlt: jeder), exit = zurück zum Menü
+//   act(s, action, by)    // Aktion auf den Spielstand anwenden, by = wer gedrückt hat
+//   open()                // eigenes Spiel auf eigener Seite (z. B. Flunky Ball)
 // })
+//
+// Jedes Spiel mit setup/view/act läuft automatisch auf einem Handy oder mit jedem am eigenen Handy.
+// Muss jemand trinken, ruft act() drink(s, [...]) auf, dann kommt auf allen Handys die Trink-Meldung.
 const GAMES = {};
 
 function registerGame(key, def) {
   GAMES[key] = def;
+}
+
+// Für Trink-Meldungen: alle trinken.
+const ALL = "*";
+
+// Trink-Meldung auslösen. items: [{ who, n, give, text }]
+//   who = Spielername oder ALL, n = Schlucke, give = verteilt statt trinkt, text = Zusatz
+function drink(s, items) {
+  s.alert = { id: Math.random().toString(36).slice(2), items };
+}
+
+function sips(n) {
+  return n === 1 ? "1 Schluck" : `${n} Schlucke`;
+}
+
+// Hinweis für Trinkregeln, bei denen die App nicht weiß, wen es trifft.
+function drinkNoteHtml(text) {
+  return `<p class="drink-note">🍺 ${text}</p>`;
 }
 
 function shuffle(arr) {

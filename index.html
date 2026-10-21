@@ -20,11 +20,34 @@
       <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>
     </section>
 
-    <!-- Spieler eintragen -->
+    <!-- Ein Handy oder jeder sein Handy -->
+    <section id="screen-mode" class="screen">
+      <header class="game-bar">
+        <button id="mode-back" class="btn ghost small" aria-label="Zurück">←</button>
+        <span class="game-title"></span>
+      </header>
+      <p class="hint">Wie wollt ihr spielen?</p>
+      <button id="mode-one" class="mode-tile">
+        <span class="mode-emoji">📱</span>
+        <span class="game-info">
+          <span class="game-name">Ein Handy</span>
+          <span class="game-desc">Alle spielen an diesem Handy, es geht reihum.</span>
+        </span>
+      </button>
+      <button id="mode-multi" class="mode-tile">
+        <span class="mode-emoji">📱📱</span>
+        <span class="game-info">
+          <span class="game-name">Jeder sein Handy</span>
+          <span class="game-desc">Ein Handy macht einen Raum auf, alle anderen treten mit Code oder QR-Code bei.</span>
+        </span>
+      </button>
+    </section>
+
+    <!-- Spieler eintragen (ein Handy) -->
     <section id="screen-players" class="screen">
       <header class="game-bar">
-        <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
-        <span id="players-title"></span>
+        <button id="players-back" class="btn ghost small" aria-label="Zurück">←</button>
+        <span class="game-title"></span>
       </header>
       <p class="hint">Wer spielt mit?</p>
 
@@ -32,41 +55,75 @@
         <input id="player-input" type="text" maxlength="20" placeholder="Name" aria-label="Spielername">
         <button type="submit" class="btn small">+</button>
       </form>
-      <ul id="player-list"></ul>
+      <ul id="player-list" class="chips"></ul>
 
       <button id="start-btn" class="btn" disabled>Los geht’s</button>
     </section>
 
-    <!-- Kartenspiele -->
-    <section id="screen-game" class="screen">
+    <!-- Raum erstellen oder beitreten (jeder sein Handy) -->
+    <section id="screen-room" class="screen">
       <header class="game-bar">
-        <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
-        <span id="round-label"></span>
+        <button id="room-back" class="btn ghost small" aria-label="Zurück">←</button>
+        <span class="game-title"></span>
       </header>
-
-      <article id="card" class="card">
-        <span id="card-category" class="card-category"></span>
-        <p id="card-text" class="card-text"></p>
-      </article>
-
-      <button id="next-btn" class="btn">Nächste Karte</button>
+      <label class="field">
+        <span>Dein Name</span>
+        <input id="room-name" type="text" maxlength="20" placeholder="Name" autocomplete="off">
+      </label>
+      <button id="room-create" class="btn">Raum erstellen</button>
+      <p class="or">oder einem Raum beitreten</p>
+      <div class="join-row">
+        <input id="room-code" type="text" maxlength="4" placeholder="Code" autocomplete="off" autocapitalize="characters" aria-label="Raumcode">
+        <button id="room-join" class="btn">Beitreten</button>
+      </div>
+      <p id="room-error" class="error" hidden></p>
+      <button id="room-resume" class="btn ghost" hidden></button>
     </section>
 
-    <!-- Spiele mit eigener Oberfläche (z. B. Busfahrer) -->
-    <section id="screen-custom" class="screen">
+    <!-- Warteraum (jeder sein Handy) -->
+    <section id="screen-lobby" class="screen">
       <header class="game-bar">
-        <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
-        <span id="custom-title"></span>
+        <button id="lobby-back" class="btn ghost small" aria-label="Raum verlassen">←</button>
+        <span class="game-title"></span>
       </header>
-      <div id="custom-root" class="custom-root"></div>
+      <p class="room-code">Raum <b id="lobby-code"></b></p>
+      <div id="lobby-qr" class="qr"></div>
+      <button id="lobby-share" class="btn ghost small share-btn">Link teilen</button>
+      <ul id="lobby-players" class="chips"></ul>
+      <p id="lobby-hint" class="hint"></p>
+      <button id="lobby-start" class="btn" hidden>Los geht’s</button>
+      <p class="conn"></p>
+    </section>
+
+    <!-- Das Spiel selbst -->
+    <section id="screen-game" class="screen">
+      <header class="game-bar">
+        <button id="game-back" class="btn ghost small" aria-label="Zurück">←</button>
+        <span class="game-title"></span>
+      </header>
+      <p class="conn"></p>
+      <div id="game-root" class="game-root"></div>
     </section>
   </main>
 
+  <!-- Trink-Meldung -->
+  <div id="drink-alert" class="drink-alert" hidden>
+    <div class="da-box" role="alertdialog" aria-labelledby="da-title">
+      <div id="da-emoji" class="da-emoji"></div>
+      <h2 id="da-title"></h2>
+      <ul id="da-list"></ul>
+      <button id="da-ok" class="btn">Prost! 🍻</button>
+    </div>
+  </div>
+
+  <script src="vendor/mqtt.min.js"></script>
+  <script src="vendor/qrcode.js"></script>
   <script src="games.js"></script>
   <script src="cards.js"></script>
   <script src="busfahrer.js"></script>
   <script src="triade.js"></script>
   <script src="flunky.js"></script>
+  <script src="room.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
