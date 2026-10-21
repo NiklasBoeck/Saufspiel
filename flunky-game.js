@@ -943,6 +943,7 @@
       scene.add(ring);
 
       addScenery(scene, rnd);
+      addGrassBlades(scene, rnd);
 
       // Flasche: gedrehtes Profil aus grünem Glas, Etikett und Kronkorken
       const bottle = new THREE.Group();
@@ -951,7 +952,7 @@
       ].map(([r, y]) => new THREE.Vector2(r * BOTTLE_R, y * BOTTLE_H));
       const glass = new THREE.Mesh(
         new THREE.LatheGeometry(profile, 32),
-        new THREE.MeshPhysicalMaterial({ color: 0x1e8a3c, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, opacity: 0.88 })
+        new THREE.MeshPhysicalMaterial({ color: 0x1e8a3c, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, opacity: 0.6, depthWrite: false })
       );
       glass.castShadow = true;
       const labelTex = canvasTexture(128, 64, (g, w, h) => {
@@ -976,7 +977,13 @@
         new THREE.MeshStandardMaterial({ color: 0xf5c518, metalness: 0.8, roughness: 0.3 })
       );
       cap.position.y = BOTTLE_H * 1.0;
-      bottle.add(glass, label, cap);
+      // Bier in der Flasche
+      const beerInside = new THREE.Mesh(
+        new THREE.CylinderGeometry(BOTTLE_R * 0.9, BOTTLE_R * 0.9, BOTTLE_H * 0.5, 24),
+        new THREE.MeshStandardMaterial({ color: 0xd98a12, roughness: 0.3, emissive: 0x5a3000, emissiveIntensity: 0.3 })
+      );
+      beerInside.position.y = BOTTLE_H * 0.26;
+      bottle.add(beerInside, glass, label, cap);
       bottle.position.set(BOTTLE.x, 0, BOTTLE.y);
       scene.add(bottle);
 
@@ -1096,6 +1103,33 @@
     }
   }
 
+  // Tausende kleine Grashalme rund um die Flasche und auf dem Feld
+  function addGrassBlades(scene, rnd) {
+    const count = 7000;
+    const blades = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(0.0018, 0.012, 3).translate(0, 0.006, 0),
+      new THREE.MeshStandardMaterial({ roughness: 0.9 }),
+      count
+    );
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const col = new THREE.Color();
+    const greens = [0x3f8a2e, 0x5aa83f, 0x6dbb4a, 0x4c9a37, 0x82c95a];
+    for (let i = 0; i < count; i++) {
+      const x = -0.4 + rnd() * 1.8;
+      const z = -0.3 + rnd() * (FIELD_L + 0.6);
+      e.set((rnd() - 0.5) * 0.6, rnd() * Math.PI, (rnd() - 0.5) * 0.6);
+      q.setFromEuler(e);
+      const sc = 0.6 + rnd() * 0.9;
+      m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc, sc, sc));
+      blades.setMatrixAt(i, m);
+      blades.setColorAt(i, col.set(greens[Math.floor(rnd() * greens.length)]));
+    }
+    blades.receiveShadow = true;
+    scene.add(blades);
+  }
+
   function capsule(r, len, mat) {
     const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 12), mat);
     m.castShadow = true;
@@ -1156,17 +1190,22 @@
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.0182, 20, 10, 0, Math.PI * 2, 0, Math.PI * (look.long ? 0.62 : 0.48)), hairMat);
     hair.position.y = 0.16;
     hair.rotation.x = -0.25;
-    body.add(neck, head, hair);
+    const headGroup = new THREE.Group(); // Kopf, Haare und Augen kippen zusammen
+    headGroup.position.y = 0.145;
+    head.position.y -= 0.145;
+    hair.position.y -= 0.145;
+    headGroup.add(head, hair);
+    body.add(neck, headGroup);
     if (look.long) {
       const tail = capsule(0.012, 0.02, hairMat);
-      tail.position.set(0, 0.145, -0.012);
-      body.add(tail);
+      tail.position.set(0, 0, -0.012);
+      headGroup.add(tail);
     }
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
     for (const side of [-1, 1]) {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.0025, 8, 6), eyeMat);
-      eye.position.set(side * 0.0065, 0.161, 0.0155);
-      body.add(eye);
+      eye.position.set(side * 0.0065, 0.016, 0.0155);
+      headGroup.add(eye);
     }
     const marker = new THREE.Mesh(
       new THREE.RingGeometry(0.03, 0.037, 40),
@@ -1176,7 +1215,7 @@
     marker.position.y = 0.002;
     const root = new THREE.Group();
     root.add(body, marker);
-    return { root, body, legs, arms, beer, marker, mats, shirtMat, team: p.team, pos: null, run: 0 };
+    return { root, body, legs, arms, beer, marker, mats, shirtMat, head: headGroup, team: p.team, pos: null, run: 0, seed: Math.random() * 10 };
   }
 
   function draw(now) {
@@ -1258,7 +1297,10 @@
     } else if (u != null && (S.phase === "flying" || !shot.hit)) {
       const b = ballAt(shot, u);
       g.ball.visible = true;
-      g.ball.position.set(b.x, b.h + BALL_R, b.y);
+      // nach der Landung hüpft der Ball noch kurz
+      const k = u > 1 ? (u - 1) / ROLL : 0;
+      const bounce = u > 1 ? 0.025 * Math.abs(Math.sin(k * Math.PI * 2)) * (1 - k) : 0;
+      g.ball.position.set(b.x, b.h + bounce + BALL_R, b.y);
       g.ball.rotation.x = u * 25 * fwd;
     }
 
@@ -1329,7 +1371,12 @@
       person.legs[0].rotation.x = swing;
       person.legs[1].rotation.x = -swing;
       person.body.position.y = moving ? Math.abs(Math.sin(person.run)) * 0.006 : 0;
-      person.arms[0].shoulder.rotation.x = -swing * 0.8;
+      person.body.rotation.z = moving ? 0 : Math.sin(now / 900 + person.seed) * 0.03; // leichtes Wippen
+      // Wer trinken muss, setzt die Flasche an
+      const drinking = S.phase === "drink" && p.team === S.drinkTeam && !p.done;
+      if (drinking) person.arms[0].shoulder.rotation.set(-2.3 + Math.sin(now / 400 + person.seed) * 0.12, 0, 0.35);
+      else person.arms[0].shoulder.rotation.set(-swing * 0.8, 0, -0.12);
+      person.head.rotation.x = drinking ? -0.35 : 0;
       if (thrower) {
         person.arms[1].shoulder.rotation.set(0, 0, 2.6 + Math.sin(now / 300) * 0.08);
       } else {
@@ -1475,7 +1522,7 @@
   let runKey = null;
   let B = null; // Balance-Zustand
   let feet = { count: 0, next: "l" };
-  const FEET_NEEDED = 18;
+  const FEET_NEEDED = 14;
 
   function startRunner() {
     const key = `${S.shot?.id}-${S.runStage}`;
@@ -1483,40 +1530,46 @@
     if (key === runKey) return;
     runKey = key;
     if (S.runStage === "aufstellen") {
-      B = { theta: (Math.random() < 0.5 ? -1 : 1) * 0.6, omega: 0, progress: 0, t: 0, last: null, finger: null, sent: false, fell: 0 };
+      B = { phase: Math.random() * Math.PI * 2, theta: 0, hits: 0, last: null, sent: false, flash: null, flashAt: 0, speed: 1 };
     } else {
       feet = { count: 0, next: "l", sent: false };
       renderFeet();
     }
   }
 
+  // Flasche aufstellen: Sie pendelt hin und her. Wer tippt, während sie gerade steht, trifft.
+  // Drei Treffer stellen sie auf, daneben tippen kostet einen Treffer.
+  const UPRIGHT_HITS = 3;
+  const UPRIGHT_ZONE = 0.25;
+  const SWAY = 0.8;
+
   function runnerFrame(now) {
     if (!S || S.phase !== "drink" || S.runnerId !== session.id || S.runStage !== "aufstellen") {
       runnerActive = false;
       return;
     }
-    const dt = B.last == null ? 0 : Math.min(0.033, (now - B.last) / 1000);
+    const dt = B.last == null ? 0 : Math.min(0.05, (now - B.last) / 1000);
     B.last = now;
-    B.t += dt;
-    const w = bal.clientWidth;
-    const wind = 1.7 * Math.sin(1.4 * B.t) + 1.2 * Math.sin(3.1 * B.t + 1.7);
-    const push = B.finger == null ? 0 : Math.max(-1, Math.min(1, (B.finger - w / 2) / (w * 0.35)));
-    const alpha = 4.5 * Math.sin(B.theta) + wind + 8 * push - 1.5 * B.omega;
-    B.omega += alpha * dt;
-    B.theta += B.omega * dt;
-    if (Math.abs(B.theta) < 0.2) B.progress = Math.min(1, B.progress + dt / 3.5);
-    else B.progress = Math.max(0, B.progress - dt * 0.25);
-    if (Math.abs(B.theta) > 1.25) {
-      B.theta = Math.sign(B.theta) * 0.5;
-      B.omega = 0;
-      B.progress = Math.max(0, B.progress - 0.3);
-      B.fell = now;
-      vibrate(80);
-    }
-    $("fb-balance-bar").style.width = `${B.progress * 100}%`;
+    // eine Schwingung dauert anfangs etwa 1,8 s, mit jedem Treffer etwas schneller
+    const before = B.phase;
+    B.phase += dt * ((Math.PI * 2) / 1.8) * (1 + 0.15 * B.hits) * B.speed;
+    if (Math.floor(before / Math.PI) !== Math.floor(B.phase / Math.PI)) B.speed = 0.85 + Math.random() * 0.35;
+    B.theta = Math.sin(B.phase) * SWAY;
+    $("fb-balance-bar").style.width = `${(B.hits / UPRIGHT_HITS) * 100}%`;
     drawBalance(now);
-    if (B.progress >= 1 && !B.sent) {
+  }
+
+  function tapBottle() {
+    if (!B || B.sent || !S || S.runStage !== "aufstellen") return;
+    const ok = Math.abs(B.theta) < UPRIGHT_ZONE;
+    B.hits = ok ? B.hits + 1 : Math.max(0, B.hits - 1);
+    B.flash = ok ? "Treffer!" : "Daneben!";
+    B.flashAt = performance.now();
+    vibrate(ok ? 40 : [60, 40, 60]);
+    $("fb-balance-bar").style.width = `${(B.hits / UPRIGHT_HITS) * 100}%`;
+    if (B.hits >= UPRIGHT_HITS) {
       B.sent = true;
+      B.theta = 0;
       send({ type: "upright" });
     }
   }
@@ -1534,10 +1587,10 @@
     const bx = w / 2;
     const by = h - 24;
     // Zielbereich
-    bctx.fillStyle = "rgba(34,197,94,0.18)";
+    bctx.fillStyle = Math.abs(B.theta) < UPRIGHT_ZONE ? "rgba(34,197,94,0.4)" : "rgba(34,197,94,0.18)";
     bctx.beginPath();
     bctx.moveTo(bx, by);
-    bctx.arc(bx, by, h - 40, -Math.PI / 2 - 0.2, -Math.PI / 2 + 0.2);
+    bctx.arc(bx, by, h - 40, -Math.PI / 2 - UPRIGHT_ZONE, -Math.PI / 2 + UPRIGHT_ZONE);
     bctx.closePath();
     bctx.fill();
     // Boden
@@ -1564,28 +1617,15 @@
     bctx.fillStyle = "#facc15";
     bctx.fillRect(-10, -198, 20, 9);
     bctx.restore();
-    if (now - B.fell < 700) {
-      bctx.fillStyle = "#fca5a5";
-      bctx.font = "700 22px system-ui, sans-serif";
+    if (B.flash && now - B.flashAt < 700) {
+      bctx.fillStyle = B.flash === "Treffer!" ? "#86efac" : "#fca5a5";
+      bctx.font = "800 26px system-ui, sans-serif";
       bctx.textAlign = "center";
-      bctx.fillText("Umgefallen!", bx, 30);
+      bctx.fillText(B.flash, bx, 34);
     }
   }
 
-  const balFinger = (e) => {
-    const r = bal.getBoundingClientRect();
-    if (B) B.finger = e.clientX - r.left;
-  };
-  bal.addEventListener("pointerdown", (e) => {
-    bal.setPointerCapture(e.pointerId);
-    balFinger(e);
-  });
-  bal.addEventListener("pointermove", (e) => {
-    if (B && B.finger != null) balFinger(e);
-  });
-  const balUp = () => B && (B.finger = null);
-  bal.addEventListener("pointerup", balUp);
-  bal.addEventListener("pointercancel", balUp);
+  bal.addEventListener("pointerdown", tapBottle);
 
   function step(foot) {
     if (!S || S.runStage !== "zurueck" || feet.sent) return;
