@@ -32,10 +32,8 @@
 
   // Die gespielten Karten liegen sortiert auf dem Tisch, gleiche Werte leicht versetzt übereinander.
   function tableCardHtml(c, j, fresh) {
-    const suit = SUITS.findIndex((x) => x.name === c.suit.name);
-    const tilt = ((c.value * 7 + suit * 13) % 9) - 4;
     const isNew = fresh && c.rank === fresh.rank && c.suit.name === fresh.suit.name;
-    return `<div class="fd-card ${c.suit.red ? "red" : ""} ${isNew ? "new" : ""}" style="--j:${j};--tilt:${tilt}deg"><span>${c.rank}</span><span>${c.suit.symbol}</span></div>`;
+    return `<div class="fd-card ${c.suit.red ? "red" : ""} ${isNew ? "new" : ""}" style="--j:${j}"><span>${c.rank}</span><span>${c.suit.symbol}</span></div>`;
   }
 
   function boardHtml(s, fresh) {
@@ -78,15 +76,9 @@
     });
   }
 
-  function stakes(s) {
-    const guesser = name(s.players[s.guesser]);
-    const dealer = name(s.players[s.dealer]);
-    if (s.stage === "guess1") {
-      return drinkNoteHtml(`Sofort richtig: ${dealer} trinkt so viele Schlucke wie die Karte wert ist (Bube 11, Dame 12, König 13, Ass 14).`);
-    }
-    return drinkNoteHtml(
-      `Richtig: ${dealer} trinkt den Abstand zum ersten Tipp (${label(s.first)}). Falsch: ${guesser} trinkt den Abstand zur echten Karte.`
-    );
+  function dealerTagHtml(s, me) {
+    const dealer = s.players[s.dealer];
+    return `<p class="fd-dealer">🃏 Dealer: <b>${me === dealer ? "Du" : escapeHtml(dealer)}</b></p>`;
   }
 
   function guessActions(s) {
@@ -112,18 +104,16 @@
 
   function dealerOnlyView(s) {
     const guesser = name(s.players[s.guesser]);
-    const dealer = name(s.players[s.dealer]);
     const second = s.stage === "guess2";
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : "erster Versuch"}`,
       title: second ? `Sag ${guesser}: <span class="fd-hint">${hintText(s)}</span>` : `${guesser}, sag deinen Tipp an!`,
       body:
-        `<p class="fd-warn">🙈 Nur ${dealer} darf aufs Handy schauen! Alle anderen weggucken.</p>` +
+        dealerTagHtml(s) +
         topCardHtml(s) +
         `<p class="bf-text fd-center">${
           second ? `Erster Tipp war ${label(s.first)}. Tipp den zweiten Tipp von ${guesser} ein.` : `Tipp ein, was ${guesser} sagt.`
-        }</p>` +
-        stakes(s),
+        }</p>`,
       actions: guessActions(s),
       actionsClass: "fd-ranks",
     };
@@ -138,12 +128,12 @@
       ? `Nicht ${cardName(s.first)}! Die Karte ist <span class="fd-hint">${hintText(s)}</span>`
       : `${guesser} rät die oberste Karte`;
     const body = isDealer
-      ? `<p class="fd-warn">🤫 Du bist Dealer. Nur du siehst die oberste Karte.</p>${topCardHtml(s)}${statusHtml(s)}`
+      ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s)}`
       : statusHtml(s) + boardHtml(s);
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
       title,
-      body: body + stakes(s),
+      body,
       actions: guessActions(s),
       actionsClass: "fd-ranks",
     };
@@ -171,7 +161,7 @@
     return {
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
       title: titles[r.kind],
-      body: `<div class="pc-row">${playingCardHtml(r.card, "pc-big pc-new")}</div><p class="bf-text fd-center">${how[r.kind]}</p>${extra}${boardHtml(s, r.card)}`,
+      body: `${dealerTagHtml(s, me)}<div class="pc-row">${playingCardHtml(r.card, "pc-big pc-new")}</div><p class="bf-text fd-center">${how[r.kind]}</p>${extra}${boardHtml(s, r.card)}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" } }],
     };
   }

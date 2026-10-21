@@ -454,26 +454,24 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
   font-weight: 900;
   font-size: 0.78rem;
   line-height: 1;
-  transform: rotate(var(--tilt));
   box-shadow: 0 -1px 2px rgb(0 0 0 / 0.15), 0 3px 6px rgb(0 0 0 / 0.45);
 }
 .fd-card span:last-child { font-size: 0.8rem; }
 .fd-card.red { color: #dc2626; }
 .fd-card.new { outline: 3px solid var(--primary); outline-offset: 1px; animation: fd-drop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
-@keyframes fd-drop { from { transform: translateY(-40px) rotate(20deg) scale(1.3); opacity: 0; } }
+@keyframes fd-drop { from { transform: translateY(-40px) scale(1.3); opacity: 0; } }
 .fd-pips { display: flex; gap: 3px; }
 .fd-pips i { width: 6px; height: 6px; border-radius: 50%; background: rgb(255 255 255 / 0.18); }
 .fd-pips i.on { background: #fde68a; }
 .fd-pile.full .fd-pips i.on { background: #fca5a5; }
 
-.fd-warn {
+.fd-dealer {
+  align-self: center;
   margin: 0;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgb(220 38 38 / 0.25);
-  border: 2px solid #dc2626;
-  text-align: center;
-  font-weight: 800;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgb(42 27 77 / 0.72);
+  border: 1px solid rgb(255 255 255 / 0.12);
   font-size: 1.05rem;
 }
 
