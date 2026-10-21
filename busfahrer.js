@@ -1,11 +1,5 @@
 // Busfahrer: Fragerunde (4 Karten pro Spieler), Pyramide, dann die Busfahrt.
 (() => {
-  const SUITS = [
-    { symbol: "♠", name: "Pik", red: false },
-    { symbol: "♥", name: "Herz", red: true },
-    { symbol: "♦", name: "Karo", red: true },
-    { symbol: "♣", name: "Kreuz", red: false },
-  ];
   const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "B", "D", "K", "A"];
   const PYRAMID_ROWS = [4, 3, 2, 1]; // unterste Reihe zuerst, Schlucke = Reihennummer
   const BUS_LENGTH = 5;
@@ -65,12 +59,6 @@
     return s.deck.pop();
   }
 
-  function cardHtml(card, size = "") {
-    if (!card) return `<div class="pc pc-back ${size}"></div>`;
-    const color = card.suit.red ? "pc-red" : "";
-    return `<div class="pc ${color} ${size}"><span>${card.rank}</span><span>${card.suit.symbol}</span></div>`;
-  }
-
   function render({ phase, title, body, actions }) {
     root.innerHTML = `
       <div class="bf">
@@ -98,7 +86,7 @@
     render({
       phase: `Fragerunde · Karte ${s.round + 1} von 4`,
       title: `${escapeHtml(player)}: ${q.text}`,
-      body: `<div class="pc-row">${hand.map((c) => cardHtml(c)).join("")}${cardHtml(null)}</div>`,
+      body: `<div class="pc-row">${hand.map((c) => playingCardHtml(c)).join("")}${playingCardHtml(null)}</div>`,
       actions: q.options.map(([value, label]) => [label, () => answer(value)]),
     });
   }
@@ -113,7 +101,7 @@
     render({
       phase: `Fragerunde · Karte ${n} von 4`,
       title: right ? `Richtig! ${escapeHtml(player)} verteilt ${sips(n)}.` : `Falsch! ${escapeHtml(player)} trinkt ${sips(n)}.`,
-      body: `<div class="pc-row">${hand.map((c, i) => cardHtml(c, i === hand.length - 1 ? "pc-new" : "")).join("")}</div>`,
+      body: `<div class="pc-row">${hand.map((c, i) => playingCardHtml(c, i === hand.length - 1 ? "pc-new" : "")).join("")}</div>`,
       actions: [["Weiter", nextTurn]],
     });
   }
@@ -142,7 +130,7 @@
     let i = 0;
     const rows = PYRAMID_ROWS.map((count) => {
       const cells = s.pyramid.slice(i, (i += count));
-      return `<div class="pc-row">${cells.map((p) => cardHtml(p.open ? p.card : null, "pc-small")).join("")}</div>`;
+      return `<div class="pc-row">${cells.map((p) => playingCardHtml(p.open ? p.card : null, "pc-small")).join("")}</div>`;
     });
     return `<div class="pyramid">${rows.reverse().join("")}</div>`;
   }
@@ -150,7 +138,7 @@
   function handsHtml(highlight = []) {
     return `<ul class="bf-hands">${ctx.players
       .map((p) => {
-        const cards = s.hands[p].map((c) => cardHtml(c, "pc-tiny")).join("");
+        const cards = s.hands[p].map((c) => playingCardHtml(c, "pc-tiny")).join("");
         const cls = highlight.includes(p) ? "hit" : "";
         return `<li class="${cls}"><span>${escapeHtml(p)}</span><div class="pc-row">${cards}</div></li>`;
       })
@@ -208,7 +196,7 @@
   }
 
   function busHtml(upTo) {
-    return `<div class="pc-row">${s.bus.map((c, i) => cardHtml(i <= upTo ? c : null, i === upTo ? "pc-new" : "")).join("")}</div>`;
+    return `<div class="pc-row">${s.bus.map((c, i) => playingCardHtml(i <= upTo ? c : null, i === upTo ? "pc-new" : "")).join("")}</div>`;
   }
 
   function showBus(title) {
@@ -235,7 +223,9 @@
         phase: "Busfahrt",
         title: `🎉 ${escapeHtml(s.driver)} ist angekommen!`,
         body: busHtml(s.pos) + `<p class="bf-text">Geschafft nach ${s.tries} ${s.tries === 1 ? "Versuch" : "Versuchen"}.</p>`,
-        actions: [["Nochmal spielen", () => start(root, ctx)], ["Zum Menü", ctx.exit, true]],
+        actions: s.busOnly
+          ? [["Weiter", ctx.exit]]
+          : [["Nochmal spielen", () => start(root, ctx)], ["Zum Menü", ctx.exit, true]],
       });
     } else {
       showBus("Richtig! Weiter: höher oder tiefer?");
@@ -249,6 +239,14 @@
     for (const p of ctx.players) s.hands[p] = [];
     askQuestion();
   }
+
+  // Nur die Busfahrt, z. B. wenn bei Triade ein Bube gezogen wird.
+  window.startBusfahrt = (rootEl, driver, onDone) => {
+    root = rootEl;
+    ctx = { exit: onDone };
+    s = { deck: newDeck(), driver, tries: 0, busOnly: true };
+    startBusRow();
+  };
 
   registerGame("busfahrer", {
     label: "Busfahrer",

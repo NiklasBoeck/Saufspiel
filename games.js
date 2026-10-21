@@ -23,3 +23,17 @@ function shuffle(arr) {
 function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
+
+// Spielkarten, gemeinsam für Busfahrer und Triade.
+const SUITS = [
+  { symbol: "♠", name: "Pik", red: false },
+  { symbol: "♥", name: "Herz", red: true },
+  { symbol: "♦", name: "Karo", red: true },
+  { symbol: "♣", name: "Kreuz", red: false },
+];
+
+function playingCardHtml(card, size = "") {
+  if (!card) return `<div class="pc pc-back ${size}"></div>`;
+  const color = card.suit.red ? "pc-red" : "";
+  return `<div class="pc ${color} ${size}"><span>${card.rank}</span><span>${card.suit.symbol}</span></div>`;
+}

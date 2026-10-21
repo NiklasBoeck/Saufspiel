@@ -19,6 +19,7 @@ python3 -m http.server 8000
 - `games.js`: Spiele-Register (`registerGame`) und gemeinsame Helfer wie `shuffle`
 - `cards.js`: die einfachen Kartenspiele (Ich hab noch nie, Pflicht, Neue Regel). `{p}` und `{p2}` werden durch zufällige Spieler ersetzt.
 - `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt
+- `triade.js`: Triade, reihum Karten ziehen (7 bis Ass), der Bube startet die Busfahrt aus `busfahrer.js`
 - `app.js`: Menü, Spielerverwaltung und Ablauf. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
