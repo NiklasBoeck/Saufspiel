@@ -38,4 +38,6 @@ Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, t
 
 Jeder spielt am eigenen Handy. Ein Handy erstellt den Raum und ist damit Host: Es hält den Spielstand und verteilt ihn über einen kostenlosen, öffentlichen MQTT-Broker (HiveMQ, falls nicht erreichbar EMQX) an die anderen. Dafür braucht es kein Konto und keinen eigenen Server. Die Nachrichten sind nicht verschlüsselt, jeder mit dem Raumcode könnte mitlesen, für ein Partyspiel reicht das.
 
+Das Spielfeld wird in 3D gezeichnet (Canvas, ohne Bibliothek): Jeder schaut von hinter der eigenen Linie auf die Flasche. Jeder Wurf hat zufälligen Wind und etwas Streuung.
+
 Lokal testen geht mit einem eigenen Broker über `flunky.html?broker=ws://localhost:8888`.
