@@ -1,5 +1,7 @@
 // F*ck den Dealer: Die App ist der Stapel. Wer rät, tippt auf den Wert der obersten Karte (2 bis Ass),
 // beim ersten Fehlversuch sagt die App „höher“ oder „niedriger“. Der Dealer wechselt nach 3 Fehlschlägen in Folge.
+// Ein Handy: Beim Raten hält der Dealer das Handy und tippt die angesagten Tipps ein, danach sehen alle den Tisch.
+// Jeder sein Handy: Der Dealer sieht immer die oberste Karte, alle anderen den Tisch.
 (() => {
   const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "B", "D", "K", "A"];
   const NAMES = { 11: "Bube", 12: "Dame", 13: "König", 14: "Ass" };
@@ -28,16 +30,25 @@
 
   // --- Anzeige ---
 
-  // Die gespielten Karten liegen sortiert in der Mitte, gleiche Werte übereinander.
+  // Die gespielten Karten liegen sortiert auf dem Tisch, gleiche Werte leicht versetzt übereinander.
+  function tableCardHtml(c, j, fresh) {
+    const suit = SUITS.findIndex((x) => x.name === c.suit.name);
+    const tilt = ((c.value * 7 + suit * 13) % 9) - 4;
+    const isNew = fresh && c.rank === fresh.rank && c.suit.name === fresh.suit.name;
+    return `<div class="fd-card ${c.suit.red ? "red" : ""} ${isNew ? "new" : ""}" style="--j:${j};--tilt:${tilt}deg"><span>${c.rank}</span><span>${c.suit.symbol}</span></div>`;
+  }
+
   function boardHtml(s, fresh) {
-    const piles = RANKS.map((rank, i) => {
-      const cards = s.played.filter((c) => c.value === i + 2);
-      const stack = cards
-        .map((c, j) => `<div class="fd-slot" style="--j:${j}">${playingCardHtml(c, `pc-tiny ${fresh && c.rank === fresh.rank && c.suit.name === fresh.suit.name ? "pc-new" : ""}`)}</div>`)
-        .join("");
-      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"><div class="fd-stack">${stack}</div><span>${rank}<small>${cards.length}/4</small></span></div>`;
-    });
-    return `<div class="fd-board">${piles.join("")}</div>`;
+    const pile = (v) => {
+      const cards = s.played.filter((c) => c.value === v);
+      const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
+      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}">
+        <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}</div>
+        <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
+      </div>`;
+    };
+    const row = (from, to) => `<div class="fd-row">${Array.from({ length: to - from + 1 }, (_, i) => pile(from + i)).join("")}</div>`;
+    return `<div class="fd-table">${row(2, 8)}${row(9, 14)}</div>`;
   }
 
   function statusHtml(s) {
@@ -49,9 +60,8 @@
     </div>`;
   }
 
-  function peekHtml(s, me) {
-    if (!me || me !== s.players[s.dealer] || !s.deck.length) return "";
-    return `<div class="fd-peek">${playingCardHtml(s.deck[s.deck.length - 1], "pc-small")}<p>🤫 Nur du als Dealer siehst die oberste Karte.</p></div>`;
+  function topCardHtml(s) {
+    return `<div class="pc-row">${playingCardHtml(s.deck[s.deck.length - 1], "pc-big")}</div>`;
   }
 
   function rankActions(s, guesser, allowed, sub) {
@@ -68,42 +78,73 @@
     });
   }
 
-  function guess1View(s, me) {
+  function stakes(s) {
+    const guesser = name(s.players[s.guesser]);
+    const dealer = name(s.players[s.dealer]);
+    if (s.stage === "guess1") {
+      return drinkNoteHtml(`Sofort richtig: ${dealer} trinkt so viele Schlucke wie die Karte wert ist (Bube 11, Dame 12, König 13, Ass 14).`);
+    }
+    return drinkNoteHtml(
+      `Richtig: ${dealer} trinkt den Abstand zum ersten Tipp (${label(s.first)}). Falsch: ${guesser} trinkt den Abstand zur echten Karte.`
+    );
+  }
+
+  function guessActions(s) {
+    const guesser = s.players[s.guesser];
+    if (s.stage === "guess1") return rankActions(s, guesser, () => true, (v) => `🍺${v}`);
+    const higher = s.hint === "hoeher";
+    return rankActions(s, guesser, (v) => (higher ? v > s.first : v < s.first), (v) => `🍺${Math.abs(v - s.first)}`);
+  }
+
+  const hintText = (s) => (s.hint === "hoeher" ? "höher ⬆" : "niedriger ⬇");
+
+  // Ein Handy: Erst sehen alle den Tisch, dann bekommt nur der Dealer das Handy.
+  function tableView(s) {
     const guesser = s.players[s.guesser];
     const dealer = s.players[s.dealer];
     return {
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
-      title: `${name(guesser)} rät die oberste Karte`,
+      title: `${name(guesser)} ist dran mit Raten`,
+      body: statusHtml(s) + boardHtml(s) + `<p class="bf-text fd-center">Schaut euch an, was schon weg ist. Dann bekommt ${name(dealer)} das Handy.</p>`,
+      actions: [{ label: `📱 Handy an ${dealer} geben`, act: { type: "peek" } }],
+    };
+  }
+
+  function dealerOnlyView(s) {
+    const guesser = name(s.players[s.guesser]);
+    const dealer = name(s.players[s.dealer]);
+    const second = s.stage === "guess2";
+    return {
+      phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : "erster Versuch"}`,
+      title: second ? `Sag ${guesser}: <span class="fd-hint">${hintText(s)}</span>` : `${guesser}, sag deinen Tipp an!`,
       body:
-        statusHtml(s) +
-        peekHtml(s, me) +
-        boardHtml(s) +
-        drinkNoteHtml(`Sofort richtig: ${name(dealer)} trinkt so viele Schlucke wie die Karte wert ist (Bube 11, Dame 12, König 13, Ass 14).`),
-      actions: rankActions(s, guesser, () => true, (v) => `🍺${v}`),
+        `<p class="fd-warn">🙈 Nur ${dealer} darf aufs Handy schauen! Alle anderen weggucken.</p>` +
+        topCardHtml(s) +
+        `<p class="bf-text fd-center">${
+          second ? `Erster Tipp war ${label(s.first)}. Tipp den zweiten Tipp von ${guesser} ein.` : `Tipp ein, was ${guesser} sagt.`
+        }</p>` +
+        stakes(s),
+      actions: guessActions(s),
       actionsClass: "fd-ranks",
     };
   }
 
-  function guess2View(s, me) {
-    const guesser = s.players[s.guesser];
-    const dealer = s.players[s.dealer];
-    const higher = s.hint === "hoeher";
+  // Jeder sein Handy: Der Dealer sieht die oberste Karte, alle anderen den Tisch.
+  function guessView(s, me) {
+    const guesser = name(s.players[s.guesser]);
+    const second = s.stage === "guess2";
+    const isDealer = me === s.players[s.dealer];
+    const title = second
+      ? `Nicht ${cardName(s.first)}! Die Karte ist <span class="fd-hint">${hintText(s)}</span>`
+      : `${guesser} rät die oberste Karte`;
+    const body = isDealer
+      ? `<p class="fd-warn">🤫 Du bist Dealer. Nur du siehst die oberste Karte.</p>${topCardHtml(s)}${statusHtml(s)}`
+      : statusHtml(s) + boardHtml(s);
     return {
-      phase: `F*ck den Dealer · zweiter Versuch`,
-      title: `Nicht ${cardName(s.first)}! Die Karte ist <span class="fd-hint">${higher ? "höher ⬆" : "niedriger ⬇"}</span>`,
-      body:
-        statusHtml(s) +
-        peekHtml(s, me) +
-        boardHtml(s) +
-        drinkNoteHtml(
-          `Richtig: ${name(dealer)} trinkt den Abstand zu deinem ersten Tipp (${label(s.first)}). Falsch: ${name(guesser)} trinkt den Abstand zur echten Karte.`
-        ),
-      actions: rankActions(
-        s,
-        guesser,
-        (v) => (higher ? v > s.first : v < s.first),
-        (v) => `🍺${Math.abs(v - s.first)}`
-      ),
+      phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
+      title,
+      body: body + stakes(s),
+      actions: guessActions(s),
       actionsClass: "fd-ranks",
     };
   }
@@ -206,20 +247,24 @@
 
     view(s, me) {
       switch (s.stage) {
-        case "guess1": return guess1View(s, me);
-        case "guess2": return guess2View(s, me);
+        case "guess1":
+        case "guess2":
+          if (me) return guessView(s, me);
+          return s.peek ? dealerOnlyView(s) : tableView(s);
         case "result": return resultView(s, me);
         default: return endView(s);
       }
     },
 
     act(s, a) {
-      if ((s.stage === "guess1" || s.stage === "guess2") && a.type === "guess") guess(s, a.value);
+      if (s.stage === "guess1" && a.type === "peek") s.peek = true;
+      else if ((s.stage === "guess1" || s.stage === "guess2") && a.type === "guess") guess(s, a.value);
       else if (s.stage === "result" && a.type === "next") {
         if (!s.deck.length) s.stage = "end";
         else {
           s.guesser = nextGuesser(s, s.guesser);
           s.stage = "guess1";
+          s.peek = false;
         }
       }
     },
