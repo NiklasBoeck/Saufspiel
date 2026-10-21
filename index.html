@@ -10,10 +10,21 @@
 </head>
 <body>
   <main id="app">
-    <!-- Startbildschirm: Spieler eintragen -->
-    <section id="screen-setup" class="screen active">
+    <!-- Menü: Spiel auswählen -->
+    <section id="screen-menu" class="screen active">
       <h1>🍻 Saufspiel</h1>
-      <p class="hint">Trag alle Mitspieler ein und leg los.</p>
+      <h2 class="section-title">Spiele</h2>
+      <div id="game-list" class="game-list"></div>
+      <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>
+    </section>
+
+    <!-- Spieler eintragen -->
+    <section id="screen-players" class="screen">
+      <header class="game-bar">
+        <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
+        <span id="players-title"></span>
+      </header>
+      <p class="hint">Wer spielt mit?</p>
 
       <form id="player-form" autocomplete="off">
         <input id="player-input" type="text" maxlength="20" placeholder="Name" aria-label="Spielername">
@@ -21,18 +32,13 @@
       </form>
       <ul id="player-list"></ul>
 
-      <fieldset id="category-select">
-        <legend>Kategorien</legend>
-      </fieldset>
-
-      <button id="start-btn" class="btn" disabled>Spiel starten</button>
-      <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>
+      <button id="start-btn" class="btn" disabled>Los geht’s</button>
     </section>
 
     <!-- Spielbildschirm: Karten -->
     <section id="screen-game" class="screen">
       <header class="game-bar">
-        <button id="back-btn" class="btn ghost small" aria-label="Zurück">←</button>
+        <button class="btn ghost small back-btn" aria-label="Zurück">←</button>
         <span id="round-label"></span>
       </header>
 

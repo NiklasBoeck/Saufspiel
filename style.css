@@ -52,16 +52,26 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
 }
 .remove { background: none; border: none; color: var(--muted); font-size: 0.9rem; cursor: pointer; }
 
-#category-select {
+.section-title { color: var(--muted); font-size: 1rem; font-weight: 600; margin: 8px 0 0; }
+
+.game-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.game-tile {
+  --accent: var(--primary);
+  min-height: 110px;
+  padding: 16px;
   border: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  border-radius: var(--radius);
+  border-top: 6px solid var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: left;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
 }
-#category-select legend { color: var(--muted); margin-bottom: 8px; }
-#category-select label { background: var(--surface); padding: 12px; border-radius: 12px; }
+.game-tile:active { transform: scale(0.97); }
 
 .btn {
   padding: 16px;

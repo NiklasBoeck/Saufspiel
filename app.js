@@ -1,9 +1,7 @@
 const STORAGE_KEY = "saufspiel-state";
 
-const state = load() ?? {
-  players: [],
-  categories: Object.keys(CATEGORIES),
-};
+const state = load() ?? { players: [] };
+let currentGame = null;
 let deck = [];
 let round = 0;
 
@@ -30,7 +28,28 @@ function showScreen(name) {
   $(`screen-${name}`).classList.add("active");
 }
 
-// --- Setup ---
+// --- Menü ---
+
+function renderGames() {
+  const list = $("game-list");
+  for (const [key, game] of Object.entries(GAMES)) {
+    const tile = document.createElement("button");
+    tile.className = "game-tile";
+    tile.style.setProperty("--accent", game.color);
+    tile.textContent = game.label;
+    tile.onclick = () => openGame(key);
+    list.appendChild(tile);
+  }
+}
+
+function openGame(key) {
+  currentGame = key;
+  $("players-title").textContent = GAMES[key].label;
+  renderPlayers();
+  showScreen("players");
+}
+
+// --- Spieler ---
 
 function renderPlayers() {
   const list = $("player-list");
@@ -50,30 +69,7 @@ function renderPlayers() {
     li.appendChild(remove);
     list.appendChild(li);
   });
-  updateStartButton();
-}
-
-function renderCategories() {
-  const box = $("category-select");
-  for (const [key, cat] of Object.entries(CATEGORIES)) {
-    const label = document.createElement("label");
-    const box_ = document.createElement("input");
-    box_.type = "checkbox";
-    box_.checked = state.categories.includes(key);
-    box_.onchange = () => {
-      state.categories = box_.checked
-        ? [...state.categories, key]
-        : state.categories.filter((c) => c !== key);
-      save();
-      updateStartButton();
-    };
-    label.append(box_, ` ${cat.label}`);
-    box.appendChild(label);
-  }
-}
-
-function updateStartButton() {
-  $("start-btn").disabled = state.players.length < 2 || state.categories.length === 0;
+  $("start-btn").disabled = state.players.length < 2;
 }
 
 $("player-form").onsubmit = (e) => {
@@ -99,38 +95,31 @@ function shuffle(arr) {
   return arr;
 }
 
-function buildDeck() {
-  const cards = state.categories.flatMap((key) =>
-    CATEGORIES[key].cards.map((text) => ({ key, text }))
-  );
-  return shuffle(cards);
-}
-
 function fillPlayers(text) {
   const [p, p2] = shuffle([...state.players]);
   return text.replaceAll("{p}", p).replaceAll("{p2}", p2);
 }
 
 function nextCard() {
-  if (deck.length === 0) deck = buildDeck();
-  const { key, text } = deck.pop();
-  const cat = CATEGORIES[key];
+  const game = GAMES[currentGame];
+  if (deck.length === 0) deck = shuffle([...game.cards]);
   round++;
   $("round-label").textContent = `Karte ${round}`;
-  $("card-category").textContent = cat.label;
-  $("card").style.setProperty("--accent", cat.color);
-  $("card-text").textContent = fillPlayers(text);
+  $("card-category").textContent = game.label;
+  $("card").style.setProperty("--accent", game.color);
+  $("card-text").textContent = fillPlayers(deck.pop());
 }
 
 $("start-btn").onclick = () => {
-  deck = buildDeck();
+  deck = [];
   round = 0;
   nextCard();
   showScreen("game");
 };
 $("next-btn").onclick = nextCard;
 $("card").onclick = nextCard;
-$("back-btn").onclick = () => showScreen("setup");
+document.querySelectorAll(".back-btn").forEach((btn) => {
+  btn.onclick = () => showScreen(btn.closest("#screen-game") ? "players" : "menu");
+});
 
-renderPlayers();
-renderCategories();
+renderGames();

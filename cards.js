@@ -1,6 +1,6 @@
-// Kartendeck. {p} = zufälliger Spieler, {p2} = ein anderer zufälliger Spieler.
-// Neue Karten einfach in die passende Kategorie eintragen.
-const CATEGORIES = {
+// Spiele mit ihren Karten. {p} = zufälliger Spieler, {p2} = ein anderer zufälliger Spieler.
+// Neue Karten einfach ins passende Spiel eintragen, oder ein neues Spiel anlegen.
+const GAMES = {
   niewieder: {
     label: "Ich hab noch nie",
     color: "#7c3aed",
