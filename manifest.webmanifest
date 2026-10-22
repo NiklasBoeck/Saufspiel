@@ -3,6 +3,7 @@
   "short_name": "Saufomat",
   "start_url": ".",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#1b1033",
   "theme_color": "#1b1033",
   "lang": "de",

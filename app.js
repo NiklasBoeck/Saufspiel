@@ -28,7 +28,8 @@ function save() {
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $(`screen-${name}`).classList.add("active");
-  if (name !== "game") document.documentElement.classList.remove("fit");
+  // Menü und Spiele passen genau auf den Bildschirm, nichts scrollt.
+  if (name !== "game") document.documentElement.classList.toggle("fit", name === "menu");
   window.scrollTo(0, 0);
 }
 
@@ -174,7 +175,7 @@ function playGame(r) {
   run = r;
   setGame(r.key);
   // fit: Spiel passt immer genau auf den Bildschirm, nichts scrollt.
-  document.documentElement.classList.toggle("fit", !!GAMES[r.key].fit);
+  document.documentElement.classList.toggle("fit", GAMES[r.key].fit !== false);
   const v = GAMES[r.key].view(r.s, r.me);
   const actions = v.actions.filter(canPress);
   // v.turn: wer dran ist, wenn das Spiel ohne Knöpfe gesteuert wird (Tippen im Spielfeld)
@@ -341,6 +342,35 @@ function hideDrinkAlert() {
 }
 $("da-ok").onclick = hideDrinkAlert;
 $("drink-alert").onclick = (e) => e.target === $("drink-alert") && hideDrinkAlert();
+
+// --- Bildschirmgröße ---
+// Beim Drehen oder Auf-/Zuklappen (Klapphandy) passt sich alles per CSS an. Ändert sich das Format
+// deutlich (hoch ↔ quer, klein ↔ groß), blendet der Bildschirm kurz sanft über, statt zu springen.
+let screenShape = null;
+let reflowTimer = null;
+
+function shapeOf() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  return `${w > h * 1.2 ? "quer" : "hoch"}-${Math.min(w, h) >= 600 ? "gross" : "klein"}`;
+}
+
+function onScreenSize() {
+  const shape = shapeOf();
+  if (screenShape && shape !== screenShape) {
+    const html = document.documentElement;
+    html.classList.remove("reflow");
+    void html.offsetWidth; // Animation neu starten
+    html.classList.add("reflow");
+    clearTimeout(reflowTimer);
+    reflowTimer = setTimeout(() => html.classList.remove("reflow"), 450);
+  }
+  screenShape = shape;
+}
+
+screenShape = shapeOf();
+window.addEventListener("resize", onScreenSize);
+screen.orientation?.addEventListener?.("change", onScreenSize);
 
 renderGames();
 Room.boot();

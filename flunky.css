@@ -222,3 +222,32 @@ h2 { margin: 0; font-size: 1.1rem; }
   animation: fb-bot-pop 0.35s ease-out;
 }
 @keyframes fb-bot-pop { from { transform: scale(0.7); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* --- Ganzer Bildschirm: jedes Handy, hoch und quer, auch Klapphandys --- */
+html { background: var(--bg); font-size: clamp(16px, calc(9px + 1.05vmin), 21px); }
+.fb-screen {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+.fb-screen.game { padding: 0; }
+.fb-hud { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.fb-foot-bar { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.fb-overlay { overflow: hidden; }
+#fb-balance { height: min(280px, 34dvh); }
+
+/* Querformat */
+@media (min-aspect-ratio: 6 / 5) {
+  .fb-screen:not(.game) { max-width: 760px; }
+  #fb-start { display: grid; grid-template-columns: 1fr 1fr; align-content: start; column-gap: 16px; }
+  #fb-start > .fb-bar, #fb-start > h1, #fb-start > .fb-hint, #fb-start > .fb-label, #fb-start > .fb-input,
+  #fb-start > #fb-resume, #fb-start > .fb-rules, #fb-start > .fb-error { grid-column: 1 / -1; }
+  .fb-overlay { padding: calc(56px + env(safe-area-inset-top)) 24px calc(70px + env(safe-area-inset-bottom)); gap: clamp(6px, 2dvh, 14px); }
+  .fb-big { font-size: clamp(1.8rem, 9dvh, 3rem); }
+  .fb-big.small { font-size: clamp(1.3rem, 6dvh, 1.9rem); }
+  .fb-task { font-size: clamp(1.05rem, 4.5dvh, 1.5rem); }
+  .fb-sub { font-size: clamp(0.8rem, 3.6dvh, 1rem); max-width: 560px; }
+  #fb-run-balance, #fb-run-back { gap: clamp(6px, 2dvh, 14px); }
+  #fb-balance { height: clamp(90px, 38dvh, 280px); }
+  .fb-foot { height: clamp(70px, 26dvh, 150px); width: clamp(100px, 18vw, 150px); }
+  .fb-qr img, .fb-qr svg { width: clamp(110px, 30dvh, 160px); height: clamp(110px, 30dvh, 160px); }
+}

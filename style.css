@@ -723,3 +723,101 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 .fd-card.back.flip-in { animation: flip-in 0.3s var(--fd) ease-out both; }
 @keyframes flip-out { to { transform: rotateY(90deg); } }
 @keyframes flip-in { from { transform: rotateY(90deg); opacity: 1; } 60% { opacity: 1; } to { opacity: 0.5; } }
+
+/* --- Ganzer Bildschirm: jedes Handy, hoch und quer, auch Klapphandys --- */
+/* Schrift wächst mit dem Bildschirm mit (aufgeklapptes Klapphandy, Tablet). */
+html { font-size: clamp(16px, calc(9px + 1.05vmin), 21px); background: var(--bg); }
+#app {
+  max-width: none;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+/* Formulare bleiben eine gut lesbare Spalte in der Mitte, Spiele nutzen die ganze Breite. */
+.screen { width: 100%; max-width: 560px; margin: 0 auto; min-height: calc(100dvh - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+#screen-menu { max-width: 1100px; }
+#screen-game { max-width: 1200px; }
+.game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+
+html.fit #app {
+  padding: calc(8px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+html.fit .bf-body { overflow-y: auto; scrollbar-width: none; }
+html.fit .bf-body::-webkit-scrollbar { display: none; }
+html.fit .bf-phase { font-size: clamp(0.7rem, 1.8dvh, 0.85rem); }
+html.fit .card { padding: clamp(14px, 3.5dvh, 28px); }
+html.fit .card-text { font-size: clamp(1.15rem, 3.6dvh, 2rem); }
+html.fit .tr-text { font-size: clamp(1rem, 2.8dvh, 1.35rem); }
+html.fit .tr-legend { font-size: clamp(0.75rem, 1.9dvh, 0.95rem); padding: clamp(6px, 1.4dvh, 12px) 14px; gap: 2px; }
+html.fit .pc { width: clamp(40px, min(12dvh, 20vw), 110px); height: auto; aspect-ratio: 58 / 84; font-size: clamp(0.9rem, min(3.4dvh, 5.6vw), 2rem); }
+html.fit .pc-small { width: clamp(30px, min(6dvh, 12vw), 64px); font-size: clamp(0.75rem, 1.6dvh, 1.15rem); }
+html.fit .pc-tiny { width: clamp(20px, 3dvh, 32px); font-size: clamp(0.55rem, 1dvh, 0.75rem); }
+html.fit .pc-big { width: auto; height: clamp(84px, 22dvh, 260px); font-size: clamp(1.6rem, 5.5dvh, 3.6rem); }
+html.fit .bf-hands li { padding: clamp(3px, 0.6dvh, 6px) 10px; }
+/* Dealer-Tisch darf auf großen Bildschirmen größer werden */
+.fd-table { --h: min((100cqh - 32px) / 3.38, (100cqw - 30px) * 0.2, 170px); }
+
+/* Querformat: Spielfeld links, Text und Knöpfe rechts */
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit #screen-game { gap: clamp(2px, 1dvh, 10px); }
+  html.fit .game-bar { min-height: 0; }
+  html.fit .game-bar .btn.small { padding: 4px 14px; }
+  html.fit .bf {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(220px, 1fr);
+    grid-template-rows: auto auto auto 1fr auto;
+    column-gap: clamp(14px, 3vw, 32px);
+    row-gap: 0;
+  }
+  html.fit .bf > * { grid-column: 2; margin-bottom: clamp(4px, 1.2dvh, 12px); }
+  html.fit .bf > .bf-body { grid-column: 1; grid-row: 1 / -1; margin: 0; height: 100%; }
+  html.fit .bf > .bf-actions { grid-row: 5; margin: 0; align-self: end; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  html.fit .bf-title { font-size: clamp(1.05rem, 4.2dvh, 1.6rem); }
+  html.fit .bf-actions .btn { padding: clamp(8px, 2.6dvh, 16px); }
+  html.fit .card-text { font-size: clamp(1.1rem, 5dvh, 2rem); }
+  html.fit .pc { width: clamp(36px, min(17dvh, 9vw), 110px); font-size: clamp(0.9rem, min(5dvh, 2.6vw), 2rem); }
+  html.fit .pc-small { width: clamp(28px, 8.5dvh, 54px); }
+  html.fit .pc-tiny { width: clamp(18px, 5.5dvh, 32px); font-size: clamp(0.55rem, 1.8dvh, 0.75rem); }
+  html.fit .pc-big { width: auto; height: clamp(84px, 40dvh, 300px); font-size: clamp(1.6rem, 9dvh, 4rem); }
+  html.fit .bf-actions.fd-ranks { grid-template-columns: repeat(5, 1fr); }
+  html.fit .fd-ranks .btn { padding: clamp(2px, 1.2dvh, 10px) 2px; font-size: clamp(0.95rem, 4.4dvh, 1.45rem); }
+  html.fit .fd-ranks .btn small { font-size: clamp(0.6rem, 2.4dvh, 0.8rem); }
+  html.fit .bf-actions.cat-pick { grid-template-columns: 1fr 1fr; }
+  html.fit .fd-tally li { padding: 6px 12px; }
+  /* Niedriges Querformat: Menü und Formulare kompakter */
+  .menu-head { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0; }
+  .menu-head h1 { margin: 0; }
+  .menu-head .hint { display: none; }
+}
+@media (min-aspect-ratio: 6 / 5) and (max-height: 520px) {
+  .menu-logo { font-size: 2.4rem; }
+  .menu-head h1 { font-size: 2rem; }
+  .game-tile { padding: 10px 12px; }
+  .game-emoji { width: 46px; height: 46px; font-size: 1.5rem; border-radius: 14px; }
+  .game-desc { font-size: 0.8rem; }
+  .screen { gap: 10px; }
+  .qr svg { width: 120px; height: 120px; }
+}
+
+/* Beim Auf- und Zuklappen oder Drehen: kurz sanft einblenden statt springen */
+html.reflow .screen.active { animation: reflow-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes reflow-in { from { opacity: 0.2; transform: scale(0.97); } }
+
+/* Menü passt genau auf eine Seite: Kacheln teilen sich die Höhe */
+html.fit #screen-menu { height: 100%; min-height: 0; gap: clamp(6px, 1.6dvh, 16px); }
+html.fit .menu-head { padding: clamp(0px, 1.5dvh, 20px) 0 0; }
+html.fit .menu-logo { font-size: clamp(1.8rem, 6.5dvh, 3.2rem); }
+html.fit .menu-head h1 { font-size: clamp(1.7rem, 5.5dvh, 2.6rem); margin: 0; }
+html.fit .menu-head .hint { font-size: clamp(0.8rem, 2dvh, 0.95rem); }
+html.fit .game-list { flex: 1; min-height: 0; grid-auto-rows: minmax(0, 1fr); gap: clamp(6px, 1.4dvh, 12px); }
+html.fit .game-tile { min-height: 0; overflow: hidden; padding: clamp(4px, 1.2dvh, 14px) 14px; gap: clamp(10px, 2vw, 16px); }
+html.fit .game-emoji { width: clamp(36px, 7dvh, 56px); height: clamp(36px, 7dvh, 56px); font-size: clamp(1.2rem, 3.6dvh, 1.8rem); border-radius: clamp(10px, 2.2dvh, 18px); }
+html.fit .game-name { font-size: clamp(0.95rem, 2.6dvh, 1.15rem); }
+html.fit .game-desc { font-size: clamp(0.72rem, 1.9dvh, 0.88rem); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+html.fit .disclaimer { font-size: clamp(0.65rem, 1.6dvh, 0.8rem); }
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit .menu-head { padding: 0; }
+  html.fit .game-emoji { width: clamp(32px, 10dvh, 56px); height: clamp(32px, 10dvh, 56px); font-size: clamp(1.1rem, 5dvh, 1.8rem); }
+  html.fit .game-name { font-size: clamp(0.9rem, 4dvh, 1.15rem); }
+  html.fit .game-desc { font-size: clamp(0.7rem, 3dvh, 0.88rem); }
+}
