@@ -40,8 +40,31 @@
   // marks: { wert: "x" } zeigt rote Kreuze für die falschen Tipps dieser Runde.
   // banner: „Höher ⬆“ / „Niedriger ⬇“ oben im grünen Tisch, sobald der Dealer es gesagt hat.
   // gold: Der Dealer sieht die oberste Karte golden an ihrem Platz auf dem Tisch liegen.
+  // Ein Zeichen poppt nur beim ersten Erscheinen auf und liegt danach still, auch wenn neu gezeichnet wird.
+  const markSeen = new Map();
+  function since(key) {
+    if (!markSeen.has(key)) markSeen.set(key, Date.now());
+    return (Date.now() - markSeen.get(key)) / 1000;
+  }
+
+  function bangHtml(round, v, picked) {
+    if (picked !== v) return "";
+    const t = since(`${round}-${v}-!`);
+    if (t > 2) return "";
+    return `<span class="fd-mark bang" style="animation-delay: ${-t}s, ${1.7 - t}s">!</span>`;
+  }
+
+  // Das Kreuz auf der gerade getippten Zahl (late) kommt erst nach dem „!“.
+  function markHtml(round, v, mark, late) {
+    if (!mark) return "";
+    const d = (late ? 2 : 0) - since(`${round}-${v}-x`);
+    const anim = d < -0.5 ? "still" : "";
+    return `<span class="fd-mark ${mark} ${anim}" style="animation-delay: ${d}s">✗</span>`;
+  }
+
   // picked: gerade getippter Wert, 2 Sekunden lang mit „!“ markiert, erst danach kommt dort das Kreuz.
-  function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "", gold = null, picked = null) {
+  function boardHtml(s, fresh, tap, marks = {}, banner = "", gold = null, picked = null) {
+    const round = s.stage === "result" || s.stage === "end" ? s.played.length - 1 : s.played.length;
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
       const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
@@ -59,8 +82,7 @@
             : ""
         }</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
-        ${picked === v ? `<span class="fd-mark bang">!</span>` : ""}
-        ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""} ${picked === v ? "late" : ""}">✗</span>` : ""}
+        ${bangHtml(round, v, picked)}${markHtml(round, v, marks[v], picked === v)}
       </div>`;
     };
     const row = (from, to) => `<div class="fd-row">${Array.from({ length: to - from + 1 }, (_, i) => pile(from + i)).join("")}</div>`;
@@ -179,8 +201,8 @@
       phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
       title: `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), false, two ? bannerText(s) : "", topCard(s), tip)}`
-        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), false, two ? bannerText(s) : "", null, tip),
+        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), two ? bannerText(s) : "", topCard(s), tip)}`
+        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), two ? bannerText(s) : "", null, tip),
       actions: [confirmAction(s)],
     };
   }
@@ -198,9 +220,9 @@
     const body = isDealer
       ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
           hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }${boardHtml(s, null, null, marksFor(s, hint || second), false, banner, topCard(s), hint ? s.first : null)}`
+        }${boardHtml(s, null, null, marksFor(s, hint || second), banner, topCard(s), hint ? s.first : null)}`
       : statusHtml(s) +
-        boardHtml(s, null, tap, marksFor(s, second), false, banner, null, hint ? s.first : null) +
+        boardHtml(s, null, tap, marksFor(s, second), banner, null, hint ? s.first : null) +
         (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
@@ -240,7 +262,7 @@
     return {
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
       title: titles[r.kind],
-      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r), true)}`,
+      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r))}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
