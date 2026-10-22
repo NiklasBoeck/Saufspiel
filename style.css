@@ -688,15 +688,17 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 }
 @keyframes banner-in { from { opacity: 0; transform: translateX(-50%) scale(0.5); } }
 
-/* Oberste Karte, golden auf dem Tisch des Dealers */
+/* Oberste Karte beim Dealer: blass, noch nicht offiziell gelegt, mit goldenem Umriss */
 .fd-card.gold {
-  background: linear-gradient(145deg, #fef3c7, #fbbf24 45%, #d97706);
-  color: #1b1033;
-  box-shadow: 0 0 12px rgb(251 191 36 / 0.8), 0 3px 6px rgb(0 0 0 / 0.45);
+  background: rgb(255 255 255 / 0.28);
+  color: rgb(27 16 51 / 0.55);
+  outline: 3px solid #fbbf24;
+  outline-offset: 0;
+  box-shadow: 0 0 10px rgb(251 191 36 / 0.7);
   animation: gold-glow 1.6s ease-in-out infinite alternate;
 }
-.fd-card.gold.red { color: #b91c1c; }
-@keyframes gold-glow { to { box-shadow: 0 0 22px rgb(251 191 36 / 1), 0 3px 6px rgb(0 0 0 / 0.45); } }
+.fd-card.gold.red { color: rgb(185 28 28 / 0.6); }
+@keyframes gold-glow { to { box-shadow: 0 0 20px rgb(251 191 36 / 1); } }
 
 /* Gerade getippte Zahl: 2 Sekunden dick schwarz gestrichelt, danach kommt das Kreuz */
 .fd-pile.picked .fd-stack::after {
