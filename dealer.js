@@ -38,7 +38,8 @@
 
   // tap: { by, allowed(v) } macht die Stapel antippbar, damit die ratende Person direkt auf dem Tisch wählt.
   // marks: { wert: "x" } zeigt rote Kreuze für die falschen Tipps dieser Runde.
-  function boardHtml(s, fresh, tap, marks = {}, fade = false) {
+  // banner: „Höher ⬆“ / „Niedriger ⬇“ oben im grünen Tisch, sobald der Dealer es gesagt hat.
+  function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "") {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
       const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
@@ -56,7 +57,9 @@
       </div>`;
     };
     const row = (from, to) => `<div class="fd-row">${Array.from({ length: to - from + 1 }, (_, i) => pile(from + i)).join("")}</div>`;
-    return `<div class="fd-table">${row(2, 8)}${row(9, 14)}</div>`;
+    return `<div class="fd-table ${banner ? "has-banner" : ""}">${
+      banner ? `<div class="fd-banner">${banner}</div>` : ""
+    }${row(2, 8)}${row(9, 14)}</div>`;
   }
 
   // Kreuze je nach dem, was die Person schon wissen darf: firstKnown = erster Fehlversuch ist bekannt,
@@ -107,6 +110,7 @@
     return rankActions(s, guesser, (v) => (higher ? v > s.first : v < s.first), (v) => `🍺${Math.abs(v - s.first)}`);
   }
 
+  const bannerText = (s) => (s.hint === "hoeher" ? "Höher ⬆" : "Niedriger ⬇");
   const hintText = (s) => (s.hint === "hoeher" ? "höher ⬆" : "niedriger ⬇");
 
   // Ein Handy: Erst sehen alle den Tisch, dann bekommt nur der Dealer das Handy.
@@ -127,7 +131,7 @@
     if (s.stage === "hint") {
       return {
         phase: "F*ck den Dealer · erster Versuch",
-        title: `${guesser} tippt ${cardName(s.first)}. Falsch!`,
+        title: `${guesser} tippt ${cardName(s.first)}`,
         body: dealerTagHtml(s) + topCardHtml(s) + `<p class="bf-text fd-center">Drück den Knopf und sag ${guesser}, ob die Karte höher oder niedriger ist.</p>`,
         actions: [sayAction(s)],
       };
@@ -175,8 +179,8 @@
       phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
       title: `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${compareHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip))}`
-        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two)),
+        ? `${dealerTagHtml(s, me)}${compareHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), false, two ? bannerText(s) : "")}`
+        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), false, two ? bannerText(s) : ""),
       actions: [confirmAction(s)],
     };
   }
@@ -186,20 +190,17 @@
     const second = s.stage === "guess2";
     const hint = s.stage === "hint";
     const isDealer = me === s.players[s.dealer];
-    const title = second
-      ? `Nicht ${cardName(s.first)}! Die Karte ist <span class="fd-hint">${hintText(s)}</span>`
-      : hint
-        ? `${guesser} tippt ${cardName(s.first)}. Falsch!`
-        : `${guesser} rät die oberste Karte`;
+    const title = second ? `${guesser} rät nochmal` : hint ? `${guesser} tippt ${cardName(s.first)}` : `${guesser} rät die oberste Karte`;
+    const banner = second ? bannerText(s) : "";
     const guesserName = s.players[s.guesser];
     const tap = hint ? null : { by: guesserName, allowed: second ? (v) => (s.hint === "hoeher" ? v > s.first : v < s.first) : () => true };
     const myTurn = !hint && (me ? me === guesserName : !isBot(guesserName)); // ohne me: ein Handy, Dealer ist ein Bot
     const body = isDealer
       ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
           hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }${boardHtml(s, null, null, marksFor(s, hint || second))}`
+        }${boardHtml(s, null, null, marksFor(s, hint || second), false, banner)}`
       : statusHtml(s) +
-        boardHtml(s, null, tap, marksFor(s, second)) +
+        boardHtml(s, null, tap, marksFor(s, second), false, banner) +
         (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
@@ -423,12 +424,6 @@
       else if ((s.stage === "guess1" || s.stage === "guess2") && a.type === "guess") guess(s, a.value);
       else if (s.stage === "hint" && a.type === "say") {
         s.stage = "guess2";
-        const up = s.hint === "hoeher";
-        notice(s, {
-          emoji: up ? "⬆️" : "⬇️",
-          title: up ? "Höher!" : "Niedriger!",
-          text: `Nicht ${cardName(s.first)}. ${s.players[s.guesser]} hat noch einen Versuch.`,
-        });
       }
       else if (s.stage === "check" && a.type === "confirm") {
         const p = s.pending;
