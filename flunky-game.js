@@ -277,6 +277,7 @@
       players: [{ id: session.id, name: session.name, team: null, done: false, online: true }],
       turnTeam: 0,
       wind: 0,
+      windY: 0,
       rot: [0, 0],
       throwerId: null,
       shot: null,
@@ -422,7 +423,11 @@
         break;
       }
     }
-    S.wind = Math.round((Math.random() * 2 - 1) * 3) / 3; // -1 … 1 in Dritteln
+    // Wind aus einer von 8 Richtungen, Stärke 0 bis 3 (in Dritteln). wind = quer, windY = längs.
+    const strength = Math.floor(Math.random() * 4) / 3;
+    const dirAngle = (Math.floor(Math.random() * 8) * Math.PI) / 4;
+    S.wind = Math.round(Math.cos(dirAngle) * strength * 1000) / 1000;
+    S.windY = Math.round(Math.sin(dirAngle) * strength * 1000) / 1000;
     S.phase = "aim";
   }
 
@@ -449,6 +454,7 @@
       range,
       power,
       wind: S.wind || 0,
+      windY: S.windY || 0,
     };
     const sim = simulate(S.shot);
     S.shot.hit = sim.hit;
@@ -558,10 +564,10 @@
   }
 
   function ballAt(shot, u) {
-    const drift = (shot.wind || 0) * WIND_DRIFT * Math.min(u, 1) ** 2; // Wind wirkt nur in der Luft
+    const air = WIND_DRIFT * Math.min(u, 1) ** 2; // Wind wirkt nur in der Luft
     return {
-      x: shot.x0 + shot.dx * shot.range * u + drift,
-      y: shot.y0 + shot.dy * shot.range * u,
+      x: shot.x0 + shot.dx * shot.range * u + (shot.wind || 0) * air,
+      y: shot.y0 + shot.dy * shot.range * u + (shot.windY || 0) * air,
       h: u < 1 ? Math.sin(Math.PI * u) * (0.12 + 0.25 * shot.power) : 0,
     };
   }
@@ -621,8 +627,9 @@
   function botThrow(p) {
     const start = ballStart(p);
     const tx = BOTTLE.x - (S.wind || 0) * WIND_DRIFT * BOT_WIND;
-    const dist = Math.hypot(tx - start.x, BOTTLE.y - start.y);
-    const angle = Math.atan2(BOTTLE.y - start.y, tx - start.x) + gauss() * BOT_AIM;
+    const ty = BOTTLE.y - (S.windY || 0) * WIND_DRIFT * BOT_WIND;
+    const dist = Math.hypot(tx - start.x, ty - start.y);
+    const angle = Math.atan2(ty - start.y, tx - start.x) + gauss() * BOT_AIM;
     // Ideal landet der Ball knapp hinter der Flasche, dann trifft er tief oder beim Rollen.
     const power = Math.min(1, (dist / 0.98 / RANGE) * (1 + gauss() * BOT_POWER));
     return { type: "throw", from: p.id, dx: Math.cos(angle), dy: Math.sin(angle), power };
@@ -631,7 +638,7 @@
   function driveBots() {
     const actorId = S.phase === "aim" ? S.throwerId : S.phase === "drink" ? S.runnerId : null;
     const bot = S.players.find((p) => p.id === actorId && p.bot);
-    const key = bot ? `${S.phase}:${bot.id}:${S.runStage}:${S.shot?.id}:${S.wind}` : null;
+    const key = bot ? `${S.phase}:${bot.id}:${S.runStage}:${S.shot?.id}:${S.wind}:${S.windY}` : null;
     if (key === botKey) return;
     botKey = key;
     clearTimeout(botTimer);
@@ -1066,6 +1073,7 @@
 
       addScenery(scene, rnd);
       addGrassBlades(scene, rnd);
+      const crowd = addCrowd(scene, rnd);
 
       // Flasche: gedrehtes Profil aus grünem Glas, Etikett und Kronkorken
       const bottle = new THREE.Group();
@@ -1130,7 +1138,7 @@
       ball.castShadow = true;
       scene.add(ball);
 
-      G = { renderer, scene, camera, bottle, puddle, ball, people: new Map(), fall: 0, size: "" };
+      G = { renderer, scene, camera, bottle, puddle, ball, crowd, people: new Map(), fall: 0, size: "" };
     } catch (err) {
       console.error(err);
       glFailed = true;
@@ -1227,9 +1235,9 @@
 
   // Tausende kleine Grashalme rund um die Flasche und auf dem Feld
   function addGrassBlades(scene, rnd) {
-    const count = 7000;
+    const count = 2500;
     const blades = new THREE.InstancedMesh(
-      new THREE.ConeGeometry(0.0018, 0.012, 3).translate(0, 0.006, 0),
+      new THREE.ConeGeometry(0.001, 0.006, 3).translate(0, 0.003, 0),
       new THREE.MeshStandardMaterial({ roughness: 0.9 }),
       count
     );
@@ -1237,19 +1245,85 @@
     const q = new THREE.Quaternion();
     const e = new THREE.Euler();
     const col = new THREE.Color();
-    const greens = [0x3f8a2e, 0x5aa83f, 0x6dbb4a, 0x4c9a37, 0x82c95a];
+    const greens = [0x4f9a3a, 0x58a441, 0x5fa946, 0x53a03d]; // nah an der Wiesenfarbe, damit es dezent bleibt
     for (let i = 0; i < count; i++) {
       const x = -0.4 + rnd() * 1.8;
       const z = -0.3 + rnd() * (FIELD_L + 0.6);
       e.set((rnd() - 0.5) * 0.6, rnd() * Math.PI, (rnd() - 0.5) * 0.6);
       q.setFromEuler(e);
-      const sc = 0.6 + rnd() * 0.9;
+      const sc = 0.6 + rnd() * 0.6;
       m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc, sc, sc));
       blades.setMatrixAt(i, m);
       blades.setColorAt(i, col.set(greens[Math.floor(rnd() * greens.length)]));
     }
     blades.receiveShadow = true;
     scene.add(blades);
+  }
+
+  // Zuschauer links und rechts neben dem Feld, die jubeln (bei Treffern besonders laut)
+  function addCrowd(scene, rnd) {
+    const shirts = [0xef4444, 0x3b82f6, 0xf59e0b, 0x22c55e, 0xa855f7, 0xec4899, 0x14b8a6, 0xfacc15, 0xffffff, 0xf97316];
+    const bodyGeo = new THREE.CapsuleGeometry(0.02, 0.05, 4, 10);
+    const legGeo = new THREE.CapsuleGeometry(0.008, 0.05, 4, 8);
+    const armGeo = new THREE.CapsuleGeometry(0.0065, 0.04, 4, 8);
+    const headGeo = new THREE.SphereGeometry(0.016, 14, 10);
+    const hairGeo = new THREE.SphereGeometry(0.0168, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    const pantsMat = new THREE.MeshStandardMaterial({ color: 0x27324a, roughness: 0.8 });
+    const fans = [];
+    for (const side of [-1, 1]) {
+      for (let row = 0; row < 3; row++) {
+        for (let i = 0; i < 16; i++) {
+          const y = 0.05 + (i + rnd() * 0.6) * ((FIELD_L - 0.1) / 16);
+          const x = side < 0 ? -0.14 - row * 0.07 - rnd() * 0.02 : 1.14 + row * 0.07 + rnd() * 0.02;
+          const look = { skin: SKINS[Math.floor(rnd() * SKINS.length)], hair: HAIRS[Math.floor(rnd() * HAIRS.length)] };
+          const shirtMat = new THREE.MeshStandardMaterial({ color: shirts[Math.floor(rnd() * shirts.length)], roughness: 0.7 });
+          const skinMat = new THREE.MeshStandardMaterial({ color: look.skin, roughness: 0.6 });
+          const fan = new THREE.Group();
+          for (const l of [-1, 1]) {
+            const leg = new THREE.Mesh(legGeo, pantsMat);
+            leg.position.set(l * 0.009, 0.033, 0);
+            fan.add(leg);
+          }
+          const body = new THREE.Mesh(bodyGeo, shirtMat);
+          body.position.y = 0.095;
+          body.castShadow = true;
+          const head = new THREE.Mesh(headGeo, skinMat);
+          head.position.y = 0.15;
+          const hair = new THREE.Mesh(hairGeo, new THREE.MeshStandardMaterial({ color: look.hair, roughness: 0.9 }));
+          hair.position.y = 0.152;
+          fan.add(body, head, hair);
+          const arms = [];
+          for (const a of [-1, 1]) {
+            const shoulder = new THREE.Group();
+            shoulder.position.set(a * 0.025, 0.12, 0);
+            const arm = new THREE.Mesh(armGeo, shirtMat);
+            arm.position.y = -0.024;
+            shoulder.add(arm);
+            fan.add(shoulder);
+            arms.push(shoulder);
+          }
+          const s = 0.9 + rnd() * 0.25;
+          fan.scale.setScalar(s);
+          fan.position.set(x, 0, y);
+          fan.rotation.y = Math.atan2(BOTTLE.x - x, BOTTLE.y - y); // schauen zur Flasche
+          scene.add(fan);
+          fans.push({ fan, arms, seed: rnd() * 10, speed: 0.8 + rnd() * 0.6 });
+        }
+      }
+    }
+    return fans;
+  }
+
+  function updateCrowd(fans, now) {
+    const hype = S.phase === "drink" || S.phase === "flying" ? 1 : S.phase === "over" ? 1.2 : 0.35;
+    const t = now / 1000;
+    for (const f of fans) {
+      const w = Math.sin(t * 6 * f.speed + f.seed);
+      f.fan.position.y = Math.max(0, w) * 0.025 * hype;
+      // Arme hoch und winken
+      f.arms[0].rotation.z = -(2.2 + Math.sin(t * 8 * f.speed + f.seed) * 0.5) * Math.min(1, hype + 0.2);
+      f.arms[1].rotation.z = (2.2 + Math.sin(t * 8 * f.speed + f.seed + 1.5) * 0.5) * Math.min(1, hype + 0.2);
+    }
   }
 
   function capsule(r, len, mat) {
@@ -1393,6 +1467,7 @@
 
     const names = [];
     updatePeople(g, now, dt, names);
+    updateCrowd(g.crowd, now);
 
     // Ball
     const thrower = S.players.find((p) => p.id === S.throwerId);
@@ -1535,12 +1610,26 @@
     ctx.stroke();
   }
 
+  // Wind aus Sicht des eigenen Teams: Pfeil zeigt, wohin er weht, Text sagt, woher er kommt.
   function drawWind() {
-    const wind = S.phase === "aim" ? S.wind || 0 : S.phase === "flying" ? S.shot?.wind || 0 : null;
-    if (wind == null) return;
-    const strength = Math.round(Math.abs(wind) * 3);
-    const toRight = (wind > 0) === (view.team === 0);
-    const text = strength ? `💨 Wind ${(toRight ? "→" : "←").repeat(strength)}` : "💨 Windstill";
+    const src = S.phase === "aim" ? S : S.phase === "flying" ? S.shot : null;
+    if (!src) return;
+    const wx = src.wind || 0;
+    const wy = src.windY || 0;
+    const strength = Math.round(Math.hypot(wx, wy) * 3);
+    let text = "💨 Windstill";
+    if (strength) {
+      const right = view.team === 0 ? wx : -wx; // weht nach rechts
+      const away = view.team === 0 ? -wy : wy; // weht vom Werfer weg
+      const arrows = ["→", "↗", "↑", "↖", "←", "↙", "↓", "↘"];
+      const octant = (Math.round(Math.atan2(away, right) / (Math.PI / 4)) + 8) % 8;
+      const from = [];
+      if (away > 0.1) from.push("hinten");
+      if (away < -0.1) from.push("vorne");
+      if (right > 0.1) from.push("links");
+      if (right < -0.1) from.push("rechts");
+      text = `💨 Wind von ${from.join(" ")} ${arrows[octant].repeat(strength)}`;
+    }
     ctx.font = "700 16px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
