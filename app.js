@@ -28,6 +28,7 @@ function save() {
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $(`screen-${name}`).classList.add("active");
+  if (name !== "game") document.documentElement.classList.remove("fit");
   window.scrollTo(0, 0);
 }
 
@@ -52,20 +53,21 @@ function vibrate(pattern) {
 
 function renderGames() {
   const list = $("game-list");
-  for (const [key, game] of Object.entries(GAMES)) {
+  Object.entries(GAMES).forEach(([key, game], i) => {
     const tile = document.createElement("button");
     tile.className = "game-tile";
     tile.style.setProperty("--accent", game.color);
+    tile.style.setProperty("--i", i);
     tile.innerHTML = `
       <span class="game-emoji">${game.emoji ?? "🎲"}</span>
       <span class="game-info">
         <span class="game-name">${escapeHtml(game.label)}</span>
         <span class="game-desc">${escapeHtml(game.description ?? "")}</span>
       </span>
-      ${game.tag ? `<span class="game-tag">${escapeHtml(game.tag)}</span>` : ""}`;
+      <span class="game-arrow" aria-hidden="true">›</span>`;
     tile.onclick = () => openGame(key);
     list.appendChild(tile);
-  }
+  });
 }
 
 function openGame(key) {
@@ -157,7 +159,9 @@ function canPress(a) {
 function playGame(r) {
   run = r;
   setGame(r.key);
-  const v = GAMES[r.key].view(r.s);
+  // fit: Spiel passt immer genau auf den Bildschirm, nichts scrollt.
+  document.documentElement.classList.toggle("fit", !!GAMES[r.key].fit);
+  const v = GAMES[r.key].view(r.s, r.me);
   const actions = v.actions.filter(canPress);
   const myTurn = r.me && v.actions.some((a) => a.by === r.me);
   const waitFor = v.actions.find((a) => a.by)?.by;
@@ -169,13 +173,15 @@ function playGame(r) {
       ${myTurn ? `<p class="your-turn">Du bist dran!</p>` : ""}
       ${v.title ? `<h2 class="bf-title">${v.title}</h2>` : ""}
       <div class="bf-body">${v.body}</div>
-      <div class="bf-actions"></div>
+      <div class="bf-actions ${v.actionsClass ?? ""}"></div>
     </div>`;
   const box = root.querySelector(".bf-actions");
   for (const a of actions) {
     const btn = document.createElement("button");
     btn.className = a.ghost ? "btn ghost" : "btn";
     btn.textContent = a.label;
+    if (a.sub) btn.insertAdjacentHTML("beforeend", `<small>${escapeHtml(a.sub)}</small>`);
+    btn.disabled = !!a.disabled;
     btn.onclick = () => (a.exit ? run.exit() : run.send(a.act));
     box.appendChild(btn);
   }

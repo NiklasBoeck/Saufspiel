@@ -3,10 +3,12 @@
 // registerGame(key, {
 //   label, emoji, description, tag, color,
 //   setup(players)        // neuer Spielstand (reines JSON, damit er an andere Handys geht)
-//   view(s)               // was gerade zu sehen ist: { phase, title, body, actions }
-//                         //   actions: [{ label, act, by, ghost, exit }]
+//   view(s, me)           // was gerade zu sehen ist: { phase, title, body, actions, actionsClass }
+//                         //   me = eigener Name bei jeder sein Handy (sonst null)
+//                         //   actions: [{ label, sub, act, by, ghost, exit, disabled }]
 //                         //   by = Spieler, der drücken darf (fehlt: jeder), exit = zurück zum Menü
 //   act(s, action, by)    // Aktion auf den Spielstand anwenden, by = wer gedrückt hat
+//   fit                   // true: Spiel passt immer auf den Bildschirm, ohne Scrollen
 //   open()                // eigenes Spiel auf eigener Seite (z. B. Flunky Ball)
 // })
 //

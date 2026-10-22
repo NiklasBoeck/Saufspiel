@@ -3,7 +3,6 @@ registerGame("flunky", {
   label: "Flunky Ball",
   emoji: "🍺",
   description: "Zwei Teams, eine Flasche. Jeder spielt am eigenen Handy.",
-  tag: "Multiplayer",
   color: "#2563eb",
   open() {
     location.href = "flunky.html";
