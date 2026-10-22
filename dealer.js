@@ -40,7 +40,8 @@
   // marks: { wert: "x" } zeigt rote Kreuze für die falschen Tipps dieser Runde.
   // banner: „Höher ⬆“ / „Niedriger ⬇“ oben im grünen Tisch, sobald der Dealer es gesagt hat.
   // gold: Der Dealer sieht die oberste Karte golden an ihrem Platz auf dem Tisch liegen.
-  function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "", gold = null) {
+  // picked: gerade getippter Wert, 2 Sekunden lang gestrichelt umrandet, erst danach kommt dort das Kreuz.
+  function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "", gold = null, picked = null) {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
       const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
@@ -51,14 +52,14 @@
           ? ` data-act='${JSON.stringify({ type: "guess", value: v })}' data-by="${escapeHtml(tap.by)}" role="button"`
           : ` data-off`;
       }
-      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
+      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""} ${picked === v ? "picked" : ""}"${attrs}>
         <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}${
           gold && gold.value === v
             ? `<div class="fd-card gold ${gold.suit.red ? "red" : ""}" style="--j:${cards.length}"><span>${gold.rank}</span><span>${gold.suit.symbol}</span></div>`
             : ""
         }</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
-        ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""}">✗</span>` : ""}
+        ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""} ${picked === v ? "late" : ""}">✗</span>` : ""}
       </div>`;
     };
     const row = (from, to) => `<div class="fd-row">${Array.from({ length: to - from + 1 }, (_, i) => pile(from + i)).join("")}</div>`;
@@ -177,8 +178,8 @@
       phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
       title: `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), false, two ? bannerText(s) : "", topCard(s))}`
-        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), false, two ? bannerText(s) : ""),
+        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), false, two ? bannerText(s) : "", topCard(s), tip)}`
+        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), false, two ? bannerText(s) : "", null, tip),
       actions: [confirmAction(s)],
     };
   }
@@ -196,9 +197,9 @@
     const body = isDealer
       ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
           hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }${boardHtml(s, null, null, marksFor(s, hint || second), false, banner, topCard(s))}`
+        }${boardHtml(s, null, null, marksFor(s, hint || second), false, banner, topCard(s), hint ? s.first : null)}`
       : statusHtml(s) +
-        boardHtml(s, null, tap, marksFor(s, second), false, banner) +
+        boardHtml(s, null, tap, marksFor(s, second), false, banner, null, hint ? s.first : null) +
         (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
