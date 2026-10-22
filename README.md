@@ -1,4 +1,4 @@
-# Saufspiel
+# Saufomat
 
 Ein Partyspiel als Web-App fürs Handy. Spiel im Menü antippen, dann aussuchen: **Ein Handy** (Spieler eintragen, das Handy geht reihum) oder **Jeder sein Handy** (ein Handy macht einen Raum auf, die anderen treten mit Code oder QR-Code bei). Muss jemand trinken, kommt eine große Trink-Meldung.
 

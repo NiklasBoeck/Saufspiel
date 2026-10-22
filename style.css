@@ -77,9 +77,12 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
 .menu-head { text-align: center; padding: 20px 0 8px; }
 .menu-logo {
   display: inline-block;
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
   font-size: 3.2rem;
   animation: logo-bob 3.5s ease-in-out infinite;
-  filter: drop-shadow(0 8px 18px rgb(245 158 11 / 0.35));
+  box-shadow: 0 10px 26px -8px rgb(245 158 11 / 0.55);
 }
 @keyframes logo-bob {
   0%, 100% { transform: translateY(0) rotate(-6deg); }
