@@ -556,3 +556,26 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 .fd-pile[data-act] .fd-spot { border-color: #fde68a; color: #fde68a; }
 .fd-pile[data-act]:active { transform: scale(0.92); }
 .fd-pile[data-off] { opacity: 0.3; }
+
+/* Kleiner Hinweis oben (Trink-Meldung für andere) */
+.toast {
+  position: fixed;
+  z-index: 9;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgb(27 16 51 / 0.92);
+  border: 1px solid var(--primary);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}
+.toast[hidden] { display: none; }
+.toast.show { animation: toast-in 0.3s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -20px); } }

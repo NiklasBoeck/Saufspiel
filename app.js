@@ -255,12 +255,36 @@ function checkAlert(s) {
   const alert = s.alert;
   if (!alert || alert.id === shownAlert) return;
   shownAlert = alert.id;
+  // privateAlerts: Mit mehreren Handys bekommt nur, wen es betrifft, die große Meldung, alle anderen einen kleinen Hinweis.
+  if (run.me && GAMES[run.key].privateAlerts) {
+    const mine = alert.notice
+      ? alert.notice.who === run.me
+      : alert.items.some((it) => it.who === run.me || it.who === ALL);
+    if (!mine) return showToast(alert);
+  }
   if (alert.notice) showNotice(alert.notice);
   else showDrinkAlert(alert.items);
 }
 
+let toastTimer = null;
+function showToast(alert) {
+  const n = alert.notice;
+  const text = n
+    ? `${n.emoji ?? ""} ${n.title} ${n.text ?? ""}`
+    : "🍺 " + alert.items.map((it) => `${it.who === ALL ? "Alle" : it.who} ${it.give ? "verteilt" : it.who === ALL ? "trinken" : "trinkt"}${it.n ? ` ${sips(it.n)}` : ""}`).join(", ");
+  const el = $("toast");
+  el.textContent = text.trim();
+  el.hidden = false;
+  el.classList.remove("show");
+  void el.offsetWidth; // Animation neu starten
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), 4500);
+}
+
 // Meldung ohne Trinken, z. B. „Höher!“
 function showNotice({ emoji, title, text }) {
+  $("toast").hidden = true;
   $("da-emoji").textContent = emoji ?? "";
   $("da-title").textContent = title;
   const li = document.createElement("li");
@@ -273,6 +297,7 @@ function showNotice({ emoji, title, text }) {
 }
 
 function showDrinkAlert(items) {
+  $("toast").hidden = true;
   const me = run.me;
   const mine = (it) => !!me && (it.who === me || it.who === ALL);
   const drinks = items.some((it) => !it.give);
@@ -312,6 +337,7 @@ function hideDrinkAlert() {
   $("drink-alert").hidden = true;
 }
 $("da-ok").onclick = hideDrinkAlert;
+$("toast").onclick = () => ($("toast").hidden = true);
 $("drink-alert").onclick = (e) => e.target === $("drink-alert") && hideDrinkAlert();
 
 renderGames();

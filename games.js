@@ -9,6 +9,7 @@
 //                         //   actions: [{ label, sub, act, by, ghost, exit, disabled }]
 //                         //   by = Spieler, der drücken darf (fehlt: jeder), exit = zurück zum Menü
 //   act(s, action, by)    // Aktion auf den Spielstand anwenden, by = wer gedrückt hat
+//   privateAlerts         // true: große Meldung nur für Betroffene, die anderen sehen einen kleinen Hinweis
 //   fit                   // true: Spiel passt immer auf den Bildschirm, ohne Scrollen
 //   open()                // eigenes Spiel auf eigener Seite (z. B. Flunky Ball)
 //   bot(s, name, actions) // was ein Bot drückt (eine act aus actions); fehlt: zufälliger Knopf
@@ -69,7 +70,7 @@ function botPick(smart, options, slip = 0.2) {
   return Math.random() < slip ? options[Math.floor(Math.random() * options.length)] : smart;
 }
 
-// Meldung ohne Trinken auf allen Handys, z. B. { emoji: "⬆️", title: "Höher!", text }
+// Meldung ohne Trinken, z. B. { emoji: "⬆️", title: "Höher!", text, who }
 function notice(s, n) {
   s.alert = { id: Math.random().toString(36).slice(2), items: [], notice: n };
 }

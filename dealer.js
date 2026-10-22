@@ -175,7 +175,7 @@
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
       title: titles[r.kind],
       body: `${dealerTagHtml(s, me)}<div class="pc-row">${playingCardHtml(r.card, "pc-big pc-new")}</div><p class="bf-text fd-center">${how[r.kind]}</p>${extra}${boardHtml(s, r.card)}`,
-      actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" } }],
+      actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
 
@@ -232,6 +232,7 @@
         emoji: up ? "⬆️" : "⬇️",
         title: up ? "Höher!" : "Niedriger!",
         text: `${guesser} hat ${cardName(v)} getippt. Noch ein Versuch!`,
+        who: guesser,
       });
     } else {
       if (s.hint === "hoeher" ? v <= s.first : v >= s.first) return;
@@ -259,6 +260,7 @@
     description: "Errate die oberste Karte, sonst trinkst du. Der Dealer trinkt, wenn du triffst.",
     color: "#dc2626",
     fit: true,
+    privateAlerts: true,
 
     setup(players) {
       const dealer = Math.floor(Math.random() * players.length);
