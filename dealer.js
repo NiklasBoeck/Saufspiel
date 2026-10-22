@@ -40,7 +40,7 @@
   // marks: { wert: "x" } zeigt rote Kreuze für die falschen Tipps dieser Runde.
   // banner: „Höher ⬆“ / „Niedriger ⬇“ oben im grünen Tisch, sobald der Dealer es gesagt hat.
   // gold: Der Dealer sieht die oberste Karte golden an ihrem Platz auf dem Tisch liegen.
-  // picked: gerade getippter Wert, 2 Sekunden lang gestrichelt umrandet, erst danach kommt dort das Kreuz.
+  // picked: gerade getippter Wert, 2 Sekunden lang mit „!“ markiert, erst danach kommt dort das Kreuz.
   function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "", gold = null, picked = null) {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
@@ -52,13 +52,14 @@
           ? ` data-act='${JSON.stringify({ type: "guess", value: v })}' data-by="${escapeHtml(tap.by)}" role="button"`
           : ` data-off`;
       }
-      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""} ${picked === v ? "picked" : ""}"${attrs}>
+      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
         <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}${
           gold && gold.value === v
             ? `<div class="fd-card gold ${gold.suit.red ? "red" : ""}" style="--j:${cards.length}"><span>${gold.rank}</span><span>${gold.suit.symbol}</span></div>`
             : ""
         }</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
+        ${picked === v ? `<span class="fd-mark bang">!</span>` : ""}
         ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""} ${picked === v ? "late" : ""}">✗</span>` : ""}
       </div>`;
     };

@@ -700,22 +700,10 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 .fd-card.gold.red { color: rgb(185 28 28 / 0.6); }
 @keyframes gold-glow { to { box-shadow: 0 0 20px rgb(251 191 36 / 1); } }
 
-/* Gerade getippte Zahl: 2 Sekunden dick schwarz gestrichelt, danach kommt das Kreuz */
-.fd-pile.picked .fd-stack::after {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  z-index: 3;
-  border: 4px dashed #000;
-  border-radius: calc(var(--h) * 0.14);
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.5);
-  pointer-events: none;
-  animation: picked 2s ease-in-out forwards;
-}
-@keyframes picked {
-  0% { opacity: 0; transform: scale(1.25); }
-  12% { opacity: 1; transform: scale(1); }
-  85% { opacity: 1; }
-  100% { opacity: 0; }
+/* Gerade getippte Zahl: 2 Sekunden ein „!“, danach kommt das Kreuz */
+.fd-mark.bang {
+  background: #fbbf24;
+  color: #1b1033;
+  animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both, mark-out 0.3s 1.7s ease-in forwards;
 }
 .fd-mark.late { animation-delay: 2s; }
