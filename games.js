@@ -8,6 +8,7 @@
 //                         //   actions: [{ label, sub, act, by, ghost, exit, disabled }]
 //                         //   by = Spieler, der drücken darf (fehlt: jeder), exit = zurück zum Menü
 //   act(s, action, by)    // Aktion auf den Spielstand anwenden, by = wer gedrückt hat
+//   fit                   // true: Spiel passt immer auf den Bildschirm, ohne Scrollen
 //   open()                // eigenes Spiel auf eigener Seite (z. B. Flunky Ball)
 // })
 //

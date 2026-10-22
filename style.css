@@ -416,10 +416,16 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
 .fd-dots i.on { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
 
 .fd-table {
+  /* Kartenhöhe passt sich an den Platz an: 2 Reihen mit je bis zu 4 versetzten Karten */
+  --h: min((100cqh - 32px) / 3.38, (100cqw - 30px) * 0.2, 104px);
+  flex: 1 1 0;
+  min-height: 120px;
+  container-type: size;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px 8px 12px;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 8px;
   border-radius: 26px;
   border: 7px solid #5b3a1e;
   background:
@@ -427,36 +433,38 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
   box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 6px 22px rgb(0 0 0 / 0.5), 0 12px 30px -10px rgb(0 0 0 / 0.7);
 }
 .fd-row { display: flex; justify-content: center; gap: 5px; }
-.fd-pile { flex: 0 0 auto; width: calc((100% - 30px) / 7); max-width: 52px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.fd-stack { position: relative; width: 100%; aspect-ratio: 40 / 56; margin-bottom: 39px; }
+.fd-pile { flex: none; width: calc(var(--h) * 0.714); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fd-stack { position: relative; width: 100%; height: calc(var(--h) * 1.69); }
 .fd-spot {
   position: absolute;
-  inset: 0;
+  inset: 0 0 auto;
+  height: var(--h);
   display: grid;
   place-items: center;
   border: 2px dashed rgb(255 255 255 / 0.28);
-  border-radius: 6px;
+  border-radius: calc(var(--h) * 0.1);
   color: rgb(255 255 255 / 0.35);
   font-weight: 900;
-  font-size: 1rem;
+  font-size: calc(var(--h) * 0.3);
 }
 .fd-card {
   position: absolute;
-  inset: 0;
-  top: calc(var(--j) * 13px);
+  left: 0;
+  right: 0;
+  top: calc(var(--j) * var(--h) * 0.23);
+  height: var(--h);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 2px 4px;
-  border-radius: 6px;
+  padding: calc(var(--h) * 0.04) calc(var(--h) * 0.08);
+  border-radius: calc(var(--h) * 0.1);
   background: #fff;
   color: #1b1033;
   font-weight: 900;
-  font-size: 0.78rem;
+  font-size: calc(var(--h) * 0.22);
   line-height: 1;
   box-shadow: 0 -1px 2px rgb(0 0 0 / 0.15), 0 3px 6px rgb(0 0 0 / 0.45);
 }
-.fd-card span:last-child { font-size: 0.8rem; }
 .fd-card.red { color: #dc2626; }
 .fd-card.new { outline: 3px solid var(--primary); outline-offset: 1px; animation: fd-drop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
 @keyframes fd-drop { from { transform: translateY(-40px) scale(1.3); opacity: 0; } }
@@ -504,7 +512,7 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
 .fd-ranks .btn small { font-size: 0.72rem; font-weight: 700; color: #b45309; }
 .fd-ranks .btn:disabled { opacity: 0.25; }
 
-.fd-tally { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fd-tally { flex: 0 1 auto; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 2px; display: flex; flex-direction: column; gap: 6px; }
 .fd-tally li {
   display: flex;
   justify-content: space-between;
@@ -513,3 +521,24 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
   background: var(--surface);
 }
 .fd-tally li:first-child { outline: 2px solid var(--primary); }
+
+/* --- Spiele, die genau auf den Bildschirm passen (fit) --- */
+html.fit, html.fit body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+html.fit body { position: fixed; inset: 0; touch-action: manipulation; }
+html.fit #app {
+  height: 100dvh;
+  padding: calc(8px + env(safe-area-inset-top)) 16px calc(10px + env(safe-area-inset-bottom));
+}
+html.fit #screen-game { height: 100%; min-height: 0; gap: clamp(4px, 1dvh, 12px); }
+html.fit .game-root, html.fit .bf, html.fit .bf-body { min-height: 0; }
+html.fit .bf { gap: clamp(6px, 1.3dvh, 14px); }
+html.fit .bf-body { gap: clamp(6px, 1.4dvh, 16px); }
+html.fit .bf-title { font-size: clamp(1.05rem, 2.7dvh, 1.45rem); }
+html.fit .bf-text { font-size: clamp(0.85rem, 2dvh, 1rem); }
+html.fit .bf-actions .btn { padding: clamp(10px, 1.8dvh, 16px); }
+html.fit .pc-big { width: auto; height: clamp(84px, 20dvh, 180px); aspect-ratio: 110 / 158; font-size: clamp(1.6rem, 5dvh, 2.8rem); }
+html.fit .fd-ranks { gap: clamp(5px, 1dvh, 10px); }
+html.fit .fd-ranks .btn { padding: clamp(3px, 0.9dvh, 10px) 4px; font-size: clamp(1rem, 2.8dvh, 1.45rem); }
+html.fit .fd-ranks .btn small { font-size: clamp(0.62rem, 1.5dvh, 0.8rem); }
+html.fit .fd-role { padding: clamp(4px, 0.8dvh, 8px) 12px; }
+html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
