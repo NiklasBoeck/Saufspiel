@@ -3,7 +3,8 @@
 // registerGame(key, {
 //   label, emoji, description, tag, color,
 //   setup(players)        // neuer Spielstand (reines JSON, damit er an andere Handys geht)
-//   view(s, me)           // was gerade zu sehen ist: { phase, title, body, actions, actionsClass }
+//   view(s, me)           // was gerade zu sehen ist: { phase, title, body, actions, actionsClass, turn }
+//                         //   turn = wer dran ist, wenn im body mit data-act/data-by getippt wird
 //                         //   me = eigener Name bei jeder sein Handy (sonst null)
 //                         //   actions: [{ label, sub, act, by, ghost, exit, disabled }]
 //                         //   by = Spieler, der drücken darf (fehlt: jeder), exit = zurück zum Menü
@@ -27,6 +28,11 @@ const ALL = "*";
 //   who = Spielername oder ALL, n = Schlucke, give = verteilt statt trinkt, text = Zusatz
 function drink(s, items) {
   s.alert = { id: Math.random().toString(36).slice(2), items };
+}
+
+// Meldung ohne Trinken auf allen Handys, z. B. { emoji: "⬆️", title: "Höher!", text }
+function notice(s, n) {
+  s.alert = { id: Math.random().toString(36).slice(2), items: [], notice: n };
 }
 
 function sips(n) {

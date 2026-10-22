@@ -51,9 +51,14 @@ function vibrate(pattern) {
 
 // --- Menü ---
 
+// Reihenfolge im Menü. Spiele, die hier fehlen, kommen danach.
+const MENU_ORDER = ["flunky", "dealer", "busfahrer", "niewieder", "triade"];
+
 function renderGames() {
   const list = $("game-list");
-  Object.entries(GAMES).forEach(([key, game], i) => {
+  const rank = (key) => (MENU_ORDER.includes(key) ? MENU_ORDER.indexOf(key) : MENU_ORDER.length);
+  const entries = Object.entries(GAMES).sort(([a], [b]) => rank(a) - rank(b));
+  entries.forEach(([key, game], i) => {
     const tile = document.createElement("button");
     tile.className = "game-tile";
     tile.style.setProperty("--accent", game.color);
@@ -163,8 +168,9 @@ function playGame(r) {
   document.documentElement.classList.toggle("fit", !!GAMES[r.key].fit);
   const v = GAMES[r.key].view(r.s, r.me);
   const actions = v.actions.filter(canPress);
-  const myTurn = r.me && v.actions.some((a) => a.by === r.me);
-  const waitFor = v.actions.find((a) => a.by)?.by;
+  // v.turn: wer dran ist, wenn das Spiel ohne Knöpfe gesteuert wird (Tippen im Spielfeld)
+  const myTurn = r.me && (v.turn === r.me || v.actions.some((a) => a.by === r.me));
+  const waitFor = v.actions.find((a) => a.by)?.by ?? v.turn;
 
   const root = $("game-root");
   root.innerHTML = `
@@ -185,7 +191,12 @@ function playGame(r) {
     btn.onclick = () => (a.exit ? run.exit() : run.send(a.act));
     box.appendChild(btn);
   }
-  if (!actions.length && v.actions.length) {
+  // Elemente im Spielfeld mit data-act sind antippbar (data-by: wer darf)
+  root.querySelectorAll("[data-act]").forEach((el) => {
+    if (!canPress({ by: el.dataset.by })) return el.removeAttribute("data-act");
+    el.onclick = () => run.send(JSON.parse(el.dataset.act));
+  });
+  if (!actions.length && (v.actions.length || v.turn) && !myTurn) {
     const wait = document.createElement("p");
     wait.className = "wait";
     wait.textContent = waitFor ? `Warte auf ${waitFor}…` : "Warte…";
@@ -204,7 +215,21 @@ function checkAlert(s) {
   const alert = s.alert;
   if (!alert || alert.id === shownAlert) return;
   shownAlert = alert.id;
-  showDrinkAlert(alert.items);
+  if (alert.notice) showNotice(alert.notice);
+  else showDrinkAlert(alert.items);
+}
+
+// Meldung ohne Trinken, z. B. „Höher!“
+function showNotice({ emoji, title, text }) {
+  $("da-emoji").textContent = emoji ?? "";
+  $("da-title").textContent = title;
+  const li = document.createElement("li");
+  li.textContent = text ?? "";
+  $("da-list").replaceChildren(...(text ? [li] : []));
+  $("da-ok").textContent = "OK 👍";
+  $("drink-alert").hidden = false;
+  $("da-ok").focus();
+  vibrate(120);
 }
 
 function showDrinkAlert(items) {
@@ -237,6 +262,7 @@ function showDrinkAlert(items) {
       return li;
     })
   );
+  $("da-ok").textContent = "Prost! 🍻";
   $("drink-alert").hidden = false;
   $("da-ok").focus();
   vibrate(meDrinks || !me ? [300, 100, 300] : 120);
