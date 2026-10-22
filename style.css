@@ -580,3 +580,49 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 .toast[hidden] { display: none; }
 .toast.show { animation: toast-in 0.3s cubic-bezier(0.2, 1.4, 0.4, 1); }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, -20px); } }
+
+/* Anstoßen in der Trink-Meldung */
+.da-emoji:has(.cheers) { animation: none; }
+.cheers { position: relative; display: inline-flex; justify-content: center; font-size: 4.2rem; line-height: 1; }
+.cheers i { display: inline-block; font-style: normal; }
+.cheers i:first-child { transform-origin: 80% 100%; animation: glass-l 1.2s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+.cheers i:nth-child(2) { transform-origin: 20% 100%; animation: glass-r 1.2s cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+.cheers b { display: inline-block; transform: scaleX(-1); }
+.cheers s {
+  position: absolute;
+  left: 50%;
+  top: -0.35em;
+  font-size: 0.6em;
+  text-decoration: none;
+  transform: translateX(-50%);
+  animation: clink 0.7s 0.45s ease-out both;
+}
+@keyframes glass-l {
+  0% { transform: translateX(-140px) rotate(-35deg); opacity: 0; }
+  40% { transform: translateX(10px) rotate(18deg); opacity: 1; }
+  52% { transform: translateX(-6px) rotate(4deg); }
+  66% { transform: translateX(6px) rotate(14deg); }
+  100% { transform: translateX(0) rotate(6deg); }
+}
+@keyframes glass-r {
+  0% { transform: translateX(140px) rotate(35deg); opacity: 0; }
+  40% { transform: translateX(-10px) rotate(-18deg); opacity: 1; }
+  52% { transform: translateX(6px) rotate(-4deg); }
+  66% { transform: translateX(-6px) rotate(-14deg); }
+  100% { transform: translateX(0) rotate(-6deg); }
+}
+@keyframes clink {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.2); }
+  40% { opacity: 1; transform: translateX(-50%) scale(1.4); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(1); }
+}
+.da-count {
+  margin-top: -4px;
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  animation: count-pop 0.5s 0.7s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.da-count[hidden] { display: none; }
+@keyframes count-pop { from { opacity: 0; transform: scale(0.3); } }

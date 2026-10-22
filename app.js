@@ -244,7 +244,7 @@ function scheduleBot(r, v) {
     const act = GAMES[r.key].bot?.(s, name, mine.map((a) => a.act)) ?? mine[Math.floor(Math.random() * mine.length)]?.act;
     if (act) r.send(act);
   };
-  botTimer = setTimeout(tick, 900 + Math.random() * 700);
+  botTimer = setTimeout(tick, 2900 + Math.random() * 700); // Bots lassen sich gut 3 Sekunden Zeit
 }
 
 $("game-back").onclick = () => run.back();
@@ -288,7 +288,16 @@ function showDrinkAlert(items) {
   const meDrinks = items.some((it) => !it.give && mine(it));
   const meGives = items.some((it) => it.give && mine(it));
 
-  $("da-emoji").textContent = drinks ? "🍺" : "🫵";
+  // Beim Trinken stoßen zwei Biergläser an, danach erscheint die Zahl der Schlucke.
+  if (drinks) {
+    $("da-emoji").innerHTML = `<span class="cheers"><i><b>🍺</b></i><i>🍺</i><s>✨</s></span>`;
+  } else {
+    $("da-emoji").textContent = "🫵";
+  }
+  const own = items.filter((it) => !it.give && it.n && (meDrinks ? mine(it) : !me));
+  const count = own.length === 1 ? own[0].n : 0;
+  $("da-count").textContent = count ? sips(count) : "";
+  $("da-count").hidden = !count;
   $("da-title").textContent = meDrinks
     ? "Du musst trinken!"
     : meGives
