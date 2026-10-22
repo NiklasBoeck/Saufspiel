@@ -73,15 +73,3 @@ registerCardGame("pflicht", {
     { text: "{p}, sprich bis zur nächsten Karte nur in Reimen.", drink: "Jeder Fehler: {p} trinkt 1 Schluck." },
   ],
 });
-
-registerCardGame("regel", {
-  label: "Neue Regel",
-  emoji: "📜",
-  description: "Regeln, die bis zum Ende gelten.",
-  color: "#0891b2",
-  cards: [
-    { text: "Neue Regel: Niemand darf mehr „trinken“ sagen.", drink: "Wer’s trotzdem sagt, trinkt." },
-    { text: "Neue Regel: {p} ist Fragenmeister.", drink: "Wer auf eine Frage von {p} antwortet, trinkt." },
-    { text: "Neue Regel: Vor jedem Schluck muss man „Prost“ sagen.", drink: "Vergessen? Noch ein Schluck." },
-  ],
-});

@@ -51,9 +51,14 @@ function vibrate(pattern) {
 
 // --- Menü ---
 
+// Reihenfolge im Menü. Spiele, die hier fehlen, kommen danach.
+const MENU_ORDER = ["flunky", "dealer", "busfahrer", "niewieder", "triade"];
+
 function renderGames() {
   const list = $("game-list");
-  Object.entries(GAMES).forEach(([key, game], i) => {
+  const rank = (key) => (MENU_ORDER.includes(key) ? MENU_ORDER.indexOf(key) : MENU_ORDER.length);
+  const entries = Object.entries(GAMES).sort(([a], [b]) => rank(a) - rank(b));
+  entries.forEach(([key, game], i) => {
     const tile = document.createElement("button");
     tile.className = "game-tile";
     tile.style.setProperty("--accent", game.color);
