@@ -226,6 +226,7 @@
     emoji: "🎴",
     description: "Errate die oberste Karte, sonst trinkst du. Der Dealer trinkt, wenn du triffst.",
     color: "#dc2626",
+    fit: true,
 
     setup(players) {
       const dealer = Math.floor(Math.random() * players.length);

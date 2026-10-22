@@ -28,6 +28,7 @@ function save() {
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $(`screen-${name}`).classList.add("active");
+  if (name !== "game") document.documentElement.classList.remove("fit");
   window.scrollTo(0, 0);
 }
 
@@ -158,6 +159,8 @@ function canPress(a) {
 function playGame(r) {
   run = r;
   setGame(r.key);
+  // fit: Spiel passt immer genau auf den Bildschirm, nichts scrollt.
+  document.documentElement.classList.toggle("fit", !!GAMES[r.key].fit);
   const v = GAMES[r.key].view(r.s, r.me);
   const actions = v.actions.filter(canPress);
   const myTurn = r.me && v.actions.some((a) => a.by === r.me);
