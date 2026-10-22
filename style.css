@@ -629,12 +629,6 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 .da-count[hidden] { display: none; }
 @keyframes count-pop { from { opacity: 0; transform: scale(0.3); } }
 
-/* Dealer: oberste Karte und Tipp nebeneinander */
-.fd-compare { display: flex; justify-content: center; gap: 18px; }
-.fd-compare figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.fd-compare figcaption { color: var(--muted); font-size: 0.85rem; }
-.fd-tip { background: rgb(255 255 255 / 0.1); color: var(--primary); border: 3px dashed var(--primary); box-shadow: none; }
-
 /* Karte, die auf den Tisch fliegt */
 .fd-fly {
   position: fixed;
@@ -693,3 +687,13 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
   animation: banner-in 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 @keyframes banner-in { from { opacity: 0; transform: translateX(-50%) scale(0.5); } }
+
+/* Oberste Karte, golden auf dem Tisch des Dealers */
+.fd-card.gold {
+  background: linear-gradient(145deg, #fef3c7, #fbbf24 45%, #d97706);
+  color: #1b1033;
+  box-shadow: 0 0 12px rgb(251 191 36 / 0.8), 0 3px 6px rgb(0 0 0 / 0.45);
+  animation: gold-glow 1.6s ease-in-out infinite alternate;
+}
+.fd-card.gold.red { color: #b91c1c; }
+@keyframes gold-glow { to { box-shadow: 0 0 22px rgb(251 191 36 / 1), 0 3px 6px rgb(0 0 0 / 0.45); } }

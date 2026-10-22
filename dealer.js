@@ -39,7 +39,8 @@
   // tap: { by, allowed(v) } macht die Stapel antippbar, damit die ratende Person direkt auf dem Tisch wählt.
   // marks: { wert: "x" } zeigt rote Kreuze für die falschen Tipps dieser Runde.
   // banner: „Höher ⬆“ / „Niedriger ⬇“ oben im grünen Tisch, sobald der Dealer es gesagt hat.
-  function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "") {
+  // gold: Der Dealer sieht die oberste Karte golden an ihrem Platz auf dem Tisch liegen.
+  function boardHtml(s, fresh, tap, marks = {}, fade = false, banner = "", gold = null) {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
       const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
@@ -51,7 +52,11 @@
           : ` data-off`;
       }
       return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
-        <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}</div>
+        <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}${
+          gold && gold.value === v
+            ? `<div class="fd-card gold ${gold.suit.red ? "red" : ""}" style="--j:${cards.length}"><span>${gold.rank}</span><span>${gold.suit.symbol}</span></div>`
+            : ""
+        }</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
         ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""}">✗</span>` : ""}
       </div>`;
@@ -79,6 +84,8 @@
       <div class="fd-role"><span>Stapel</span><b>${s.deck.length}</b></div>
     </div>`;
   }
+
+  const topCard = (s) => s.deck[s.deck.length - 1];
 
   function topCardHtml(s) {
     return `<div class="pc-row">${playingCardHtml(s.deck[s.deck.length - 1], "pc-big")}</div>`;
@@ -161,15 +168,6 @@
     return { label: right ? "Richtig ✅" : "Falsch ❌", act: { type: "confirm" }, by: s.players[s.dealer] };
   }
 
-  // Der Dealer sieht oberste Karte und Tipp nebeneinander.
-  function compareHtml(s) {
-    const tip = s.pending.guesses[s.pending.guesses.length - 1];
-    return `<div class="fd-compare">
-      <figure>${playingCardHtml(s.deck[s.deck.length - 1], "pc-big")}<figcaption>Oberste Karte</figcaption></figure>
-      <figure><div class="pc pc-big fd-tip">${label(tip)}</div><figcaption>Tipp von ${name(s.players[s.guesser])}</figcaption></figure>
-    </div>`;
-  }
-
   function checkView(s, me) {
     const guesser = name(s.players[s.guesser]);
     const tip = s.pending.guesses[s.pending.guesses.length - 1];
@@ -179,7 +177,7 @@
       phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
       title: `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${compareHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), false, two ? bannerText(s) : "")}`
+        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), false, two ? bannerText(s) : "", topCard(s))}`
         : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), false, two ? bannerText(s) : ""),
       actions: [confirmAction(s)],
     };
@@ -198,7 +196,7 @@
     const body = isDealer
       ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
           hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }${boardHtml(s, null, null, marksFor(s, hint || second), false, banner)}`
+        }${boardHtml(s, null, null, marksFor(s, hint || second), false, banner, topCard(s))}`
       : statusHtml(s) +
         boardHtml(s, null, tap, marksFor(s, second), false, banner) +
         (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
