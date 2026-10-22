@@ -184,7 +184,7 @@ function playGame(r) {
   const root = $("game-root");
   root.innerHTML = `
     <div class="bf">
-      <p class="bf-phase">${v.phase}</p>
+      ${v.phase ? `<p class="bf-phase">${v.phase}</p>` : ""}
       ${myTurn ? `<p class="your-turn">Du bist dran!</p>` : ""}
       ${v.title ? `<h2 class="bf-title">${v.title}</h2>` : ""}
       <div class="bf-body">${v.body}</div>

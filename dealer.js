@@ -62,6 +62,25 @@
     return `<span class="fd-mark ${mark} ${anim}" style="animation-delay: ${d}s">✗</span>`;
   }
 
+  // Sind alle 4 Karten eines Werts gelegt, liegen sie umgedreht da. In der Runde, in der das passiert,
+  // drehen sie sich nach der Landung der Karte nacheinander um.
+  const FLIP_AT = 2.1;
+  function stackHtml(s, round, v, cards, fresh) {
+    const backs = cards.map((c, j) => `<div class="fd-card back" style="--j:${j}"></div>`).join("");
+    if (cards.length < 4) return cards.map((c, j) => tableCardHtml(c, j, fresh)).join("");
+    const completing = s.stage === "result" && s.result?.completed === v;
+    if (!completing) return backs;
+    const t = since(`${round}-${v}-flip`);
+    if (t > FLIP_AT + 1.5) return backs;
+    return cards
+      .map((c, j) => {
+        const at = FLIP_AT + j * 0.15 - t;
+        return tableCardHtml(c, j, fresh).replace('class="fd-card', 'class="flip-out fd-card').replace(`style="--j:${j}"`, `style="--j:${j};--fd:${at}s"`) +
+          `<div class="fd-card back flip-in" style="--j:${j};--fd:${at + 0.3}s"></div>`;
+      })
+      .join("");
+  }
+
   // picked: gerade getippter Wert, 2 Sekunden lang mit „!“ markiert, erst danach kommt dort das Kreuz.
   function boardHtml(s, fresh, tap, marks = {}, banner = "", gold = null, picked = null) {
     const round = s.stage === "result" || s.stage === "end" ? s.played.length - 1 : s.played.length;
@@ -76,7 +95,7 @@
           : ` data-off`;
       }
       return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
-        <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}${
+        <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${stackHtml(s, round, v, cards, fresh)}${
           gold && gold.value === v
             ? `<div class="fd-card gold ${gold.suit.red ? "red" : ""}" style="--j:${cards.length}"><span>${gold.rank}</span><span>${gold.suit.symbol}</span></div>`
             : ""
@@ -100,10 +119,11 @@
     return m;
   }
 
-  function statusHtml(s) {
+  // Ampel mit den Fehlschlägen und Stapel; ohne Dealer-Kasten, wo der Dealer schon oben steht.
+  function statusHtml(s, withDealer = true) {
     const dots = Array.from({ length: STRIKES }, (_, i) => `<i class="${i < s.strikes ? "on" : ""}"></i>`).join("");
-    return `<div class="fd-status">
-      <div class="fd-role"><span>🃏 Dealer</span>${name(s.players[s.dealer])}</div>
+    return `<div class="fd-status ${withDealer ? "" : "short"}">
+      ${withDealer ? `<div class="fd-role"><span>🃏 Dealer</span>${name(s.players[s.dealer])}</div>` : ""}
       <div class="fd-role"><span>Fehlschläge</span><div class="fd-dots" title="${s.strikes} von ${STRIKES}">${dots}</div></div>
       <div class="fd-role"><span>Stapel</span><b>${s.deck.length}</b></div>
     </div>`;
@@ -149,7 +169,7 @@
     const guesser = s.players[s.guesser];
     const dealer = s.players[s.dealer];
     return {
-      phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
+      phase: "",
       title: `${name(guesser)} ist dran mit Raten`,
       body: statusHtml(s) + boardHtml(s) + `<p class="bf-text fd-center">Schaut euch an, was schon weg ist. Dann bekommt ${name(dealer)} das Handy.</p>`,
       actions: [{ label: `📱 Handy an ${dealer} geben`, act: { type: "peek" } }],
@@ -161,14 +181,14 @@
     const second = s.stage === "guess2";
     if (s.stage === "hint") {
       return {
-        phase: "F*ck den Dealer · erster Versuch",
+        phase: "Erster Versuch",
         title: `${guesser} tippt ${cardName(s.first)}`,
         body: dealerTagHtml(s) + topCardHtml(s) + `<p class="bf-text fd-center">Drück den Knopf und sag ${guesser}, ob die Karte höher oder niedriger ist.</p>`,
         actions: [sayAction(s)],
       };
     }
     return {
-      phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : "erster Versuch"}`,
+      phase: second ? "Zweiter Versuch" : "Erster Versuch",
       title: second ? `Sag ${guesser}: <span class="fd-hint">${hintText(s)}</span>` : `${guesser}, sag deinen Tipp an!`,
       body:
         dealerTagHtml(s) +
@@ -198,10 +218,10 @@
     const isDealer = me ? me === s.players[s.dealer] : s.peek;
     const two = s.pending.guesses.length === 2;
     return {
-      phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
-      title: `${guesser} tippt ${cardName(tip)}`,
+      phase: two ? "Zweiter Versuch" : "Erster Versuch",
+      title: isDealer ? "" : `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip), two ? bannerText(s) : "", topCard(s), tip)}`
+        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s, false)}${boardHtml(s, null, null, marksFor(s, two, tip), two ? bannerText(s) : "", topCard(s), tip)}`
         : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), two ? bannerText(s) : "", null, tip),
       actions: [confirmAction(s)],
     };
@@ -212,20 +232,22 @@
     const second = s.stage === "guess2";
     const hint = s.stage === "hint";
     const isDealer = me === s.players[s.dealer];
-    const title = second ? `${guesser} rät nochmal` : hint ? `${guesser} tippt ${cardName(s.first)}` : `${guesser} rät die oberste Karte`;
+    const title = second
+      ? `${guesser} rät nochmal`
+      : hint
+        ? isDealer
+          ? ""
+          : `${guesser} tippt ${cardName(s.first)}`
+        : `${guesser} rät die oberste Karte`;
     const banner = second ? bannerText(s) : "";
     const guesserName = s.players[s.guesser];
     const tap = hint ? null : { by: guesserName, allowed: second ? (v) => (s.hint === "hoeher" ? v > s.first : v < s.first) : () => true };
-    const myTurn = !hint && (me ? me === guesserName : !isBot(guesserName)); // ohne me: ein Handy, Dealer ist ein Bot
     const body = isDealer
-      ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
-          hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }${boardHtml(s, null, null, marksFor(s, hint || second), banner, topCard(s), hint ? s.first : null)}`
+      ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s, false)}${boardHtml(s, null, null, marksFor(s, hint || second), banner, topCard(s), hint ? s.first : null)}`
       : statusHtml(s) +
-        boardHtml(s, null, tap, marksFor(s, second), banner, null, hint ? s.first : null) +
-        (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
+        boardHtml(s, null, tap, marksFor(s, second), banner, null, hint ? s.first : null);
     return {
-      phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
+      phase: second ? "Zweiter Versuch" : "Erster Versuch",
       title,
       body,
       actions: hint ? [sayAction(s)] : [],
@@ -247,22 +269,14 @@
       hit2: `✅ Im zweiten Versuch! ${name(r.who)} trinkt ${sips(r.n)}.`,
       miss: `❌ Daneben! ${name(r.who)} trinkt ${sips(r.n)}.`,
     };
-    const how = {
-      hit1: `${cardName(r.card.value)} ist ${r.card.value} wert.`,
-      hit2: `Abstand von ${label(r.guesses[0])} zu ${label(r.guesses[1])}.`,
-      miss: `Getippt ${label(r.guesses[0])} und ${label(r.guesses[1])}, es war ${label(r.card.value)}: Abstand ${r.n}.`,
-    };
-    let extra = "";
-    if (r.newDealer) {
-      extra = `<p class="fd-swap">🔄 ${name(r.oldDealer)} hat ${STRIKES} Mal in Folge gewonnen und gibt ab. Neuer Dealer: ${name(r.newDealer)}</p>`;
-    } else if (r.kind === "miss") {
-      extra = `<p class="bf-text fd-center">Fehlschlag ${s.strikes} von ${STRIKES} für den Dealer.</p>`;
-    }
+    const extra = r.newDealer
+      ? `<p class="fd-swap">🔄 ${name(r.oldDealer)} hat ${STRIKES} Mal in Folge gewonnen und gibt ab. Neuer Dealer: ${name(r.newDealer)}</p>`
+      : statusHtml(s, false);
     const last = !s.deck.length;
     return {
-      phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
+      phase: "",
       title: titles[r.kind],
-      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r))}`,
+      body: `${dealerTagHtml(s, me)}${extra}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r))}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
@@ -273,7 +287,7 @@
       .map((p, i) => `<li><span>${i === 0 ? "👑 " : ""}${name(p)}</span><b>${sips(s.tally[p])}</b></li>`)
       .join("");
     return {
-      phase: "F*ck den Dealer · Stapel leer",
+      phase: "",
       title: "Alle Karten gespielt! 🎉",
       body: `${boardHtml(s)}<p class="bf-text fd-center">Wer hat am meisten getrunken?</p><ul class="fd-tally">${rows}</ul>`,
       actions: [
@@ -291,6 +305,12 @@
     s.tally[who] += n;
     s.result = { id: Math.random().toString(36).slice(2), kind, who, n, card, guesses };
     const items = [{ who, n, text: kind === "miss" ? "fürs Danebenraten" : `als Dealer, ${label(card.value)} wurde erraten` }];
+    if (playedCount(s, card.value) === 4) {
+      // Alle 4 Karten eines Werts liegen: Die Karten werden umgedreht und alle trinken einen.
+      s.result.completed = card.value;
+      for (const p of s.players) s.tally[p] += 1;
+      items.push({ who: ALL, n: 1, text: `Alle ${{ 11: "Buben", 12: "Damen", 13: "Könige", 14: "Asse" }[card.value] || card.value + "er"} sind durch!` });
+    }
 
     if (kind === "miss") s.strikes++;
     else s.strikes = 0;
@@ -336,8 +356,8 @@
       for (let k = playedCount(s, v); k < 4; k++) pool.push(v);
     }
     if (!pool.length) return null;
-    let v = pool[Math.floor(pool.length / 2)];
-    if (Math.random() < 0.35) v = pool[Math.floor(Math.random() * pool.length)]; // mittel: nicht immer perfekt
+    // Eher aus der Mitte der möglichen Karten, aber jedes Mal anders (Mittel aus zwei Zufallszahlen).
+    const v = pool[Math.floor(((Math.random() + Math.random()) / 2) * pool.length)];
     return { type: "guess", value: v };
   }
 
@@ -360,7 +380,8 @@
       }
       return 0;
     }
-    flying = { id: s.result.id, end: now + FLY_MS };
+    const total = FLY_MS + (s.result.completed ? 1300 : 0); // erst umdrehen, dann Meldung
+    flying = { id: s.result.id, end: now + total };
     target.style.visibility = "hidden";
     const tr = target.getBoundingClientRect();
     const br = table.getBoundingClientRect();
@@ -399,7 +420,7 @@
         if (right) landed.classList.add("right");
       }
     };
-    return FLY_MS;
+    return total;
   }
 
   registerGame("dealer", {
