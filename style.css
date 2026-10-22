@@ -542,3 +542,9 @@ html.fit .fd-ranks .btn { padding: clamp(3px, 0.9dvh, 10px) 4px; font-size: clam
 html.fit .fd-ranks .btn small { font-size: clamp(0.62rem, 1.5dvh, 0.8rem); }
 html.fit .fd-role { padding: clamp(4px, 0.8dvh, 8px) 12px; }
 html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
+
+/* Antippbare Stapel auf dem Tisch (ratende Person, mehrere Handys) */
+.fd-pile[data-act] { cursor: pointer; -webkit-tap-highlight-color: transparent; filter: drop-shadow(0 0 5px rgb(253 230 138 / 0.7)); }
+.fd-pile[data-act] .fd-spot { border-color: #fde68a; color: #fde68a; }
+.fd-pile[data-act]:active { transform: scale(0.92); }
+.fd-pile[data-off] { opacity: 0.3; }
