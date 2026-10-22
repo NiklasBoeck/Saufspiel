@@ -645,7 +645,7 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
   box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
 }
 
-/* Kreuze und Haken auf dem Tisch */
+/* Kreuze auf dem Tisch */
 .fd-mark {
   position: absolute;
   left: 50%;
@@ -666,7 +666,8 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
   animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both;
 }
 .fd-mark.x { background: #dc2626; }
-.fd-mark.ok { background: #16a34a; }
 .fd-mark.fade { animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both, mark-out 0.4s 1.9s ease-in forwards; }
 @keyframes mark-in { from { transform: translate(-50%, -50%) scale(0) rotate(-90deg); opacity: 0; } }
 @keyframes mark-out { to { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } }
+.fd-fly.right { outline: 5px solid #22c55e; outline-offset: 2px; box-shadow: 0 0 28px #22c55e, 0 12px 30px rgb(0 0 0 / 0.5); }
+.fd-card.new.right { outline-color: #22c55e; }

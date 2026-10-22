@@ -33,11 +33,11 @@
   // Die gespielten Karten liegen sortiert auf dem Tisch, gleiche Werte leicht versetzt übereinander.
   function tableCardHtml(c, j, fresh) {
     const isNew = fresh && c.rank === fresh.rank && c.suit.name === fresh.suit.name;
-    return `<div class="fd-card ${c.suit.red ? "red" : ""} ${isNew ? "new" : ""}" style="--j:${j}"><span>${c.rank}</span><span>${c.suit.symbol}</span></div>`;
+    return `<div class="fd-card ${c.suit.red ? "red" : ""} ${isNew ? "new" : ""} ${isNew && fresh.right ? "right" : ""}" style="--j:${j}"><span>${c.rank}</span><span>${c.suit.symbol}</span></div>`;
   }
 
   // tap: { by, allowed(v) } macht die Stapel antippbar, damit die ratende Person direkt auf dem Tisch wählt.
-  // marks: { wert: "x" | "ok" } zeigt rote Kreuze und grüne Haken für die Tipps dieser Runde.
+  // marks: { wert: "x" } zeigt rote Kreuze für die falschen Tipps dieser Runde.
   function boardHtml(s, fresh, tap, marks = {}, fade = false) {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
@@ -52,19 +52,19 @@
       return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
         <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
-        ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""}">${marks[v] === "ok" ? "✓" : "✗"}</span>` : ""}
+        ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""}">✗</span>` : ""}
       </div>`;
     };
     const row = (from, to) => `<div class="fd-row">${Array.from({ length: to - from + 1 }, (_, i) => pile(from + i)).join("")}</div>`;
     return `<div class="fd-table">${row(2, 8)}${row(9, 14)}</div>`;
   }
 
-  // Kreuze/Haken je nach dem, was die Person schon wissen darf: firstKnown = erster Fehlversuch ist bekannt,
+  // Kreuze je nach dem, was die Person schon wissen darf: firstKnown = erster Fehlversuch ist bekannt,
   // tip = gerade geprüfter Tipp (nur der Dealer kennt das Ergebnis schon).
   function marksFor(s, firstKnown, tip) {
     const m = {};
     if (firstKnown && s.first) m[s.first] = "x";
-    if (tip) m[tip] = s.deck[s.deck.length - 1].value === tip ? "ok" : "x";
+    if (tip && s.deck[s.deck.length - 1].value !== tip) m[tip] = "x";
     return m;
   }
 
@@ -213,7 +213,7 @@
   function resultMarks(r) {
     const m = {};
     if (r.guesses.length === 2) m[r.guesses[0]] = "x";
-    m[r.guesses[r.guesses.length - 1]] = r.kind === "miss" ? "x" : "ok";
+    if (r.kind === "miss") m[r.guesses[1]] = "x";
     return m;
   }
 
@@ -239,7 +239,7 @@
     return {
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
       title: titles[r.kind],
-      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, r.card, null, resultMarks(r), true)}`,
+      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r), true)}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
@@ -344,7 +344,8 @@
     const h = Math.min(br.height * 0.7, 190);
     const w = h * (110 / 158);
     const el = document.createElement("div");
-    el.className = `pc fd-fly ${s.result.card.suit.red ? "pc-red" : ""}`;
+    const right = s.result.kind !== "miss"; // erratene Karte wird grün umrandet hingelegt
+    el.className = `pc fd-fly ${s.result.card.suit.red ? "pc-red" : ""} ${right ? "right" : ""}`;
     el.innerHTML = `<span>${s.result.card.rank}</span><span>${s.result.card.suit.symbol}</span>`;
     Object.assign(el.style, {
       left: `${br.left + br.width / 2 - w / 2}px`,
@@ -372,6 +373,7 @@
       if (landed) {
         landed.style.visibility = "";
         landed.classList.add("landed");
+        if (right) landed.classList.add("right");
       }
     };
     return FLY_MS;
