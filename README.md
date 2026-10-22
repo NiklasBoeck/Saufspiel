@@ -42,7 +42,7 @@ In jedem Spiel kann man Bots mitspielen lassen, damit man auch alleine spielen k
 
 - Ist ein Knopf für einen Bot (`by`), drückt ihn die App nach einer kurzen Pause selbst (beim Mehr-Handy-Spiel das Handy des Hosts). Ein Spiel kann mit `bot(s, name, actions)` sagen, welchen Knopf; sonst drückt der Bot zufällig.
 - Muss ein Bot trinken, kommt die normale Trink-Meldung. Darf er verteilen, verteilt er gleich selbst an zufällige Mitspieler.
-- Kartenspiele: Bots „haben’s schon mal gemacht“ oder brechen Regeln (`botChance`), schaffen Pflicht-Aufgaben nur manchmal (`fail`).
+- Kartenspiele: Bei Ich hab noch nie haben Bots manches „schon mal gemacht“ (`botChance`), Pflicht-Aufgaben schaffen sie nur manchmal (`fail`). Triade: Zieht ein Bot Dame oder 10, denkt er sich selbst eine Regel oder Kategorie aus.
 - Flunky Ball: Bots werfen (trifft etwa jeder dritte Wurf), rennen zur Flasche und trinken virtuell mit, bis ihr Bier leer ist. Was sie trinken, steht oben auf allen Handys.
 
 ## Jeder sein Handy
