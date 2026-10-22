@@ -28,6 +28,14 @@
   const ROLL_MS = 500;
   const STOP_MS = 2500;
 
+  // Bots (mittel): zielen auf die Flasche, gleichen den Wind nur teilweise aus und streuen.
+  // Mit diesen Werten trifft ein Bot etwa jeden dritten Wurf.
+  const BOT_NAMES = ["Robo-Rudi", "Bot-Bärbel", "Chip-Charlie", "Byte-Brigitte", "Turbo-Tom", "Pixel-Paula", "Kalle Klon", "Data-Dörte"];
+  const BOT_AIM = 0.08; // Streuung der Richtung (rad, Standardabweichung)
+  const BOT_POWER = 0.15; // Streuung der Kraft (Anteil)
+  const BOT_WIND = 0.85; // so viel vom Wind gleicht ein Bot aus
+  const BOT_SIP = [0.12, 0.28]; // so viel Bier trinkt ein Bot pro Treffer (von 1)
+
   const TEAM_NAMES = ["Team Rot", "Team Blau"];
   const TEAM_COLORS = ["#ef4444", "#3b82f6"];
   const TEAM_EMOJI = ["🔴", "🔵"];
@@ -322,6 +330,19 @@
           p.online = false;
         }
         break;
+      case "bot-add": {
+        if (!fromHost || S.phase !== "lobby" || S.players.length >= MAX_PLAYERS) return;
+        const names = S.players.map((x) => x.name);
+        const free = BOT_NAMES.map((n) => `🤖 ${n}`).filter((n) => !names.includes(n));
+        const name = free.length ? free[Math.floor(Math.random() * free.length)] : `🤖 Bot ${S.players.length + 1}`;
+        S.players.push({ id: `bot-${randomString("abcdefghijkmnopqrstuvwxyz23456789", 8)}`, name, team: null, done: false, online: true, bot: true, beer: 1 });
+        S.max = Math.max(S.max, S.players.length);
+        break;
+      }
+      case "bot-remove":
+        if (!fromHost || S.phase !== "lobby") return;
+        S.players = S.players.filter((x) => !(x.bot && x.id === a.id));
+        break;
       case "max":
         if (!fromHost || S.phase !== "lobby") return;
         S.max = Math.max(MIN_PLAYERS, S.players.length, Math.min(MAX_PLAYERS, Number(a.max) || 0));
@@ -362,7 +383,10 @@
         break;
       case "again":
         if (!fromHost || S.phase !== "over") return;
-        S.players.forEach((x) => (x.done = false));
+        S.players.forEach((x) => {
+          x.done = false;
+          if (x.bot) x.beer = 1;
+        });
         S.phase = "teams";
         S.winner = null;
         S.shot = null;
@@ -381,6 +405,8 @@
     S.bottleDown = false;
     S.winner = null;
     S.phase = "aim";
+    S.botNews = null;
+    S.players.forEach((x) => x.bot && (x.beer = 1));
     pickThrower();
   }
 
@@ -454,7 +480,23 @@
     publishState();
   }
 
+  // Die Bots im Trink-Team haben mitgetrunken. Ist ein Bier leer, ist der Bot fertig.
+  function botsDrink() {
+    S.botNews = [];
+    for (const p of teamPlayers(S.drinkTeam)) {
+      if (!p.bot || p.done) continue;
+      p.beer = Math.max(0, (p.beer ?? 1) - (BOT_SIP[0] + Math.random() * (BOT_SIP[1] - BOT_SIP[0])));
+      if (p.beer < 0.03) {
+        p.beer = 0;
+        p.done = true;
+      }
+      S.botNews.push({ name: p.name, beer: p.beer });
+    }
+    return checkWinner();
+  }
+
   function endDrink() {
+    if (botsDrink()) return publishState();
     S.bottleDown = false;
     S.phase = "stop";
     S.runnerId = null;
@@ -554,6 +596,7 @@
       if (S.phase === "drink") newDrinkTask();
       lastPhase = S.phase;
     }
+    if (session.host) driveBots();
     if (S.phase === "lobby" || S.phase === "teams") {
       show("fb-lobby");
       renderLobby();
@@ -562,6 +605,52 @@
       keepAwake();
       renderGame();
     }
+  }
+
+  // --- Bots (nur der Host lässt sie spielen) ---
+
+  let botKey = null;
+  let botTimer = null;
+
+  function gauss() {
+    let u = 0;
+    while (!u) u = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random());
+  }
+
+  function botThrow(p) {
+    const start = ballStart(p);
+    const tx = BOTTLE.x - (S.wind || 0) * WIND_DRIFT * BOT_WIND;
+    const dist = Math.hypot(tx - start.x, BOTTLE.y - start.y);
+    const angle = Math.atan2(BOTTLE.y - start.y, tx - start.x) + gauss() * BOT_AIM;
+    // Ideal landet der Ball knapp hinter der Flasche, dann trifft er tief oder beim Rollen.
+    const power = Math.min(1, (dist / 0.98 / RANGE) * (1 + gauss() * BOT_POWER));
+    return { type: "throw", from: p.id, dx: Math.cos(angle), dy: Math.sin(angle), power };
+  }
+
+  function driveBots() {
+    const actorId = S.phase === "aim" ? S.throwerId : S.phase === "drink" ? S.runnerId : null;
+    const bot = S.players.find((p) => p.id === actorId && p.bot);
+    const key = bot ? `${S.phase}:${bot.id}:${S.runStage}:${S.shot?.id}:${S.wind}` : null;
+    if (key === botKey) return;
+    botKey = key;
+    clearTimeout(botTimer);
+    if (!bot) return;
+    let action;
+    let wait;
+    if (S.phase === "aim") {
+      action = () => botThrow(bot);
+      wait = 1400 + Math.random() * 1000;
+    } else if (S.runStage === "aufstellen") {
+      action = () => ({ type: "upright", from: bot.id });
+      wait = 2500 + Math.random() * 2500; // Flasche aufstellen dauert
+    } else {
+      action = () => ({ type: "back", from: bot.id });
+      wait = 1500 + Math.random() * 1500;
+    }
+    botTimer = setTimeout(() => {
+      if (session?.host && S && botKey === key) handleAction(action());
+    }, wait);
   }
 
   function vibrate(pattern) {
@@ -586,6 +675,8 @@
     list.replaceChildren(...S.players.map(playerChip));
     $("fb-count").textContent = `${S.players.length} von ${S.max} Spielern`;
     $("fb-host-max").hidden = !isHost || teamsPhase;
+    $("fb-bot-add").hidden = !isHost || teamsPhase;
+    $("fb-bot-add").disabled = S.players.length >= MAX_PLAYERS;
     $("fb-lmax").textContent = S.max;
 
     if (teamsPhase) {
@@ -602,7 +693,7 @@
 
     let hint;
     if (!m) hint = full ? "Der Raum ist leider voll." : "Du wirst gleich hinzugefügt…";
-    else if (isHost) hint = teamsPhase ? "Passt? Dann los!" : full ? "Alle da! Teams auslosen." : "Warte, bis alle beigetreten sind.";
+    else if (isHost) hint = teamsPhase ? "Passt? Dann los!" : full ? "Alle da! Teams auslosen." : "Warte, bis alle beigetreten sind, oder nimm Bots dazu.";
     else hint = teamsPhase ? "Gleich geht’s los…" : "Warte, bis der Host die Teams auslost.";
     $("fb-lobby-hint").textContent = hint;
   }
@@ -612,6 +703,15 @@
     li.textContent = `${p.id === S.hostId ? "👑 " : ""}${p.name}`;
     li.classList.toggle("me", p.id === session.id);
     li.classList.toggle("off", !p.online);
+    li.classList.toggle("bot", !!p.bot);
+    if (p.bot && session.host && S.phase === "lobby") {
+      const remove = document.createElement("button");
+      remove.textContent = "✕";
+      remove.className = "fb-remove";
+      remove.setAttribute("aria-label", `${p.name} entfernen`);
+      remove.onclick = () => send({ type: "bot-remove", id: p.id });
+      li.appendChild(remove);
+    }
     return li;
   }
 
@@ -657,6 +757,7 @@
     }
 
     $("fb-stop").hidden = !(S.phase === "stop" && m && m.team === S.drinkTeam);
+    renderBotBar();
 
     $("fb-over").hidden = S.phase !== "over";
     if (S.phase === "over") {
@@ -685,6 +786,27 @@
         const div = document.createElement("div");
         div.textContent = `${TEAM_EMOJI[t]} ${open}/${team.length} Bier offen`;
         return div;
+      })
+    );
+  }
+
+  // Was die Bots trinken, sehen alle: beim Treffer wer mittrinkt, danach wie viel Bier noch drin ist.
+  function renderBotBar() {
+    const bar = $("fb-botbar");
+    let items = [];
+    if (S.phase === "drink") {
+      items = teamPlayers(S.drinkTeam)
+        .filter((p) => p.bot && !p.done)
+        .map((p) => `🍺 ${p.name} trinkt!`);
+    } else if (S.phase === "stop" && S.botNews) {
+      items = S.botNews.map((b) => (b.beer ? `${b.name}: noch ${Math.round(b.beer * 100)} % Bier` : `${b.name} hat ausgetrunken! ✓`));
+    }
+    bar.hidden = !items.length;
+    bar.replaceChildren(
+      ...items.map((t) => {
+        const li = document.createElement("li");
+        li.textContent = t;
+        return li;
       })
     );
   }
@@ -1671,7 +1793,7 @@
       $("fb-players").replaceChildren();
       $("fb-count").textContent = "";
       $("fb-lobby-hint").textContent = "Suche Raum…";
-      ["fb-draw", "fb-start-game", "fb-host-max", "fb-teams"].forEach((id) => ($(id).hidden = true));
+      ["fb-draw", "fb-start-game", "fb-host-max", "fb-bot-add", "fb-teams"].forEach((id) => ($(id).hidden = true));
     }
     connect();
     if (session.host) resumeHostTimers();
@@ -1764,13 +1886,14 @@
     const saved = parseSaved();
     if (!saved) return showStart();
     const { state, ...s } = saved;
-    if (s.host && state) state.players.forEach((p) => (p.online = p.id === s.id));
+    if (s.host && state) state.players.forEach((p) => (p.online = p.bot || p.id === s.id));
     startSession(s, s.host ? state : null);
   };
 
   $("fb-lmax-minus").onclick = () => send({ type: "max", max: S.max - 1 });
   $("fb-lmax-plus").onclick = () => send({ type: "max", max: S.max + 1 });
   $("fb-draw").onclick = () => send({ type: "draw" });
+  $("fb-bot-add").onclick = () => send({ type: "bot-add" });
   $("fb-start-game").onclick = () => send({ type: "start" });
   $("fb-again").onclick = () => send({ type: "again" });
   $("fb-skip").onclick = () => send({ type: "skip" });

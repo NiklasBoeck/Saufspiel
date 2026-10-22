@@ -221,6 +221,19 @@
     }
   }
 
+  // Bot rät den Wert in der Mitte der Karten, die noch im Stapel sein können (so wird der Abstand klein).
+  function botGuess(s) {
+    let pool = [];
+    for (let v = 2; v <= 14; v++) {
+      if (s.stage === "guess2" && (s.hint === "hoeher" ? v <= s.first : v >= s.first)) continue;
+      for (let k = playedCount(s, v); k < 4; k++) pool.push(v);
+    }
+    if (!pool.length) return null;
+    let v = pool[Math.floor(pool.length / 2)];
+    if (Math.random() < 0.35) v = pool[Math.floor(Math.random() * pool.length)]; // mittel: nicht immer perfekt
+    return { type: "guess", value: v };
+  }
+
   registerGame("dealer", {
     label: "F*ck den Dealer",
     emoji: "🎴",
@@ -240,11 +253,16 @@
       switch (s.stage) {
         case "guess1":
         case "guess2":
-          if (me) return guessView(s, me);
+          // Ist der Dealer ein Bot, braucht niemand die Karte zu sehen: alle raten am Tisch.
+          if (me || isBot(s.players[s.dealer])) return guessView(s, me);
           return s.peek ? dealerOnlyView(s) : tableView(s);
         case "result": return resultView(s, me);
         default: return endView(s);
       }
+    },
+
+    bot(s, name, acts) {
+      return s.stage === "guess1" || s.stage === "guess2" ? botGuess(s) : acts[0];
     },
 
     act(s, a) {

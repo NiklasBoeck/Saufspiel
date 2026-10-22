@@ -92,6 +92,7 @@ function renderPlayers() {
   state.players.forEach((name, i) => {
     const li = document.createElement("li");
     li.textContent = name;
+    li.classList.toggle("bot", isBot(name));
     const remove = document.createElement("button");
     remove.textContent = "✕";
     remove.className = "remove";
@@ -105,7 +106,14 @@ function renderPlayers() {
     list.appendChild(li);
   });
   $("start-btn").disabled = state.players.length < 2;
+  $("bot-btn").disabled = state.players.length >= 16;
 }
+
+$("bot-btn").onclick = () => {
+  state.players.push(newBotName(state.players));
+  save();
+  renderPlayers();
+};
 
 $("player-form").onsubmit = (e) => {
   e.preventDefault();
@@ -152,6 +160,7 @@ function applyAction(key, s, action, by) {
 }
 
 function canPress(a) {
+  if (a.by && isBot(a.by)) return false; // drückt der Bot selbst
   if (!run.me || !a.by || a.by === run.me) return true;
   return run.host && run.offline(a.by); // der Host springt für Spieler ohne Verbindung ein
 }
@@ -194,6 +203,35 @@ function playGame(r) {
 
   if (!$("screen-game").classList.contains("active")) showScreen("game");
   checkAlert(r.s);
+  scheduleBot(r, v);
+}
+
+// --- Bots ---
+// Ist ein Bot dran, drückt er nach einer kurzen Pause. Auf einem Handy wartet er, bis die
+// Trink-Meldung weg ist, beim Mehr-Handy-Spiel (nur der Host lässt Bots spielen) höchstens ein paar Sekunden.
+
+let botTimer = null;
+
+function scheduleBot(r, v) {
+  clearTimeout(botTimer);
+  if (r.me && !r.host) return;
+  const choices = v.actions.filter((a) => a.by && isBot(a.by) && !a.disabled && a.act);
+  if (!choices.length) return;
+  const name = choices[0].by;
+  const mine = choices.filter((a) => a.by === name);
+  const s = r.s;
+  const start = Date.now();
+  const tick = () => {
+    if (run !== r || !$("screen-game").classList.contains("active")) return;
+    const waiting = !$("drink-alert").hidden && (!r.me || Date.now() - start < 4000);
+    if (waiting) {
+      botTimer = setTimeout(tick, 300);
+      return;
+    }
+    const act = GAMES[r.key].bot?.(s, name, mine.map((a) => a.act)) ?? mine[Math.floor(Math.random() * mine.length)].act;
+    r.send(act);
+  };
+  botTimer = setTimeout(tick, 900 + Math.random() * 700);
 }
 
 $("game-back").onclick = () => run.back();

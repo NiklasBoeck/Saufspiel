@@ -108,6 +108,14 @@
       };
     },
 
+    // Bot: bei kleinen Karten höher, bei großen tiefer.
+    bot(b, acts) {
+      if (b.stage !== "guess") return acts[0];
+      const v = b.cards[b.pos].value;
+      const smart = v === 8 ? (Math.random() < 0.5 ? "hoeher" : "tiefer") : v < 8 ? "hoeher" : "tiefer";
+      return { type: "bus", choice: botPick(smart, ["hoeher", "tiefer"], 0.15) };
+    },
+
     act(s, b, a) {
       if (a.type === "row" && b.stage === "fail") return busRow(b);
       if (a.type !== "bus" || b.stage !== "guess") return;
@@ -159,6 +167,16 @@
     hand.push(card);
     s.stage = "answered";
     drink(s, [{ who: player, n: s.round + 1, give: s.right }]);
+  }
+
+  // Bot in der Fragerunde: rät so, wie es am wahrscheinlichsten passt.
+  function botAnswer(s, player) {
+    const hand = s.hands[player];
+    const options = QUESTIONS[s.round].options.map(([v]) => v);
+    let smart = options[Math.floor(Math.random() * options.length)];
+    if (s.round === 1) smart = hand[0].value === 8 ? smart : hand[0].value < 8 ? "hoeher" : "tiefer";
+    if (s.round === 2) smart = Math.abs(hand[0].value - hand[1].value) >= 7 ? "innen" : "aussen";
+    return { type: "answer", choice: botPick(smart, options) };
   }
 
   function nextTurn(s) {
@@ -279,6 +297,12 @@
             { label: "Zum Menü", exit: true, ghost: true },
           ]);
       }
+    },
+
+    bot(s, name, acts) {
+      if (s.stage === "ask") return botAnswer(s, name);
+      if (s.stage === "bus") return Busfahrt.bot(s.bus, acts);
+      return acts[0];
     },
 
     act(s, a) {

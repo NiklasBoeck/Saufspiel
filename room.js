@@ -270,6 +270,14 @@ const Room = (() => {
         if (!p) return;
         p.online = false;
         break;
+      case "bot-add":
+        if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length >= MAX_PLAYERS) return;
+        S.players.push({ id: `bot-${randomString("abcdefghijkmnopqrstuvwxyz23456789", 8)}`, name: newBotName(S.players.map((x) => x.name)), online: true, bot: true });
+        break;
+      case "bot-remove":
+        if (a.from !== S.hostId || S.phase !== "lobby") return;
+        S.players = S.players.filter((x) => !(x.bot && x.id === a.id));
+        break;
       case "start":
         if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length < MIN_PLAYERS) return;
         S.phase = "play";
@@ -326,15 +334,26 @@ const Room = (() => {
         li.textContent = `${p.id === S.hostId ? "👑 " : ""}${p.name}`;
         li.classList.toggle("me", p.id === session.id);
         li.classList.toggle("off", !p.online);
+        li.classList.toggle("bot", !!p.bot);
+        if (p.bot && session.host) {
+          const remove = document.createElement("button");
+          remove.textContent = "✕";
+          remove.className = "remove";
+          remove.setAttribute("aria-label", `${p.name} entfernen`);
+          remove.onclick = () => send({ type: "bot-remove", id: p.id });
+          li.appendChild(remove);
+        }
         return li;
       })
     );
     const enough = S.players.length >= MIN_PLAYERS;
     $("lobby-start").hidden = !session.host;
+    $("lobby-bot").hidden = !session.host;
+    $("lobby-bot").disabled = S.players.length >= MAX_PLAYERS;
     $("lobby-start").disabled = !enough;
     let hint;
     if (!me()) hint = "Du wirst gleich hinzugefügt…";
-    else if (session.host) hint = enough ? `${S.players.length} Spieler da. Alle drin? Dann los!` : "Warte auf Mitspieler: Code eingeben oder QR-Code scannen.";
+    else if (session.host) hint = enough ? `${S.players.length} Spieler da. Alle drin? Dann los!` : "Warte auf Mitspieler: Code eingeben, QR-Code scannen oder einen Bot dazunehmen.";
     else hint = "Du bist drin! Warte, bis der Host startet.";
     $("lobby-hint").textContent = hint;
   }
@@ -392,6 +411,7 @@ const Room = (() => {
       $("lobby-players").replaceChildren();
       $("lobby-hint").textContent = "Suche Raum…";
       $("lobby-start").hidden = true;
+      $("lobby-bot").hidden = true;
       showScreen("lobby");
     }
     connect();
@@ -455,13 +475,14 @@ const Room = (() => {
   function resume(saved) {
     const { state, ...s } = saved;
     gameKey = s.game;
-    if (s.host && state) state.players.forEach((p) => (p.online = p.id === s.id));
+    if (s.host && state) state.players.forEach((p) => (p.online = p.bot || p.id === s.id));
     startSession(s, s.host ? state : null);
   }
 
   $("room-back").onclick = () => showScreen("mode");
   $("lobby-back").onclick = leave;
   $("lobby-start").onclick = () => send({ type: "start" });
+  $("lobby-bot").onclick = () => send({ type: "bot-add" });
 
   $("room-create").onclick = () => {
     const name = nameOrError();

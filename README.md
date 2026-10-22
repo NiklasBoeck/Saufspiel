@@ -36,6 +36,15 @@ Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, c
 - `setup(players)`, `view(s, me)`, `act(s, action, by)`: eigenes Spiel. Der ganze Spielstand ist ein JSON-Objekt, `view` sagt, was zu sehen ist und wer welchen Knopf drücken darf, `act` ändert den Stand. Damit läuft das Spiel automatisch auf einem Handy und mit jedem am eigenen Handy. Muss jemand trinken, `drink(s, [{ who, n }])` aufrufen.
 - `open()`: eigenes Spiel ohne Namenseingabe, z. B. eine eigene Seite
 
+## Bots
+
+In jedem Spiel kann man Bots mitspielen lassen, damit man auch alleine spielen kann: bei „Ein Handy“ mit „🤖 Bot dazu“ unter der Spielerliste, bei „Jeder sein Handy“ und Flunky Ball fügt der Host im Raum Bots hinzu. Bots und echte Spieler lassen sich mischen. Bots haben mittlere Schwierigkeit: meistens die kluge Wahl, manchmal daneben. Ihre Namen fangen mit 🤖 an (`isBot()` in `games.js`).
+
+- Ist ein Knopf für einen Bot (`by`), drückt ihn die App nach einer kurzen Pause selbst (beim Mehr-Handy-Spiel das Handy des Hosts). Ein Spiel kann mit `bot(s, name, actions)` sagen, welchen Knopf; sonst drückt der Bot zufällig.
+- Muss ein Bot trinken, kommt die normale Trink-Meldung. Darf er verteilen, verteilt er gleich selbst an zufällige Mitspieler.
+- Kartenspiele: Bots „haben’s schon mal gemacht“ oder brechen Regeln (`botChance`), schaffen Pflicht-Aufgaben nur manchmal (`fail`).
+- Flunky Ball: Bots werfen (trifft etwa jeder dritte Wurf), rennen zur Flasche und trinken virtuell mit, bis ihr Bier leer ist. Was sie trinken, steht oben auf allen Handys.
+
 ## Jeder sein Handy
 
 Funktioniert wie bei Flunky Ball: Das Handy, das den Raum erstellt, ist Host und hält den Spielstand, die anderen schicken nur ihre Knopfdrücke. Jeder sieht dasselbe, drücken darf nur, wer dran ist (bei „Weiter“ jeder). Ist jemand ohne Verbindung, darf der Host für ihn drücken. Nach dem Neuladen kommt man automatisch zurück in den Raum. Lokal testen: `index.html?broker=ws://localhost:8888`.

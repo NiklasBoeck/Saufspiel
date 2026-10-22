@@ -42,6 +42,19 @@
   };
   const RANKS = ["7", "8", "9", "10", "B", "D", "K", "A"];
 
+  // Zieht ein Bot Dame oder 10, sucht er sich selbst etwas aus.
+  const BOT_PICKS = {
+    D: [
+      "Wer flucht, trinkt.",
+      "Vor jedem Schluck „Prost, Bot!“ sagen.",
+      "Niemand darf mehr auf sein Handy schauen, außer wenn er dran ist.",
+      "Wer lacht, trinkt.",
+      "Nur noch mit der linken Hand trinken.",
+      "Keine Vornamen mehr sagen.",
+    ],
+    10: ["Automarken", "Biersorten", "Fußballvereine", "Länder in Europa", "Tiere im Zoo", "Pizzabeläge", "Disney-Filme", "Dinge im Kühlschrank"],
+  };
+
   function newDeck() {
     return shuffle(SUITS.flatMap((suit) => RANKS.map((rank) => ({ suit, rank }))));
   }
@@ -82,7 +95,7 @@
       title: rule.title,
       body: `<div class="pc-row">${playingCardHtml(s.card, "pc-big pc-new")}</div><p class="tr-text">${text}</p>${
         rule.drink ? drinkNoteHtml(rule.drink) : ""
-      }`,
+      }${s.botPick ? `<p class="bot-line">${escapeHtml(s.drawer)}: „${escapeHtml(s.botPick)}“</p>` : ""}`,
       actions: rule.bus
         ? [{ label: "Busfahrt starten", act: { type: "bus-start" }, by: s.drawer }]
         : [{ label: "Weiter", act: { type: "next" } }],
@@ -105,10 +118,17 @@
       return turnView(s);
     },
 
+    bot(s, name, acts) {
+      if (s.stage === "bus") return Busfahrt.bot(s.bus, acts);
+      return acts[0];
+    },
+
     act(s, a) {
       if (s.stage === "turn" && a.type === "draw" && s.deck.length) {
         s.drawer = s.players[s.turn];
         s.card = s.deck.pop();
+        const picks = isBot(s.drawer) && BOT_PICKS[s.card.rank];
+        s.botPick = picks ? picks[Math.floor(Math.random() * picks.length)] : null;
         s.turn = (s.turn + 1) % s.players.length;
         s.stage = "card";
         const rule = RULES[s.card.rank];

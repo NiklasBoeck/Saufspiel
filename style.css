@@ -51,6 +51,10 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
   gap: 6px;
 }
 .remove { background: none; border: none; color: var(--muted); font-size: 0.9rem; cursor: pointer; }
+.chips li.bot { background: color-mix(in srgb, var(--surface) 70%, #22d3ee 30%); }
+.bot-add { align-self: center; }
+.hint.small-hint { font-size: 0.8rem; margin-top: -8px; }
+.bot-line { text-align: center; margin: 8px 0 0; font-weight: 600; color: #67e8f9; }
 
 /* --- Menü --- */
 .bg-blobs { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }

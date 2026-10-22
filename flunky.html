@@ -48,6 +48,7 @@
         <li>Wer dran ist, zieht den Finger nach hinten und lässt los. Je weiter du ziehst, desto weiter fliegt der Ball.</li>
         <li>Treffer: Dein ganzes Team trinkt, bis das andere Team die Flasche aufgestellt hat und zurück hinter der Linie ist.</li>
         <li>Bier in echt leer? Unten links auf „Fertig“ tippen. Das Team, das zuerst alle Biere leer hat, gewinnt.</li>
+        <li>Zu wenige Leute? Im Raum mit „🤖 Bot dazu“ Bots mitspielen lassen. Die werfen, rennen und trinken (virtuell) mit.</li>
       </ol>
     </details>
     <p id="fb-start-error" class="fb-error" hidden></p>
@@ -75,6 +76,7 @@
         <strong id="fb-lmax"></strong>
         <button id="fb-lmax-plus" class="fb-step" aria-label="Mehr Spieler">+</button>
       </div>
+      <button id="fb-bot-add" class="fb-btn secondary small" hidden>🤖 Bot dazu</button>
     </div>
 
     <div id="fb-teams" class="fb-teams" hidden>
@@ -98,6 +100,8 @@
       <p id="fb-status" class="fb-status"></p>
       <span id="fb-conn2" class="fb-dot" title="Verbindung"></span>
     </header>
+
+    <ul id="fb-botbar" class="fb-botbar" hidden></ul>
 
     <div id="fb-drink" class="fb-overlay drink" hidden>
       <div class="fb-big">🍺 TRINKEN!</div>
