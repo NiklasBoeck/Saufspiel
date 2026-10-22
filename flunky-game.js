@@ -744,10 +744,14 @@
     }
   }
 
-  // --- Spielfeld in 3D: Die Kamera steht hinter der eigenen Linie und schaut auf die Flasche ---
+  // --- Spielfeld in echtem 3D (three.js / WebGL) ---
+  // Die Kamera steht hinter der eigenen Linie und schaut auf die Flasche. Darüber liegt ein
+  // durchsichtiges 2D-Canvas für Zielhilfe, Namen und Wind; es nimmt auch die Finger entgegen.
+  // Koordinaten: Spielfeld x (quer), y (längs) → three.js x, z; Höhe → three.js y.
 
   const canvas = $("fb-field");
   const ctx = canvas.getContext("2d");
+  const glCanvas = $("fb-3d");
   const CAM_BACK = 0.32; // so weit hinter der Linie steht die Kamera
   const CAM_H = 0.34; // Kamerahöhe
   const CAM_PITCH = 0.45; // Blick schräg nach unten
@@ -759,6 +763,7 @@
   let view = { w: 0, h: 0, team: 0, camX: 0.5, camY: 0, focal: 1, cx: 0, cy: 0 };
   let camX = 0.5;
   let aim = null; // { sx, sy, x, y } Finger beim Zielen relativ zum Startpunkt
+  let lastFrame = 0;
 
   function layout() {
     const dpr = window.devicePixelRatio || 1;
@@ -786,7 +791,7 @@
     };
   }
 
-  // Weltpunkt (x quer, y längs, z Höhe) → Bildschirm. null, wenn er hinter der Kamera liegt.
+  // Weltpunkt (x quer, y längs, z Höhe) → Bildschirm. Gleiche Lochkamera wie die three.js-Kamera.
   function project(x, y, z) {
     const fwd = view.team === 0 ? view.camY - y : y - view.camY;
     const right = view.team === 0 ? x - view.camX : view.camX - x;
@@ -799,140 +804,448 @@
     return { x: view.cx + right * k, y: view.cy - (fwd * sn + up * c) * k, k, depth };
   }
 
-  function polygon(points, fill) {
-    const pts = points.map(([x, y, z]) => project(x, y, z ?? 0));
-    if (pts.some((p) => !p)) return;
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-    ctx.closePath();
-    ctx.fillStyle = fill;
-    ctx.fill();
+  // Kleiner fester Zufall, damit Bäume und Gras bei allen gleich aussehen.
+  function seeded(seed) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
   }
 
-  function groundEllipse(x, y, rx, ry, fill) {
-    const pts = [];
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2;
-      pts.push([x + Math.cos(a) * rx, y + Math.sin(a) * ry, 0]);
+  function canvasTexture(w, h, paint) {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    paint(c.getContext("2d"), w, h);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  function paintGrass(g, w, h, rnd, base) {
+    g.fillStyle = base;
+    g.fillRect(0, 0, w, h);
+    const greens = ["#3f8a2e", "#5aa83f", "#6dbb4a", "#4c9a37", "#82c95a", "#356f27"];
+    for (let i = 0; i < (w * h) / 40; i++) {
+      const x = rnd() * w;
+      const y = rnd() * h;
+      g.strokeStyle = greens[Math.floor(rnd() * greens.length)];
+      g.globalAlpha = 0.35 + rnd() * 0.4;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + (rnd() - 0.5) * 3, y - 2 - rnd() * 4);
+      g.stroke();
     }
-    polygon(pts, fill);
+    g.globalAlpha = 1;
   }
 
-  // Grasbüschel und Wolken einmal zufällig verteilen, damit sie nicht flackern.
-  const TUFTS = Array.from({ length: 700 }, () => ({
-    x: Math.random() * 1.6 - 0.3,
-    y: Math.random() * (FIELD_L + 0.6) - 0.3,
-    shade: Math.random() < 0.5 ? "#2f6f27" : "#7cc35a",
-  }));
-  const CLOUDS = Array.from({ length: 5 }, (_, i) => ({ x: i / 5 + Math.random() * 0.1, y: 0.15 + Math.random() * 0.45, s: 0.7 + Math.random() * 0.6 }));
+  const SKINS = ["#f6d3b3", "#e8b48f", "#c68863", "#8d5a3b", "#f2c9a0"];
+  const HAIRS = ["#2b1d14", "#5a3a22", "#d9a441", "#1a1a1a", "#a0522d", "#e6e0d4"];
+  const PANTS = ["#1f2a44", "#2d3a2a", "#3b3b3b", "#4a3426", "#24476b"];
 
-  function drawGrass() {
-    ctx.lineWidth = 1.2;
-    for (const t of TUFTS) {
-      const g = project(t.x, t.y, 0);
-      if (!g || g.y > view.h + 10 || g.x < -10 || g.x > view.w + 10) continue;
-      const hgt = Math.min(9, 0.012 * g.k);
-      if (hgt < 1.2) continue;
-      ctx.strokeStyle = t.shade;
-      ctx.beginPath();
-      for (const dx of [-0.6, 0, 0.6]) {
-        ctx.moveTo(g.x + dx * hgt * 0.5, g.y);
-        ctx.lineTo(g.x + dx * hgt, g.y - hgt);
+  function looks(id) {
+    let hsh = 0;
+    for (const c of id) hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0;
+    return {
+      skin: SKINS[hsh % SKINS.length],
+      hair: HAIRS[(hsh >>> 4) % HAIRS.length],
+      pants: PANTS[(hsh >>> 12) % PANTS.length],
+      long: (hsh >>> 8) % 3 === 0,
+    };
+  }
+
+  let G = null; // alles, was three.js braucht
+  let glFailed = false;
+
+  function init3D() {
+    if (G || glFailed) return G;
+    try {
+      const renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.1;
+
+      const scene = new THREE.Scene();
+      scene.background = canvasTexture(4, 256, (g, w, h) => {
+        const sky = g.createLinearGradient(0, 0, 0, h);
+        sky.addColorStop(0, "#1f6fe0");
+        sky.addColorStop(0.55, "#62b2ff");
+        sky.addColorStop(1, "#dff1ff");
+        g.fillStyle = sky;
+        g.fillRect(0, 0, w, h);
+      });
+      scene.fog = new THREE.Fog(0xcfe9ff, 2.5, 9);
+
+      const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 60);
+
+      scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x3d6b2a, 1.1));
+      const sun = new THREE.DirectionalLight(0xfff0d0, 2.6);
+      sun.position.set(1.8, 2.6, -0.6);
+      sun.target.position.set(0.5, 0, FIELD_L / 2);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      Object.assign(sun.shadow.camera, { left: -1.3, right: 1.3, top: 1.3, bottom: -1.3, near: 0.5, far: 6 });
+      sun.shadow.bias = -0.0005;
+      sun.shadow.normalBias = 0.01;
+      scene.add(sun, sun.target);
+
+      const rnd = seeded(42);
+      const maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+      // Wiese rundherum
+      const grassTex = canvasTexture(256, 256, (g, w, h) => paintGrass(g, w, h, rnd, "#4b9636"));
+      grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+      grassTex.repeat.set(140, 140);
+      grassTex.anisotropy = maxAniso;
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.95 }));
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.set(0.5, -0.001, FIELD_L / 2);
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // Spielfeld: hellere Mähstreifen als durchsichtige Schicht über der feinen Wiese
+      const fieldTex = canvasTexture(4, 24, (g, w, h) => {
+        for (let i = 0; i < 12; i++) {
+          g.fillStyle = i % 2 ? "rgba(190,255,150,0.22)" : "rgba(150,230,110,0.12)";
+          g.fillRect(0, (i * h) / 12, w, h / 12);
+        }
+      });
+      fieldTex.magFilter = THREE.NearestFilter;
+      const field = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, FIELD_L),
+        new THREE.MeshStandardMaterial({ map: fieldTex, transparent: true, roughness: 0.9, depthWrite: false })
+      );
+      field.rotation.x = -Math.PI / 2;
+      field.position.set(0.5, 0.0005, FIELD_L / 2);
+      field.receiveShadow = true;
+      scene.add(field);
+
+      for (const t of [0, 1]) {
+        const line = new THREE.Mesh(
+          new THREE.BoxGeometry(1.1, 0.002, 0.012),
+          new THREE.MeshStandardMaterial({ color: TEAM_COLORS[t], emissive: TEAM_COLORS[t], emissiveIntensity: 0.35 })
+        );
+        line.position.set(0.5, 0.001, LINE_Y[t]);
+        line.receiveShadow = true;
+        scene.add(line);
       }
-      ctx.stroke();
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.115, 0.122, 72),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(BOTTLE.x, 0.0015, BOTTLE.y);
+      scene.add(ring);
+
+      addScenery(scene, rnd);
+      addGrassBlades(scene, rnd);
+
+      // Flasche: gedrehtes Profil aus grünem Glas, Etikett und Kronkorken
+      const bottle = new THREE.Group();
+      const profile = [
+        [0, 0], [0.98, 0], [1, 0.04], [1, 0.55], [0.93, 0.66], [0.55, 0.78], [0.42, 0.86], [0.4, 0.97], [0.45, 1], [0, 1],
+      ].map(([r, y]) => new THREE.Vector2(r * BOTTLE_R, y * BOTTLE_H));
+      const glass = new THREE.Mesh(
+        new THREE.LatheGeometry(profile, 32),
+        new THREE.MeshPhysicalMaterial({ color: 0x1e8a3c, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, transparent: true, opacity: 0.6, depthWrite: false })
+      );
+      glass.castShadow = true;
+      const labelTex = canvasTexture(128, 64, (g, w, h) => {
+        g.fillStyle = "#f8f3e6";
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = "#c81e1e";
+        g.fillRect(0, h * 0.3, w, h * 0.4);
+        g.fillStyle = "#f5c518";
+        g.font = "bold 20px sans-serif";
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillText("PILS", w / 4, h / 2);
+        g.fillText("PILS", (3 * w) / 4, h / 2);
+      });
+      const label = new THREE.Mesh(
+        new THREE.CylinderGeometry(BOTTLE_R * 1.01, BOTTLE_R * 1.01, BOTTLE_H * 0.22, 32, 1, true),
+        new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.6 })
+      );
+      label.position.y = BOTTLE_H * 0.32;
+      const cap = new THREE.Mesh(
+        new THREE.CylinderGeometry(BOTTLE_R * 0.47, BOTTLE_R * 0.47, BOTTLE_H * 0.05, 20),
+        new THREE.MeshStandardMaterial({ color: 0xf5c518, metalness: 0.8, roughness: 0.3 })
+      );
+      cap.position.y = BOTTLE_H * 1.0;
+      // Bier in der Flasche
+      const beerInside = new THREE.Mesh(
+        new THREE.CylinderGeometry(BOTTLE_R * 0.9, BOTTLE_R * 0.9, BOTTLE_H * 0.5, 24),
+        new THREE.MeshStandardMaterial({ color: 0xd98a12, roughness: 0.3, emissive: 0x5a3000, emissiveIntensity: 0.3 })
+      );
+      beerInside.position.y = BOTTLE_H * 0.26;
+      bottle.add(beerInside, glass, label, cap);
+      bottle.position.set(BOTTLE.x, 0, BOTTLE.y);
+      scene.add(bottle);
+
+      const puddle = new THREE.Mesh(
+        new THREE.CircleGeometry(1, 40),
+        new THREE.MeshStandardMaterial({ color: 0xf2b72a, transparent: true, opacity: 0.6, roughness: 0.1 })
+      );
+      puddle.rotation.x = -Math.PI / 2;
+      puddle.visible = false;
+      scene.add(puddle);
+
+      // Ball mit orangem Streifen
+      const ballTex = canvasTexture(128, 64, (g, w, h) => {
+        g.fillStyle = "#ffffff";
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = "#f97316";
+        g.fillRect(0, h * 0.42, w, h * 0.16);
+        g.fillRect(w * 0.22, 0, w * 0.06, h);
+        g.fillRect(w * 0.72, 0, w * 0.06, h);
+      });
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 28, 18), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45 }));
+      ball.castShadow = true;
+      scene.add(ball);
+
+      G = { renderer, scene, camera, bottle, puddle, ball, people: new Map(), fall: 0, size: "" };
+    } catch (err) {
+      console.error(err);
+      glFailed = true;
+      G = null;
+    }
+    return G;
+  }
+
+  // Bäume, Hügel, Bierkisten in Teamfarben und Fähnchen rund ums Feld
+  function addScenery(scene, rnd) {
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
+    const leafColors = [0x2f7d32, 0x3c9a3f, 0x4caf50, 0x26663a, 0x6bb33e];
+    const leafGeo = new THREE.IcosahedronGeometry(1, 1);
+    const trunkGeo = new THREE.CylinderGeometry(0.6, 0.8, 1, 8);
+    for (let i = 0; i < 70; i++) {
+      const a = rnd() * Math.PI * 2;
+      const r = 2.2 + rnd() * 4;
+      const x = 0.5 + Math.cos(a) * r * 0.9;
+      const z = FIELD_L / 2 + Math.sin(a) * r;
+      const s = 0.12 + rnd() * 0.14;
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.scale.set(s * 0.12, s * 0.9, s * 0.12);
+      trunk.position.y = s * 0.45;
+      const leaves = new THREE.Mesh(leafGeo, new THREE.MeshStandardMaterial({ color: leafColors[Math.floor(rnd() * leafColors.length)], roughness: 0.8, flatShading: true }));
+      leaves.scale.set(s * 0.55, s * 0.7, s * 0.55);
+      leaves.position.y = s * 1.15;
+      tree.add(trunk, leaves);
+      tree.position.set(x, 0, z);
+      tree.traverse((o) => (o.castShadow = true));
+      scene.add(tree);
+    }
+    // Wolken
+    const cloudTex = canvasTexture(128, 64, (g, w, h) => {
+      for (const [x, y, r] of [[40, 38, 22], [64, 28, 26], [90, 38, 20], [64, 42, 22]]) {
+        const grad = g.createRadialGradient(x, y, 2, x, y, r);
+        grad.addColorStop(0, "rgba(255,255,255,1)");
+        grad.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = grad;
+        g.fillRect(0, 0, w, h);
+      }
+    });
+    for (let i = 0; i < 14; i++) {
+      const a = rnd() * Math.PI * 2;
+      const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, fog: false, transparent: true, opacity: 0.9, depthWrite: false }));
+      const s = 2 + rnd() * 2;
+      cloud.scale.set(s, s / 2, 1);
+      cloud.position.set(0.5 + Math.cos(a) * 12, 1.4 + rnd() * 1.8, FIELD_L / 2 + Math.sin(a) * 12);
+      scene.add(cloud);
+    }
+    const hillMat = new THREE.MeshStandardMaterial({ color: 0x5f9e45, roughness: 1 });
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + rnd() * 0.3;
+      const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), hillMat);
+      hill.scale.set(1.5 + rnd(), 0.35 + rnd() * 0.3, 1.5 + rnd());
+      hill.position.set(0.5 + Math.cos(a) * 8, -0.1, FIELD_L / 2 + Math.sin(a) * 8);
+      scene.add(hill);
+    }
+    // Bierkisten hinter den Linien
+    for (const t of [0, 1]) {
+      const mat = new THREE.MeshStandardMaterial({ color: TEAM_COLORS[t], roughness: 0.6 });
+      const behind = t === 0 ? 1 : -1;
+      for (let i = 0; i < 3; i++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.045, 0.05), mat);
+        const side = i === 2 ? 0.03 : 0;
+        crate.position.set(1.12 + (i % 2) * 0.08 - side, 0.0225 + (i === 2 ? 0.045 : 0), LINE_Y[t] + behind * 0.12);
+        crate.castShadow = crate.receiveShadow = true;
+        scene.add(crate);
+      }
+    }
+    // Wimpelkette quer hinter dem Feld
+    const flagColors = [0xef4444, 0xf59e0b, 0xfacc15, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899];
+    for (const t of [0, 1]) {
+      const z = t === 0 ? FIELD_L + 0.35 : -0.35;
+      for (let i = 0; i < 18; i++) {
+        const x = -0.2 + (i / 17) * 1.4;
+        const sag = 0.06 * Math.sin((i / 17) * Math.PI);
+        const flag = new THREE.Mesh(
+          new THREE.ConeGeometry(0.018, 0.04, 3),
+          new THREE.MeshStandardMaterial({ color: flagColors[i % flagColors.length], emissive: flagColors[i % flagColors.length], emissiveIntensity: 0.45, roughness: 0.7 })
+        );
+        flag.rotation.x = Math.PI;
+        flag.position.set(x, 0.32 - sag, z);
+        scene.add(flag);
+      }
+      for (const x of [-0.22, 1.22]) {
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.34, 8), trunkMat);
+        pole.position.set(x, 0.17, z);
+        pole.castShadow = true;
+        scene.add(pole);
+      }
     }
   }
 
-  function drawSkyDecor(horizon, now) {
-    const { w } = view;
-    // Sonne
-    const sx = w * 0.82;
-    const sy = horizon * 0.42;
-    const glow = ctx.createRadialGradient(sx, sy, 4, sx, sy, 70);
-    glow.addColorStop(0, "rgba(255,248,200,0.9)");
-    glow.addColorStop(1, "rgba(255,248,200,0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(sx - 70, sy - 70, 140, 140);
-    ctx.fillStyle = "#fff7c2";
-    ctx.beginPath();
-    ctx.arc(sx, sy, 20, 0, Math.PI * 2);
-    ctx.fill();
-    // Wolken ziehen langsam
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    for (const c of CLOUDS) {
-      const cx = ((c.x + now / 120000) % 1.2) * (w + 160) - 80;
-      const cy = c.y * horizon;
-      const r = 14 * c.s;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.arc(cx + r * 1.1, cy - r * 0.5, r * 1.2, 0, Math.PI * 2);
-      ctx.arc(cx + r * 2.3, cy, r, 0, Math.PI * 2);
-      ctx.rect(cx, cy - r * 0.2, r * 2.3, r * 1.1);
-      ctx.fill();
+  // Tausende kleine Grashalme rund um die Flasche und auf dem Feld
+  function addGrassBlades(scene, rnd) {
+    const count = 7000;
+    const blades = new THREE.InstancedMesh(
+      new THREE.ConeGeometry(0.0018, 0.012, 3).translate(0, 0.006, 0),
+      new THREE.MeshStandardMaterial({ roughness: 0.9 }),
+      count
+    );
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const col = new THREE.Color();
+    const greens = [0x3f8a2e, 0x5aa83f, 0x6dbb4a, 0x4c9a37, 0x82c95a];
+    for (let i = 0; i < count; i++) {
+      const x = -0.4 + rnd() * 1.8;
+      const z = -0.3 + rnd() * (FIELD_L + 0.6);
+      e.set((rnd() - 0.5) * 0.6, rnd() * Math.PI, (rnd() - 0.5) * 0.6);
+      q.setFromEuler(e);
+      const sc = 0.6 + rnd() * 0.9;
+      m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(sc, sc, sc));
+      blades.setMatrixAt(i, m);
+      blades.setColorAt(i, col.set(greens[Math.floor(rnd() * greens.length)]));
     }
-    // Baumreihe am Horizont
-    ctx.fillStyle = "#2d5a27";
-    ctx.beginPath();
-    ctx.moveTo(0, horizon + 1);
-    for (let x = 0; x <= w + 12; x += 12) {
-      const hgt = 10 + 8 * Math.sin(x * 0.07) + 6 * Math.sin(x * 0.23 + 1);
-      ctx.quadraticCurveTo(x - 6, horizon - hgt - 6, x, horizon - hgt * 0.6);
-    }
-    ctx.lineTo(w, horizon + 1);
-    ctx.closePath();
-    ctx.fill();
+    blades.receiveShadow = true;
+    scene.add(blades);
   }
 
-  function groundRing(x, y, r, color) {
-    const pts = [];
-    for (let i = 0; i < 32; i++) {
-      const a = (i / 32) * Math.PI * 2;
-      pts.push(project(x + Math.cos(a) * r, y + Math.sin(a) * r, 0));
+  function capsule(r, len, mat) {
+    const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 6, 12), mat);
+    m.castShadow = true;
+    return m;
+  }
+
+  // Figur aus Kapseln: Beine, Oberkörper, Arme, Kopf mit Haaren und ein Bier in der Hand.
+  function makePerson(p) {
+    const look = looks(p.id);
+    const shirtMat = new THREE.MeshStandardMaterial({ color: TEAM_COLORS[p.team], roughness: 0.7, transparent: true });
+    const pantsMat = new THREE.MeshStandardMaterial({ color: look.pants, roughness: 0.8, transparent: true });
+    const skinMat = new THREE.MeshStandardMaterial({ color: look.skin, roughness: 0.6, transparent: true });
+    const hairMat = new THREE.MeshStandardMaterial({ color: look.hair, roughness: 0.9, transparent: true });
+    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5, transparent: true });
+    const beerMat = new THREE.MeshStandardMaterial({ color: 0x8a4b0f, roughness: 0.2, transparent: true });
+    const mats = [shirtMat, pantsMat, skinMat, hairMat, shoeMat, beerMat];
+
+    const body = new THREE.Group();
+    const legs = [];
+    for (const side of [-1, 1]) {
+      const hip = new THREE.Group();
+      hip.position.set(side * 0.012, 0.075, 0);
+      const leg = capsule(0.01, 0.055, pantsMat);
+      leg.position.y = -0.037;
+      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.01, 0.028), shoeMat);
+      shoe.position.set(0, -0.07, 0.006);
+      shoe.castShadow = true;
+      hip.add(leg, shoe);
+      body.add(hip);
+      legs.push(hip);
     }
-    if (pts.some((p) => !p)) return;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-    ctx.closePath();
-    ctx.stroke();
+    const torso = capsule(0.024, 0.035, shirtMat);
+    torso.scale.set(1.1, 1, 0.75);
+    torso.position.y = 0.105;
+    body.add(torso);
+    const arms = [];
+    for (const side of [-1, 1]) {
+      const shoulder = new THREE.Group();
+      shoulder.position.set(side * 0.032, 0.128, 0);
+      const arm = capsule(0.0075, 0.042, shirtMat);
+      arm.position.y = -0.025;
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.008, 12, 8), skinMat);
+      hand.position.y = -0.052;
+      shoulder.add(arm, hand);
+      shoulder.rotation.z = side * 0.12;
+      body.add(shoulder);
+      arms.push({ shoulder, hand });
+    }
+    const beer = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.032, 12), beerMat);
+    beer.position.set(0, -0.058, 0.008);
+    beer.castShadow = true;
+    arms[0].shoulder.add(beer);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.007, 0.01, 10), skinMat);
+    neck.position.y = 0.142;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.017, 20, 14), skinMat);
+    head.position.y = 0.158;
+    head.castShadow = true;
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.0182, 20, 10, 0, Math.PI * 2, 0, Math.PI * (look.long ? 0.62 : 0.48)), hairMat);
+    hair.position.y = 0.16;
+    hair.rotation.x = -0.25;
+    const headGroup = new THREE.Group(); // Kopf, Haare und Augen kippen zusammen
+    headGroup.position.y = 0.145;
+    head.position.y -= 0.145;
+    hair.position.y -= 0.145;
+    headGroup.add(head, hair);
+    body.add(neck, headGroup);
+    if (look.long) {
+      const tail = capsule(0.012, 0.02, hairMat);
+      tail.position.set(0, 0, -0.012);
+      headGroup.add(tail);
+    }
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.0025, 8, 6), eyeMat);
+      eye.position.set(side * 0.0065, 0.016, 0.0155);
+      headGroup.add(eye);
+    }
+    const marker = new THREE.Mesh(
+      new THREE.RingGeometry(0.03, 0.037, 40),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.9 })
+    );
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.y = 0.002;
+    const root = new THREE.Group();
+    root.add(body, marker);
+    return { root, body, legs, arms, beer, marker, mats, shirtMat, head: headGroup, team: p.team, pos: null, run: 0, seed: Math.random() * 10 };
   }
 
   function draw(now) {
     layout();
-    const { w, h } = view;
-    ctx.clearRect(0, 0, w, h);
-
-    // Himmel mit Sonne, Wolken und Bäumen am Horizont
-    const horizon = view.cy - Math.tan(CAM_PITCH) * view.focal;
-    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    sky.addColorStop(0, "#2f80ed");
-    sky.addColorStop(0.7, "#7cc2ff");
-    sky.addColorStop(1, "#d6eeff");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, horizon + 1);
-    drawSkyDecor(horizon, now);
-
-    // Rasen außerhalb des Felds
-    const ground = ctx.createLinearGradient(0, horizon, 0, h);
-    ground.addColorStop(0, "#3d8a33");
-    ground.addColorStop(1, "#47943a");
-    ctx.fillStyle = ground;
-    ctx.fillRect(0, horizon, w, h - horizon);
-
-    // Spielfeld mit Mähstreifen
-    const stripes = 12;
-    for (let i = 0; i < stripes; i++) {
-      const y0 = (i * FIELD_L) / stripes;
-      const y1 = ((i + 1) * FIELD_L) / stripes;
-      polygon([[0, y0], [1, y0], [1, y1], [0, y1]], i % 2 ? "#4c9a3c" : "#58a844");
+    const dt = Math.min(0.05, (now - (lastFrame || now)) / 1000);
+    lastFrame = now;
+    const g = init3D();
+    ctx.clearRect(0, 0, view.w, view.h);
+    if (!g) {
+      ctx.fillStyle = "#fff";
+      ctx.font = "600 16px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("3D wird auf diesem Gerät nicht unterstützt.", view.w / 2, view.h / 2);
+      return;
     }
-    drawGrass();
-    for (const t of [0, 1]) {
-      const y = LINE_Y[t];
-      polygon([[0, y - 0.006], [1, y - 0.006], [1, y + 0.006], [0, y + 0.006]], TEAM_COLORS[t]);
+
+    // Größe und Kamera passend zur Lochkamera in project()
+    const size = `${view.w}x${view.h}`;
+    if (g.size !== size) {
+      g.renderer.setSize(view.w, view.h, false);
+      g.size = size;
     }
-    groundRing(BOTTLE.x, BOTTLE.y, 0.12, "rgba(255,255,255,0.55)");
+    const cam = g.camera;
+    cam.aspect = view.w / view.h;
+    cam.fov = (2 * Math.atan(view.h / 2 / view.focal) * 180) / Math.PI;
+    cam.setViewOffset(view.w, view.h, 0, view.h / 2 - view.cy, view.w, view.h);
+    cam.updateProjectionMatrix();
+    const fwd = view.team === 0 ? -1 : 1;
+    cam.position.set(view.camX, CAM_H, view.camY);
+    cam.lookAt(view.camX, CAM_H - Math.sin(CAM_PITCH), view.camY + fwd * Math.cos(CAM_PITCH));
 
     const shot = S.shot;
     let u = null;
@@ -940,56 +1253,75 @@
     const flyingHitDone = S.phase === "flying" && shot?.hit && u >= shot.uEnd;
     const bottleDown = (S.bottleDown && S.phase === "drink") || flyingHitDone;
 
+    // Flasche kippt weich um und wird wieder aufgestellt
+    g.fall += ((bottleDown ? 1 : 0) - g.fall) * Math.min(1, dt * (bottleDown ? 14 : 6));
+    const dir = shot ? new THREE.Vector3(shot.dx, 0, shot.dy).normalize() : new THREE.Vector3(0, 0, 1);
+    const lying = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    g.bottle.quaternion.slerpQuaternions(new THREE.Quaternion(), lying, g.fall);
+    g.bottle.position.y = BOTTLE_R * g.fall;
+
     // Bierpfütze
-    if (S.phase === "drink" && shot) {
+    g.puddle.visible = S.phase === "drink" && !!shot;
+    if (g.puddle.visible) {
       const grow = Math.min(1, (now - drinkTaskAt) / 4000);
-      const tip = { x: BOTTLE.x + shot.dx * BOTTLE_H, y: BOTTLE.y + shot.dy * BOTTLE_H };
-      groundEllipse(tip.x, tip.y, 0.02 + 0.05 * grow, 0.02 + 0.05 * grow, "rgba(250, 204, 21, 0.5)");
+      const r = 0.02 + 0.05 * grow;
+      g.puddle.scale.set(r, r * 0.8, 1);
+      g.puddle.position.set(BOTTLE.x + shot.dx * BOTTLE_H, 0.0012, BOTTLE.y + shot.dy * BOTTLE_H);
     }
 
-    // Alles mit Tiefe sammeln und von hinten nach vorne zeichnen.
-    const sprites = [];
-    const bp = project(BOTTLE.x, BOTTLE.y, 0);
-    if (bp) sprites.push({ depth: bp.depth, draw: () => drawBottle(bottleDown, shot) });
+    const names = [];
+    updatePeople(g, now, dt, names);
 
-    for (const p of S.players) {
-      if (p.team == null) continue;
-      let spot = playerSpot(p);
-      if (S.phase === "drink" && p.id === S.runnerId && S.runStage === "aufstellen") {
-        spot = { x: BOTTLE.x + 0.08, y: BOTTLE.y };
-      }
-      const pp = project(spot.x, spot.y, 0);
-      if (!pp || pp.depth < 0.4) continue; // wer direkt neben der Kamera steht, verdeckt nur die Sicht
-      sprites.push({ depth: pp.depth, draw: () => drawPerson(p, spot, now) });
-    }
-
+    // Ball
     const thrower = S.players.find((p) => p.id === S.throwerId);
+    let overlayBall = null;
+    g.ball.visible = false;
     if (S.phase === "aim" && thrower) {
       const st = ballStart(thrower);
-      const bp2 = project(st.x, st.y, HOLD_H);
-      // Sichtbare Figuren halten den Ball selbst hoch.
-      const figure = project(playerSpot(thrower).x, playerSpot(thrower).y, 0);
-      const heldByFigure = thrower.id !== session.id && figure && figure.depth >= 0.4;
-      if (bp2 && !heldByFigure) {
-        const mine = aim && S.throwerId === session.id;
-        sprites.push({
-          depth: bp2.depth - 0.001,
-          draw: () => {
-            if (mine) drawAim(st, bp2);
-            const off = mine ? pullVector() : { x: 0, y: 0 };
-            drawBallAt(bp2.x + off.x, bp2.y + off.y, BALL_R * bp2.k, null);
-          },
-        });
+      const person = g.people.get(thrower.id);
+      if (thrower.id === session.id) {
+        const rest = project(st.x, st.y, HOLD_H);
+        if (aim && rest) overlayBall = { st, rest };
+        else if (rest) {
+          g.ball.visible = true;
+          g.ball.position.set(st.x, HOLD_H, st.y);
+        }
+      } else if (person?.root.visible) {
+        g.ball.visible = true;
+        person.arms[1].hand.getWorldPosition(g.ball.position);
+        g.ball.position.y += BALL_R;
+      } else {
+        g.ball.visible = true;
+        g.ball.position.set(st.x, HOLD_H, st.y);
       }
     } else if (u != null && (S.phase === "flying" || !shot.hit)) {
       const b = ballAt(shot, u);
-      const bp3 = project(b.x, b.y, b.h + BALL_R);
-      const sh = project(b.x, b.y, 0);
-      if (bp3) sprites.push({ depth: bp3.depth - 0.001, draw: () => drawBallAt(bp3.x, bp3.y, BALL_R * bp3.k, sh) });
+      g.ball.visible = true;
+      // nach der Landung hüpft der Ball noch kurz
+      const k = u > 1 ? (u - 1) / ROLL : 0;
+      const bounce = u > 1 ? 0.025 * Math.abs(Math.sin(k * Math.PI * 2)) * (1 - k) : 0;
+      g.ball.position.set(b.x, b.h + bounce + BALL_R, b.y);
+      g.ball.rotation.x = u * 25 * fwd;
     }
 
-    sprites.sort((a, b) => b.depth - a.depth).forEach((sp) => sp.draw());
+    g.renderer.render(g.scene, cam);
 
+    // 2D-Overlay: Namen, Zielhilfe, Wind
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 4;
+    for (const n of names) {
+      ctx.font = `700 ${n.size}px system-ui, sans-serif`;
+      ctx.fillStyle = "#fff";
+      ctx.fillText(n.text, n.x, n.y);
+    }
+    ctx.shadowBlur = 0;
+    if (overlayBall) {
+      drawAim(overlayBall.st, overlayBall.rest);
+      const off = pullVector();
+      drawBallAt(overlayBall.rest.x + off.x, overlayBall.rest.y + off.y, BALL_R * overlayBall.rest.k);
+    }
     drawWind();
 
     if (S.phase === "drink" && now - drinkTaskAt > 8000) {
@@ -998,193 +1330,80 @@
     }
   }
 
-  function drawBottle(down, shot) {
-    if (down && shot) {
-      // liegt in Wurfrichtung
-      const a = project(BOTTLE.x, BOTTLE.y, BOTTLE_R);
-      const mid = project(BOTTLE.x + shot.dx * BOTTLE_H * 0.62, BOTTLE.y + shot.dy * BOTTLE_H * 0.62, BOTTLE_R);
-      const tip = project(BOTTLE.x + shot.dx * BOTTLE_H, BOTTLE.y + shot.dy * BOTTLE_H, BOTTLE_R * 0.6);
-      if (!a || !mid || !tip) return;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "#14532d";
-      ctx.lineWidth = BOTTLE_R * 2 * a.k;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(mid.x, mid.y);
-      ctx.stroke();
-      ctx.lineWidth = BOTTLE_R * 0.9 * mid.k;
-      ctx.beginPath();
-      ctx.moveTo(mid.x, mid.y);
-      ctx.lineTo(tip.x, tip.y);
-      ctx.stroke();
-      ctx.lineCap = "butt";
-      return;
-    }
-    groundEllipse(BOTTLE.x + 0.01, BOTTLE.y + (view.team === 0 ? -0.01 : 0.01), BOTTLE_R * 1.3, BOTTLE_R * 1.3, "rgba(0,0,0,0.3)");
-    const base = project(BOTTLE.x, BOTTLE.y, 0);
-    const top = project(BOTTLE.x, BOTTLE.y, BOTTLE_H);
-    if (!base || !top) return;
-    const r = BOTTLE_R * base.k;
-    const H = base.y - top.y;
-    const x = base.x;
-    const g = ctx.createLinearGradient(x - r, 0, x + r, 0);
-    g.addColorStop(0, "#14532d");
-    g.addColorStop(0.35, "#22c55e");
-    g.addColorStop(1, "#14532d");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(x - r, base.y);
-    ctx.lineTo(x - r, base.y - H * 0.55);
-    ctx.quadraticCurveTo(x - r, base.y - H * 0.72, x - r * 0.4, base.y - H * 0.8);
-    ctx.lineTo(x - r * 0.4, top.y);
-    ctx.lineTo(x + r * 0.4, top.y);
-    ctx.lineTo(x + r * 0.4, base.y - H * 0.8);
-    ctx.quadraticCurveTo(x + r, base.y - H * 0.72, x + r, base.y - H * 0.55);
-    ctx.lineTo(x + r, base.y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#f5f0ff";
-    ctx.fillRect(x - r, base.y - H * 0.42, r * 2, H * 0.18);
-    ctx.fillStyle = "#facc15";
-    ctx.fillRect(x - r * 0.45, top.y - H * 0.05, r * 0.9, H * 0.06);
-  }
+  function updatePeople(g, now, dt, names) {
+    const seen = new Set();
+    for (const p of S.players) {
+      if (p.team == null) continue;
+      seen.add(p.id);
+      let person = g.people.get(p.id);
+      if (!person || person.team !== p.team) {
+        if (person) g.scene.remove(person.root);
+        person = makePerson(p);
+        g.people.set(p.id, person);
+        g.scene.add(person.root);
+      }
+      const runner = S.phase === "drink" && p.id === S.runnerId;
+      const thrower = S.phase === "aim" && p.id === S.throwerId;
+      const target = runner && S.runStage === "aufstellen" ? { x: BOTTLE.x + 0.08, y: BOTTLE.y } : playerSpot(p);
+      if (!person.pos) person.pos = { ...target };
+      // weich zum Ziel laufen
+      const dx = target.x - person.pos.x;
+      const dy = target.y - person.pos.y;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.min(dist, dt * 0.9);
+      if (dist > 0.0005) {
+        person.pos.x += (dx / dist) * step;
+        person.pos.y += (dy / dist) * step;
+      }
+      const moving = dist > 0.01;
+      person.root.position.set(person.pos.x, 0, person.pos.y);
 
-  const SKINS = ["#f6d3b3", "#e8b48f", "#c68863", "#8d5a3b", "#f2c9a0"];
-  const HAIRS = ["#2b1d14", "#5a3a22", "#d9a441", "#1a1a1a", "#a0522d", "#e6e0d4"];
+      const pp = project(person.pos.x, person.pos.y, 0);
+      person.root.visible = !!pp && pp.depth >= 0.4; // direkt neben der Kamera nur im Weg
+      if (!person.root.visible) continue;
 
-  function looks(id) {
-    let hsh = 0;
-    for (const c of id) hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0;
-    return { skin: SKINS[hsh % SKINS.length], hair: HAIRS[(hsh >>> 4) % HAIRS.length], long: (hsh >>> 8) % 3 === 0 };
-  }
+      // Läufer schaut in Laufrichtung, sonst zur Kamera
+      const face = moving ? Math.atan2(dx, dy) : Math.atan2(view.camX - person.pos.x, view.camY - person.pos.y);
+      person.root.rotation.y = face;
 
-  function limb(x1, y1, x2, y2, width, color) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
+      person.run = moving || (runner && S.runStage === "zurueck") ? person.run + dt * 14 : 0;
+      const swing = Math.sin(person.run) * (moving ? 0.7 : 0.25);
+      person.legs[0].rotation.x = swing;
+      person.legs[1].rotation.x = -swing;
+      person.body.position.y = moving ? Math.abs(Math.sin(person.run)) * 0.006 : 0;
+      person.body.rotation.z = moving ? 0 : Math.sin(now / 900 + person.seed) * 0.03; // leichtes Wippen
+      // Wer trinken muss, setzt die Flasche an
+      const drinking = S.phase === "drink" && p.team === S.drinkTeam && !p.done;
+      if (drinking) person.arms[0].shoulder.rotation.set(-2.3 + Math.sin(now / 400 + person.seed) * 0.12, 0, 0.35);
+      else person.arms[0].shoulder.rotation.set(-swing * 0.8, 0, -0.12);
+      person.head.rotation.x = drinking ? -0.35 : 0;
+      if (thrower) {
+        person.arms[1].shoulder.rotation.set(0, 0, 2.6 + Math.sin(now / 300) * 0.08);
+      } else {
+        person.arms[1].shoulder.rotation.set(swing * 0.8, 0, 0.12);
+      }
+      person.beer.visible = !p.done;
+      person.shirtMat.color.set(p.done ? "#6b7280" : TEAM_COLORS[p.team]);
+      const alpha = p.online ? 1 : 0.45;
+      person.mats.forEach((m) => (m.opacity = alpha));
+      person.marker.visible = thrower || runner;
+      person.marker.scale.setScalar(1 + Math.sin(now / 150) * 0.08);
 
-  // Kleine Figur, die zur Kamera schaut: Beine, Shirt in Teamfarbe, Arme, Kopf mit Haaren, Bier in der Hand.
-  function drawPerson(p, spot, now) {
-    const feet = project(spot.x, spot.y, 0);
-    if (!feet) return;
-    const H = PERSON_H * feet.k;
-    const runner = S.phase === "drink" && p.id === S.runnerId;
-    const thrower = S.phase === "aim" && p.id === S.throwerId;
-    const look = looks(p.id);
-    const shirt = p.done ? "#6b7280" : TEAM_COLORS[p.team];
-    const swing = runner ? Math.sin(now / 80) : 0;
-    const bob = runner ? Math.abs(swing) * 0.04 * H : 0;
-    const x = feet.x;
-    const hip = feet.y - 0.46 * H - bob;
-    const shoulder = feet.y - 0.78 * H - bob;
-    const headR = 0.095 * H;
-    const headY = shoulder - headR * 1.05;
-
-    ctx.globalAlpha = p.online ? 1 : 0.45;
-    groundEllipse(spot.x, spot.y, 0.03, 0.018, "rgba(0,0,0,0.3)");
-    ctx.lineCap = "round";
-
-    // Beine und Schuhe
-    const legW = 0.075 * H;
-    for (const side of [-1, 1]) {
-      const fx = x + side * 0.07 * H + side * swing * 0.06 * H;
-      limb(x + side * 0.05 * H, hip, fx, feet.y - legW * 0.6, legW, "#1f2a44");
-      limb(fx - 0.02 * H, feet.y - legW * 0.3, fx + 0.03 * H * side, feet.y - legW * 0.3, legW * 0.8, "#111");
-    }
-
-    // Arme hinter dem Körper ansetzen
-    const armW = 0.06 * H;
-    const handL = { x: x - 0.17 * H - swing * 0.05 * H, y: hip - 0.02 * H };
-    const handR = thrower ? { x: x + 0.15 * H, y: headY - headR * 1.6 } : { x: x + 0.17 * H + swing * 0.05 * H, y: hip - 0.02 * H };
-    limb(x - 0.12 * H, shoulder + armW * 0.5, handL.x, handL.y, armW, shirt);
-    limb(x + 0.12 * H, shoulder + armW * 0.5, handR.x, handR.y, armW, shirt);
-
-    // Oberkörper
-    ctx.fillStyle = shirt;
-    ctx.beginPath();
-    ctx.moveTo(x - 0.13 * H, shoulder);
-    ctx.lineTo(x + 0.13 * H, shoulder);
-    ctx.lineTo(x + 0.1 * H, hip + 0.02 * H);
-    ctx.lineTo(x - 0.1 * H, hip + 0.02 * H);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(0,0,0,0.15)";
-    ctx.fillRect(x - 0.1 * H, hip - 0.03 * H, 0.2 * H, 0.05 * H);
-
-    // Hände, links mit Bierflasche (außer wer fertig ist)
-    ctx.fillStyle = look.skin;
-    for (const hd of [handL, handR]) {
-      ctx.beginPath();
-      ctx.arc(hd.x, hd.y, armW * 0.55, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    if (!p.done) {
-      ctx.fillStyle = "#7c4a12";
-      ctx.fillRect(handL.x - 0.025 * H, handL.y - 0.11 * H, 0.05 * H, 0.13 * H);
-      ctx.fillRect(handL.x - 0.012 * H, handL.y - 0.16 * H, 0.024 * H, 0.06 * H);
-    }
-    if (thrower) {
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.arc(handR.x, handR.y - armW * 0.6, armW * 0.75, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Hals, Kopf, Haare, Augen
-    limb(x, shoulder, x, headY + headR * 0.5, headR * 0.7, look.skin);
-    if (look.long) {
-      ctx.fillStyle = look.hair;
-      ctx.fillRect(x - headR * 1.05, headY - headR * 0.2, headR * 2.1, headR * 1.6);
-    }
-    ctx.fillStyle = look.skin;
-    ctx.beginPath();
-    ctx.arc(x, headY, headR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.hair;
-    ctx.beginPath();
-    ctx.arc(x, headY - headR * 0.1, headR * 1.03, Math.PI * 1.05, Math.PI * 1.95);
-    ctx.fill();
-    if (headR > 4) {
-      ctx.fillStyle = "#222";
-      for (const side of [-1, 1]) {
-        ctx.beginPath();
-        ctx.arc(x + side * headR * 0.38, headY + headR * 0.1, Math.max(0.8, headR * 0.12), 0, Math.PI * 2);
-        ctx.fill();
+      const head = project(person.pos.x, person.pos.y, PERSON_H + 0.03);
+      if (head) {
+        const name = p.name.length > 9 ? p.name.slice(0, 8) + "…" : p.name;
+        names.push({ text: p.done ? `✓ ${name}` : name, x: head.x, y: head.y, size: Math.max(11, Math.min(16, Math.round(0.02 * head.k))) });
       }
     }
-    ctx.lineCap = "butt";
-
-    if (thrower || runner) {
-      ctx.strokeStyle = "#facc15";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(x, feet.y, 0.22 * H, 0.07 * H, 0, 0, Math.PI * 2);
-      ctx.stroke();
+    for (const [id, person] of g.people) {
+      if (!seen.has(id)) {
+        g.scene.remove(person.root);
+        g.people.delete(id);
+      }
     }
-
-    ctx.fillStyle = "#fff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.font = `700 ${Math.max(10, Math.min(16, Math.round(headR * 1.2)))}px system-ui, sans-serif`;
-    ctx.shadowColor = "rgba(0,0,0,0.8)";
-    ctx.shadowBlur = 3;
-    const name = p.name.length > 9 ? p.name.slice(0, 8) + "…" : p.name;
-    ctx.fillText(p.done ? `✓ ${name}` : name, x, headY - headR * 1.3);
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
   }
 
-  function drawBallAt(x, y, r, shadow) {
-    if (shadow) {
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.beginPath();
-      ctx.ellipse(shadow.x, shadow.y, BALL_R * shadow.k, BALL_R * shadow.k * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
+  function drawBallAt(x, y, r) {
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(x, y, Math.max(2, r), 0, Math.PI * 2);
@@ -1289,7 +1508,8 @@
 
   function loop(now) {
     requestAnimationFrame(loop);
-    if (S && $("fb-game").classList.contains("active")) draw(now);
+    // Während die Läufer-Aufgabe den Bildschirm verdeckt, braucht es kein 3D.
+    if (S && $("fb-game").classList.contains("active") && $("fb-run").hidden) draw(now);
     if (runnerActive) runnerFrame(now);
   }
   requestAnimationFrame(loop);
@@ -1302,7 +1522,7 @@
   let runKey = null;
   let B = null; // Balance-Zustand
   let feet = { count: 0, next: "l" };
-  const FEET_NEEDED = 18;
+  const FEET_NEEDED = 14;
 
   function startRunner() {
     const key = `${S.shot?.id}-${S.runStage}`;
@@ -1310,40 +1530,46 @@
     if (key === runKey) return;
     runKey = key;
     if (S.runStage === "aufstellen") {
-      B = { theta: (Math.random() < 0.5 ? -1 : 1) * 0.6, omega: 0, progress: 0, t: 0, last: null, finger: null, sent: false, fell: 0 };
+      B = { phase: Math.random() * Math.PI * 2, theta: 0, hits: 0, last: null, sent: false, flash: null, flashAt: 0, speed: 1 };
     } else {
       feet = { count: 0, next: "l", sent: false };
       renderFeet();
     }
   }
 
+  // Flasche aufstellen: Sie pendelt hin und her. Wer tippt, während sie gerade steht, trifft.
+  // Drei Treffer stellen sie auf, daneben tippen kostet einen Treffer.
+  const UPRIGHT_HITS = 3;
+  const UPRIGHT_ZONE = 0.25;
+  const SWAY = 0.8;
+
   function runnerFrame(now) {
     if (!S || S.phase !== "drink" || S.runnerId !== session.id || S.runStage !== "aufstellen") {
       runnerActive = false;
       return;
     }
-    const dt = B.last == null ? 0 : Math.min(0.033, (now - B.last) / 1000);
+    const dt = B.last == null ? 0 : Math.min(0.05, (now - B.last) / 1000);
     B.last = now;
-    B.t += dt;
-    const w = bal.clientWidth;
-    const wind = 1.7 * Math.sin(1.4 * B.t) + 1.2 * Math.sin(3.1 * B.t + 1.7);
-    const push = B.finger == null ? 0 : Math.max(-1, Math.min(1, (B.finger - w / 2) / (w * 0.35)));
-    const alpha = 4.5 * Math.sin(B.theta) + wind + 8 * push - 1.5 * B.omega;
-    B.omega += alpha * dt;
-    B.theta += B.omega * dt;
-    if (Math.abs(B.theta) < 0.2) B.progress = Math.min(1, B.progress + dt / 3.5);
-    else B.progress = Math.max(0, B.progress - dt * 0.25);
-    if (Math.abs(B.theta) > 1.25) {
-      B.theta = Math.sign(B.theta) * 0.5;
-      B.omega = 0;
-      B.progress = Math.max(0, B.progress - 0.3);
-      B.fell = now;
-      vibrate(80);
-    }
-    $("fb-balance-bar").style.width = `${B.progress * 100}%`;
+    // eine Schwingung dauert anfangs etwa 1,8 s, mit jedem Treffer etwas schneller
+    const before = B.phase;
+    B.phase += dt * ((Math.PI * 2) / 1.8) * (1 + 0.15 * B.hits) * B.speed;
+    if (Math.floor(before / Math.PI) !== Math.floor(B.phase / Math.PI)) B.speed = 0.85 + Math.random() * 0.35;
+    B.theta = Math.sin(B.phase) * SWAY;
+    $("fb-balance-bar").style.width = `${(B.hits / UPRIGHT_HITS) * 100}%`;
     drawBalance(now);
-    if (B.progress >= 1 && !B.sent) {
+  }
+
+  function tapBottle() {
+    if (!B || B.sent || !S || S.runStage !== "aufstellen") return;
+    const ok = Math.abs(B.theta) < UPRIGHT_ZONE;
+    B.hits = ok ? B.hits + 1 : Math.max(0, B.hits - 1);
+    B.flash = ok ? "Treffer!" : "Daneben!";
+    B.flashAt = performance.now();
+    vibrate(ok ? 40 : [60, 40, 60]);
+    $("fb-balance-bar").style.width = `${(B.hits / UPRIGHT_HITS) * 100}%`;
+    if (B.hits >= UPRIGHT_HITS) {
       B.sent = true;
+      B.theta = 0;
       send({ type: "upright" });
     }
   }
@@ -1361,10 +1587,10 @@
     const bx = w / 2;
     const by = h - 24;
     // Zielbereich
-    bctx.fillStyle = "rgba(34,197,94,0.18)";
+    bctx.fillStyle = Math.abs(B.theta) < UPRIGHT_ZONE ? "rgba(34,197,94,0.4)" : "rgba(34,197,94,0.18)";
     bctx.beginPath();
     bctx.moveTo(bx, by);
-    bctx.arc(bx, by, h - 40, -Math.PI / 2 - 0.2, -Math.PI / 2 + 0.2);
+    bctx.arc(bx, by, h - 40, -Math.PI / 2 - UPRIGHT_ZONE, -Math.PI / 2 + UPRIGHT_ZONE);
     bctx.closePath();
     bctx.fill();
     // Boden
@@ -1391,28 +1617,15 @@
     bctx.fillStyle = "#facc15";
     bctx.fillRect(-10, -198, 20, 9);
     bctx.restore();
-    if (now - B.fell < 700) {
-      bctx.fillStyle = "#fca5a5";
-      bctx.font = "700 22px system-ui, sans-serif";
+    if (B.flash && now - B.flashAt < 700) {
+      bctx.fillStyle = B.flash === "Treffer!" ? "#86efac" : "#fca5a5";
+      bctx.font = "800 26px system-ui, sans-serif";
       bctx.textAlign = "center";
-      bctx.fillText("Umgefallen!", bx, 30);
+      bctx.fillText(B.flash, bx, 34);
     }
   }
 
-  const balFinger = (e) => {
-    const r = bal.getBoundingClientRect();
-    if (B) B.finger = e.clientX - r.left;
-  };
-  bal.addEventListener("pointerdown", (e) => {
-    bal.setPointerCapture(e.pointerId);
-    balFinger(e);
-  });
-  bal.addEventListener("pointermove", (e) => {
-    if (B && B.finger != null) balFinger(e);
-  });
-  const balUp = () => B && (B.finger = null);
-  bal.addEventListener("pointerup", balUp);
-  bal.addEventListener("pointercancel", balUp);
+  bal.addEventListener("pointerdown", tapBottle);
 
   function step(foot) {
     if (!S || S.runStage !== "zurueck" || feet.sent) return;

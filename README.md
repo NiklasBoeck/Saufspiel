@@ -23,7 +23,7 @@ python3 -m http.server 8000
 - `dealer.js`: F*ck den Dealer, die App ist der Stapel: oberste Karte raten (2 bis Ass), beim Fehlversuch sagt sie höher oder niedriger, nach 3 Fehlschlägen in Folge wechselt der Dealer. Gespielte Karten liegen gestapelt auf einem Tisch. Mit einem Handy hält der Dealer beim Raten das Handy, mit mehreren sieht nur der Dealer die oberste Karte
 - `room.js`: Jeder sein Handy, Raum mit Code und QR-Code, Sync über MQTT wie bei Flunky Ball
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
-- `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4)
+- `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4, three.js r159)
 - `app.js`: Menü, Spielerverwaltung, zeichnet das laufende Spiel und die Trink-Meldung. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
@@ -44,6 +44,6 @@ Funktioniert wie bei Flunky Ball: Das Handy, das den Raum erstellt, ist Host und
 
 Jeder spielt am eigenen Handy. Ein Handy erstellt den Raum und ist damit Host: Es hält den Spielstand und verteilt ihn über einen kostenlosen, öffentlichen MQTT-Broker (HiveMQ, falls nicht erreichbar EMQX) an die anderen. Dafür braucht es kein Konto und keinen eigenen Server. Die Nachrichten sind nicht verschlüsselt, jeder mit dem Raumcode könnte mitlesen, für ein Partyspiel reicht das.
 
-Das Spielfeld wird in 3D gezeichnet (Canvas, ohne Bibliothek): Jeder schaut von hinter der eigenen Linie auf die Flasche. Jeder Wurf hat zufälligen Wind und etwas Streuung.
+Das Spielfeld ist echtes 3D mit three.js (WebGL, Licht und Schatten): Jeder schaut von hinter der eigenen Linie auf die Flasche. Jeder Wurf hat zufälligen Wind und etwas Streuung.
 
 Lokal testen geht mit einem eigenen Broker über `flunky.html?broker=ws://localhost:8888`.
