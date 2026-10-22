@@ -37,7 +37,8 @@
   }
 
   // tap: { by, allowed(v) } macht die Stapel antippbar, damit die ratende Person direkt auf dem Tisch wählt.
-  function boardHtml(s, fresh, tap) {
+  // marks: { wert: "x" | "ok" } zeigt rote Kreuze und grüne Haken für die Tipps dieser Runde.
+  function boardHtml(s, fresh, tap, marks = {}, fade = false) {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
       const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
@@ -51,10 +52,20 @@
       return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
         <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
+        ${marks[v] ? `<span class="fd-mark ${marks[v]} ${fade ? "fade" : ""}">${marks[v] === "ok" ? "✓" : "✗"}</span>` : ""}
       </div>`;
     };
     const row = (from, to) => `<div class="fd-row">${Array.from({ length: to - from + 1 }, (_, i) => pile(from + i)).join("")}</div>`;
     return `<div class="fd-table">${row(2, 8)}${row(9, 14)}</div>`;
+  }
+
+  // Kreuze/Haken je nach dem, was die Person schon wissen darf: firstKnown = erster Fehlversuch ist bekannt,
+  // tip = gerade geprüfter Tipp (nur der Dealer kennt das Ergebnis schon).
+  function marksFor(s, firstKnown, tip) {
+    const m = {};
+    if (firstKnown && s.first) m[s.first] = "x";
+    if (tip) m[tip] = s.deck[s.deck.length - 1].value === tip ? "ok" : "x";
+    return m;
   }
 
   function statusHtml(s) {
@@ -159,12 +170,13 @@
     const guesser = name(s.players[s.guesser]);
     const tip = s.pending.guesses[s.pending.guesses.length - 1];
     const isDealer = me ? me === s.players[s.dealer] : s.peek;
+    const two = s.pending.guesses.length === 2;
     return {
       phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
       title: `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${compareHtml(s)}<p class="bf-text fd-center">Stimmt der Tipp? Drück den Knopf, dann kommt die Auflösung.</p>`
-        : statusHtml(s) + boardHtml(s),
+        ? `${dealerTagHtml(s, me)}${compareHtml(s)}${boardHtml(s, null, null, marksFor(s, two, tip))}`
+        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two)),
       actions: [confirmAction(s)],
     };
   }
@@ -185,9 +197,9 @@
     const body = isDealer
       ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
           hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }${boardHtml(s)}`
+        }${boardHtml(s, null, null, marksFor(s, hint || second))}`
       : statusHtml(s) +
-        boardHtml(s, null, tap) +
+        boardHtml(s, null, tap, marksFor(s, second)) +
         (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
@@ -196,6 +208,13 @@
       actions: hint ? [sayAction(s)] : [],
       turn: hint ? undefined : guesserName,
     };
+  }
+
+  function resultMarks(r) {
+    const m = {};
+    if (r.guesses.length === 2) m[r.guesses[0]] = "x";
+    m[r.guesses[r.guesses.length - 1]] = r.kind === "miss" ? "x" : "ok";
+    return m;
   }
 
   function resultView(s, me) {
@@ -220,7 +239,7 @@
     return {
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
       title: titles[r.kind],
-      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, r.card)}`,
+      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, r.card, null, resultMarks(r), true)}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
@@ -420,6 +439,7 @@
           s.guesser = nextGuesser(s, s.guesser);
           s.stage = "guess1";
           s.peek = false;
+          s.first = null;
         }
       }
     },

@@ -437,7 +437,7 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
   box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 6px 22px rgb(0 0 0 / 0.5), 0 12px 30px -10px rgb(0 0 0 / 0.7);
 }
 .fd-row { display: flex; justify-content: center; gap: 5px; }
-.fd-pile { flex: none; width: calc(var(--h) * 0.714); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fd-pile { position: relative; flex: none; width: calc(var(--h) * 0.714); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .fd-stack { position: relative; width: 100%; height: calc(var(--h) * 1.69); }
 .fd-spot {
   position: absolute;
@@ -556,7 +556,7 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
 .fd-pile[data-act] { cursor: pointer; -webkit-tap-highlight-color: transparent; filter: drop-shadow(0 0 5px rgb(253 230 138 / 0.7)); }
 .fd-pile[data-act] .fd-spot { border-color: #fde68a; color: #fde68a; }
 .fd-pile[data-act]:active { transform: scale(0.92); }
-.fd-pile[data-off] { opacity: 0.3; }
+.fd-pile[data-off] > :not(.fd-mark) { opacity: 0.3; }
 
 /* Kleiner Hinweis oben (Trink-Meldung für andere) */
 .toast {
@@ -644,3 +644,29 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
   pointer-events: none;
   box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
 }
+
+/* Kreuze und Haken auf dem Tisch */
+.fd-mark {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--h) * 0.5);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: calc(var(--h) * 0.62);
+  height: calc(var(--h) * 0.62);
+  border-radius: 50%;
+  color: #fff;
+  font-size: calc(var(--h) * 0.42);
+  font-weight: 900;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 0.45);
+  pointer-events: none;
+  animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.fd-mark.x { background: #dc2626; }
+.fd-mark.ok { background: #16a34a; }
+.fd-mark.fade { animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both, mark-out 0.4s 1.9s ease-in forwards; }
+@keyframes mark-in { from { transform: translate(-50%, -50%) scale(0) rotate(-90deg); opacity: 0; } }
+@keyframes mark-out { to { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } }
