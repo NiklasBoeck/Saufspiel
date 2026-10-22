@@ -542,3 +542,7 @@ html.fit .fd-ranks .btn { padding: clamp(3px, 0.9dvh, 10px) 4px; font-size: clam
 html.fit .fd-ranks .btn small { font-size: clamp(0.62rem, 1.5dvh, 0.8rem); }
 html.fit .fd-role { padding: clamp(4px, 0.8dvh, 8px) 12px; }
 html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
+
+/* Kategorie-Auswahl (z. B. Ich hab noch nie) */
+.bf-actions.cat-pick { grid-template-columns: 1fr; }
+.cat-pick .btn small { display: block; margin-top: 2px; font-size: 0.85rem; font-weight: 500; opacity: 0.8; }
