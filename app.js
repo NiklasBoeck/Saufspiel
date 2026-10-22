@@ -255,15 +255,13 @@ function checkAlert(s) {
   const alert = s.alert;
   if (!alert || alert.id === shownAlert) return;
   shownAlert = alert.id;
-  // privateAlerts: Mit mehreren Handys bekommt nur, wen es betrifft, die große Meldung, alle anderen einen kleinen Hinweis.
-  if (run.me && GAMES[run.key].privateAlerts) {
-    const mine = alert.notice
-      ? alert.notice.who === run.me
-      : alert.items.some((it) => it.who === run.me || it.who === ALL);
-    if (!mine) return showToast(alert);
+  // Meldungen ohne Trinken (z. B. „Höher!“) kommen immer nur klein, ohne Knopf.
+  if (alert.notice) return showToast(alert);
+  // privateAlerts: Mit mehreren Handys bekommt nur, wer trinkt, die große Meldung, alle anderen einen kleinen Hinweis.
+  if (run.me && GAMES[run.key].privateAlerts && !alert.items.some((it) => it.who === run.me || it.who === ALL)) {
+    return showToast(alert);
   }
-  if (alert.notice) showNotice(alert.notice);
-  else showDrinkAlert(alert.items);
+  showDrinkAlert(alert.items);
 }
 
 let toastTimer = null;
@@ -280,20 +278,6 @@ function showToast(alert) {
   el.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 4500);
-}
-
-// Meldung ohne Trinken, z. B. „Höher!“
-function showNotice({ emoji, title, text }) {
-  $("toast").hidden = true;
-  $("da-emoji").textContent = emoji ?? "";
-  $("da-title").textContent = title;
-  const li = document.createElement("li");
-  li.textContent = text ?? "";
-  $("da-list").replaceChildren(...(text ? [li] : []));
-  $("da-ok").textContent = "OK 👍";
-  $("drink-alert").hidden = false;
-  $("da-ok").focus();
-  vibrate(120);
 }
 
 function showDrinkAlert(items) {
@@ -337,7 +321,6 @@ function hideDrinkAlert() {
   $("drink-alert").hidden = true;
 }
 $("da-ok").onclick = hideDrinkAlert;
-$("toast").onclick = () => ($("toast").hidden = true);
 $("drink-alert").onclick = (e) => e.target === $("drink-alert") && hideDrinkAlert();
 
 renderGames();

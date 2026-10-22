@@ -232,7 +232,6 @@
         emoji: up ? "⬆️" : "⬇️",
         title: up ? "Höher!" : "Niedriger!",
         text: `${guesser} hat ${cardName(v)} getippt. Noch ein Versuch!`,
-        who: guesser,
       });
     } else {
       if (s.hint === "hoeher" ? v <= s.first : v >= s.first) return;
