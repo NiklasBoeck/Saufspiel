@@ -822,3 +822,44 @@ html.fit .disclaimer { font-size: clamp(0.65rem, 1.6dvh, 0.8rem); }
   html.fit .game-desc { font-size: clamp(0.7rem, 3dvh, 0.88rem); }
 }
 .recommended { font-size: 0.68em; font-weight: 600; color: var(--primary); margin-left: 2px; white-space: nowrap; }
+
+/* F*ck den Dealer im Querformat: Tisch groß in der Mitte (eine Reihe mit allen 13 Stapeln),
+   oben eine Zeile mit Versuch, Titel, Karte und Ampel, unten die Knöpfe. */
+.fd-top { display: contents; }
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit[data-game="dealer"] .bf {
+    grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: clamp(4px, 1.4dvh, 10px);
+    align-items: center;
+  }
+  html.fit[data-game="dealer"] .bf > * { grid-column: auto; grid-row: 1; margin: 0; }
+  html.fit[data-game="dealer"] .bf > .bf-phase { grid-column: 2; }
+  html.fit[data-game="dealer"] .bf > .your-turn { grid-column: 3; }
+  html.fit[data-game="dealer"] .bf > .bf-title { grid-column: 4; }
+  html.fit[data-game="dealer"] .bf > .bf-body { grid-column: 1 / -1; grid-row: 2; height: 100%; overflow: hidden; }
+  html.fit[data-game="dealer"] .bf > .bf-actions { grid-column: 1 / -1; grid-row: 3; justify-self: center; width: min(100%, 520px); }
+  html.fit[data-game="dealer"] .bf-title { font-size: clamp(1rem, 4.4dvh, 1.5rem); }
+  html.fit[data-game="dealer"] .bf-actions .btn { padding: clamp(6px, 2.2dvh, 14px); }
+  html.fit[data-game="dealer"] .fd-top { display: flex; flex: none; align-items: center; justify-content: center; gap: clamp(8px, 1.5vw, 16px); }
+  html.fit[data-game="dealer"] .fd-top .pc-big { height: clamp(48px, 15dvh, 130px); font-size: clamp(1rem, 4.6dvh, 2.2rem); }
+  html.fit[data-game="dealer"] .fd-top .fd-status { grid-template-columns: repeat(3, auto); }
+  html.fit[data-game="dealer"] .fd-top .fd-status.short { grid-template-columns: repeat(2, auto); }
+  html.fit[data-game="dealer"] .fd-top .fd-role { min-width: 110px; padding: clamp(3px, 0.8dvh, 8px) 14px; }
+  html.fit[data-game="dealer"] .fd-top .fd-swap { padding: 6px 12px; font-size: 0.9rem; }
+  html.fit[data-game="dealer"] .fd-top .bf-text { margin: 0; }
+  html.fit[data-game="dealer"] .fd-top .fd-tally { flex-direction: row; flex-wrap: wrap; justify-content: center; overflow: visible; }
+  html.fit[data-game="dealer"] .fd-top .fd-tally li { gap: 12px; }
+  html.fit[data-game="dealer"] .fd-table {
+    --h: min((100cqh - 12px) / 1.69, (100cqw - 60px) / 9.28, 150px);
+    min-height: 0;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    padding: 8px;
+  }
+  html.fit[data-game="dealer"] .fd-row { display: contents; }
+  html.fit[data-game="dealer"] .fd-table.has-banner { padding-top: 32px; }
+  html.fit[data-game="dealer"] .fd-banner { top: 4px; font-size: 0.95rem; }
+}

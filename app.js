@@ -35,6 +35,7 @@ function showScreen(name) {
 
 function setGame(key) {
   currentGame = key;
+  document.documentElement.dataset.game = key; // für Layouts einzelner Spiele
   document.querySelectorAll(".game-title").forEach((el) => (el.textContent = GAMES[key].label));
 }
 

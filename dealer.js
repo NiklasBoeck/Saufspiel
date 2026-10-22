@@ -129,6 +129,9 @@
     </div>`;
   }
 
+  // Alles außer dem Tisch: im Hochformat untereinander, im Querformat als eine Zeile über dem Tisch.
+  const top = (html) => `<div class="fd-top">${html}</div>`;
+
   const topCard = (s) => s.deck[s.deck.length - 1];
 
   function topCardHtml(s) {
@@ -167,8 +170,8 @@
       phase: two ? "Zweiter Versuch" : "Erster Versuch",
       title: isDealer ? "" : `${guesser} tippt ${cardName(tip)}`,
       body: isDealer
-        ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s, false)}${boardHtml(s, null, null, marksFor(s, two, tip), two ? bannerText(s) : "", topCard(s), tip)}`
-        : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), two ? bannerText(s) : "", null, tip),
+        ? `${top(dealerTagHtml(s, me) + topCardHtml(s) + statusHtml(s, false))}${boardHtml(s, null, null, marksFor(s, two, tip), two ? bannerText(s) : "", topCard(s), tip)}`
+        : top(statusHtml(s)) + boardHtml(s, null, null, marksFor(s, two), two ? bannerText(s) : "", null, tip),
       actions: me ? [confirmAction(s)] : [],
       auto: me ? undefined : { key: autoKey(s), act: { type: "confirm" }, ms: AUTO_MS },
     };
@@ -190,8 +193,8 @@
     const guesserName = s.players[s.guesser];
     const tap = hint ? null : { by: guesserName, allowed: second ? (v) => (s.hint === "hoeher" ? v > s.first : v < s.first) : () => true };
     const body = isDealer
-      ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s, false)}${boardHtml(s, null, null, marksFor(s, hint || second), banner, topCard(s), hint ? s.first : null)}`
-      : statusHtml(s) +
+      ? `${top(dealerTagHtml(s, me) + topCardHtml(s) + statusHtml(s, false))}${boardHtml(s, null, null, marksFor(s, hint || second), banner, topCard(s), hint ? s.first : null)}`
+      : top(statusHtml(s)) +
         boardHtml(s, null, tap, marksFor(s, second), banner, null, hint ? s.first : null);
     return {
       phase: second ? "Zweiter Versuch" : "Erster Versuch",
@@ -224,7 +227,7 @@
     return {
       phase: "",
       title: titles[r.kind],
-      body: `${dealerTagHtml(s, me)}${extra}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r))}`,
+      body: `${top(dealerTagHtml(s, me) + extra)}${boardHtml(s, { ...r.card, right: r.kind !== "miss" }, null, resultMarks(r))}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
@@ -237,7 +240,7 @@
     return {
       phase: "",
       title: "Alle Karten gespielt! 🎉",
-      body: `${boardHtml(s)}<p class="bf-text fd-center">Wer hat am meisten getrunken?</p><ul class="fd-tally">${rows}</ul>`,
+      body: `${boardHtml(s)}${top(`<p class="bf-text fd-center">Wer hat am meisten getrunken?</p><ul class="fd-tally">${rows}</ul>`)}`,
       actions: [
         { label: "Nochmal spielen", act: { type: "restart" } },
         { label: "Zum Menü", exit: true, ghost: true },
