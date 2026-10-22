@@ -667,6 +667,7 @@ html.fit .fd-dealer { padding: clamp(4px, 0.8dvh, 8px) 18px; }
   animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both;
 }
 .fd-mark.x { background: #dc2626; }
+.fd-mark.old { background: #b45454; color: rgb(255 255 255 / 0.7); opacity: 0.6; box-shadow: none; }
 .fd-mark.fade { animation: mark-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1) both, mark-out 0.4s 1.9s ease-in forwards; }
 @keyframes mark-in { from { transform: translate(-50%, -50%) scale(0) rotate(-90deg); opacity: 0; } }
 @keyframes mark-out { to { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } }

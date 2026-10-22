@@ -66,7 +66,7 @@
   // tip = gerade geprüfter Tipp (nur der Dealer kennt das Ergebnis schon).
   function marksFor(s, firstKnown, tip) {
     const m = {};
-    if (firstKnown && s.first) m[s.first] = "x";
+    if (firstKnown && s.first) m[s.first] = s.stage === "check" ? "x old" : "x"; // nach dem 2. Tipp etwas blasser
     if (tip && s.deck[s.deck.length - 1].value !== tip) m[tip] = "x";
     return m;
   }
@@ -213,7 +213,7 @@
 
   function resultMarks(r) {
     const m = {};
-    if (r.guesses.length === 2) m[r.guesses[0]] = "x";
+    if (r.guesses.length === 2) m[r.guesses[0]] = "x old";
     if (r.kind === "miss") m[r.guesses[1]] = "x";
     return m;
   }
