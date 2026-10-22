@@ -10,6 +10,7 @@
 //                         //   by = Spieler, der drücken darf (fehlt: jeder), exit = zurück zum Menü
 //   act(s, action, by)    // Aktion auf den Spielstand anwenden, by = wer gedrückt hat
 //   privateAlerts         // true: große Trink-Meldung nur für alle, die trinken, die anderen sehen einen kleinen Hinweis
+//   afterRender(root, s, me) // nach dem Zeichnen, z. B. Animation; gibt ms zurück, die die Meldung wartet
 //   fit                   // true: Spiel passt immer auf den Bildschirm, ohne Scrollen
 //   open()                // eigenes Spiel auf eigener Seite (z. B. Flunky Ball)
 //   bot(s, name, actions) // was ein Bot drückt (eine act aus actions); fehlt: zufälliger Knopf

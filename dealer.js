@@ -141,6 +141,34 @@
     return { label: s.hint === "hoeher" ? "Höher ⬆" : "Niedriger ⬇", act: { type: "say" }, by: s.players[s.dealer] };
   }
 
+  function confirmAction(s) {
+    const right = s.pending.kind !== "miss";
+    return { label: right ? "Richtig ✅" : "Falsch ❌", act: { type: "confirm" }, by: s.players[s.dealer] };
+  }
+
+  // Der Dealer sieht oberste Karte und Tipp nebeneinander.
+  function compareHtml(s) {
+    const tip = s.pending.guesses[s.pending.guesses.length - 1];
+    return `<div class="fd-compare">
+      <figure>${playingCardHtml(s.deck[s.deck.length - 1], "pc-big")}<figcaption>Oberste Karte</figcaption></figure>
+      <figure><div class="pc pc-big fd-tip">${label(tip)}</div><figcaption>Tipp von ${name(s.players[s.guesser])}</figcaption></figure>
+    </div>`;
+  }
+
+  function checkView(s, me) {
+    const guesser = name(s.players[s.guesser]);
+    const tip = s.pending.guesses[s.pending.guesses.length - 1];
+    const isDealer = me ? me === s.players[s.dealer] : s.peek;
+    return {
+      phase: `F*ck den Dealer · ${s.pending.guesses.length === 2 ? "zweiter Versuch" : "erster Versuch"}`,
+      title: `${guesser} tippt ${cardName(tip)}`,
+      body: isDealer
+        ? `${dealerTagHtml(s, me)}${compareHtml(s)}<p class="bf-text fd-center">Stimmt der Tipp? Drück den Knopf, dann kommt die Auflösung.</p>`
+        : statusHtml(s) + boardHtml(s),
+      actions: [confirmAction(s)],
+    };
+  }
+
   function guessView(s, me) {
     const guesser = name(s.players[s.guesser]);
     const second = s.stage === "guess2";
@@ -155,9 +183,9 @@
     const tap = hint ? null : { by: guesserName, allowed: second ? (v) => (s.hint === "hoeher" ? v > s.first : v < s.first) : () => true };
     const myTurn = !hint && (me ? me === guesserName : !isBot(guesserName)); // ohne me: ein Handy, Dealer ist ein Bot
     const body = isDealer
-      ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s)}${
+      ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${
           hint ? `<p class="bf-text fd-center">Sag ${guesser}, ob die Karte höher oder niedriger ist.</p>` : ""
-        }`
+        }${boardHtml(s)}`
       : statusHtml(s) +
         boardHtml(s, null, tap) +
         (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
@@ -192,7 +220,7 @@
     return {
       phase: `F*ck den Dealer · noch ${s.deck.length} Karten`,
       title: titles[r.kind],
-      body: `${dealerTagHtml(s, me)}<div class="pc-row">${playingCardHtml(r.card, "pc-big pc-new")}</div><p class="bf-text fd-center">${how[r.kind]}</p>${extra}${boardHtml(s, r.card)}`,
+      body: `${dealerTagHtml(s, me)}<p class="bf-text fd-center">Die Karte war ${cardName(r.card.value)} ${r.card.suit.symbol}. ${how[r.kind]}</p>${extra}${boardHtml(s, r.card)}`,
       actions: [{ label: last ? "Zur Abrechnung" : "Nächste Karte", act: { type: "next" }, by: s.players[s.dealer] }],
     };
   }
@@ -219,7 +247,7 @@
     const card = s.deck.pop();
     s.played.push(card);
     s.tally[who] += n;
-    s.result = { kind, who, n, card, guesses };
+    s.result = { id: Math.random().toString(36).slice(2), kind, who, n, card, guesses };
     const items = [{ who, n, text: kind === "miss" ? "fürs Danebenraten" : `als Dealer, ${label(card.value)} wurde erraten` }];
 
     if (kind === "miss") s.strikes++;
@@ -241,15 +269,21 @@
     const dealer = s.players[s.dealer];
     if (!(v >= 2 && v <= 14) || playedCount(s, v) === 4) return;
     if (s.stage === "guess1") {
-      if (v === top.value) return resolve(s, "hit1", dealer, v, [v]);
+      if (v === top.value) return check(s, "hit1", dealer, v, [v]);
       s.first = v;
       s.hint = top.value > v ? "hoeher" : "tiefer";
       s.stage = "hint";
     } else {
       if (s.hint === "hoeher" ? v <= s.first : v >= s.first) return;
-      if (v === top.value) resolve(s, "hit2", dealer, Math.abs(v - s.first), [s.first, v]);
-      else resolve(s, "miss", guesser, Math.abs(v - top.value), [s.first, v]);
+      if (v === top.value) check(s, "hit2", dealer, Math.abs(v - s.first), [s.first, v]);
+      else check(s, "miss", guesser, Math.abs(v - top.value), [s.first, v]);
     }
+  }
+
+  // Erst schaut der Dealer nach und drückt „Richtig“ oder „Falsch“, dann wird aufgelöst.
+  function check(s, kind, who, n, guesses) {
+    s.pending = { kind, who, n, guesses };
+    s.stage = "check";
   }
 
   // Bot rät den Wert in der Mitte der Karten, die noch im Stapel sein können (so wird der Abstand klein).
@@ -263,6 +297,65 @@
     let v = pool[Math.floor(pool.length / 2)];
     if (Math.random() < 0.35) v = pool[Math.floor(Math.random() * pool.length)]; // mittel: nicht immer perfekt
     return { type: "guess", value: v };
+  }
+
+  // Die aufgedeckte Karte erscheint groß in der Tischmitte und wandert langsam auf ihren Stapel.
+  // Gibt zurück, wie lange die Trink-Meldung warten soll.
+  const FLY_MS = 2000;
+  let flying = null; // { id, end }
+
+  function flyCard(root, s) {
+    if (s.stage !== "result" || !s.result) return 0;
+    const target = root.querySelector(".fd-card.new");
+    const table = root.querySelector(".fd-table");
+    if (!target || !table) return 0;
+    const now = Date.now();
+    if (flying && flying.id === s.result.id) {
+      // Neu gezeichnet während des Flugs: Platz auf dem Tisch frei halten bis zur Landung.
+      if (now < flying.end) {
+        target.style.visibility = "hidden";
+        return flying.end - now;
+      }
+      return 0;
+    }
+    flying = { id: s.result.id, end: now + FLY_MS };
+    target.style.visibility = "hidden";
+    const tr = target.getBoundingClientRect();
+    const br = table.getBoundingClientRect();
+    const h = Math.min(br.height * 0.7, 190);
+    const w = h * (110 / 158);
+    const el = document.createElement("div");
+    el.className = `pc fd-fly ${s.result.card.suit.red ? "pc-red" : ""}`;
+    el.innerHTML = `<span>${s.result.card.rank}</span><span>${s.result.card.suit.symbol}</span>`;
+    Object.assign(el.style, {
+      left: `${br.left + br.width / 2 - w / 2}px`,
+      top: `${br.top + br.height / 2 - h / 2}px`,
+      width: `${w}px`,
+      height: `${h}px`,
+      fontSize: `${h * 0.22}px`,
+    });
+    document.body.appendChild(el);
+    const dx = tr.left - (br.left + br.width / 2 - w / 2);
+    const dy = tr.top - (br.top + br.height / 2 - h / 2);
+    const sc = tr.width / w;
+    const anim = el.animate(
+      [
+        { transform: `translate(${w * 0.35}px, ${h * 0.35}px) scale(0.3) rotateY(90deg)`, opacity: 0 },
+        { transform: "translate(0, 0) scale(1) rotateY(0deg)", opacity: 1, offset: 0.2 },
+        { transform: "translate(0, 0) scale(1)", offset: 0.45 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${sc})`, opacity: 1 },
+      ],
+      { duration: FLY_MS, easing: "ease-in-out", fill: "forwards" }
+    );
+    anim.onfinish = () => {
+      el.remove();
+      const landed = document.querySelector("#game-root .fd-card.new");
+      if (landed) {
+        landed.style.visibility = "";
+        landed.classList.add("landed");
+      }
+    };
+    return FLY_MS;
   }
 
   registerGame("dealer", {
@@ -289,9 +382,15 @@
           // Ist der Dealer ein Bot, braucht niemand die Karte zu sehen: alle raten am Tisch.
           if (me || isBot(s.players[s.dealer])) return guessView(s, me);
           return s.peek ? dealerOnlyView(s) : tableView(s);
+        case "check":
+          return checkView(s, me);
         case "result": return resultView(s, me);
         default: return endView(s);
       }
+    },
+
+    afterRender(root, s) {
+      return flyCard(root, s);
     },
 
     bot(s, name, acts) {
@@ -309,6 +408,11 @@
           title: up ? "Höher!" : "Niedriger!",
           text: `Nicht ${cardName(s.first)}. ${s.players[s.guesser]} hat noch einen Versuch.`,
         });
+      }
+      else if (s.stage === "check" && a.type === "confirm") {
+        const p = s.pending;
+        s.pending = null;
+        resolve(s, p.kind, p.who, p.n, p.guesses);
       }
       else if (s.stage === "result" && a.type === "next") {
         if (!s.deck.length) s.stage = "end";

@@ -214,7 +214,17 @@ function playGame(r) {
   }
 
   if (!$("screen-game").classList.contains("active")) showScreen("game");
-  checkAlert(r.s);
+  // afterRender: Spiel kann nach dem Zeichnen animieren und gibt zurück, wie lange die Meldung warten soll.
+  const delay = GAMES[r.key].afterRender?.(root, r.s, r.me) || 0;
+  if (delay) {
+    const btns = [...box.querySelectorAll("button")].filter((b) => !b.disabled);
+    btns.forEach((b) => (b.disabled = true)); // erst weiter, wenn die Animation durch ist
+    setTimeout(() => {
+      btns.forEach((b) => (b.disabled = false));
+      if (run === r) checkAlert(r.s);
+    }, delay);
+  }
+  else checkAlert(r.s);
   scheduleBot(r, v);
 }
 
