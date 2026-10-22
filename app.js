@@ -227,6 +227,24 @@ function playGame(r) {
   }
   else checkAlert(r.s);
   scheduleBot(r, v);
+  scheduleAuto(r, v);
+}
+
+// v.auto = { key, act, ms }: das Spiel macht nach kurzer Pause selbst weiter (nur wer den Spielstand hält).
+// Gleicher key beim Neuzeichnen: die Pause läuft einfach weiter.
+let autoTimer = null;
+let autoKey = null;
+
+function scheduleAuto(r, v) {
+  const want = v.auto && (!r.me || r.host) ? v.auto.key : null;
+  if (want === autoKey) return;
+  clearTimeout(autoTimer);
+  autoKey = want;
+  if (!want) return;
+  autoTimer = setTimeout(() => {
+    autoKey = null;
+    if (run.key === r.key && $("screen-game").classList.contains("active")) run.send(v.auto.act);
+  }, v.auto.ms);
 }
 
 // --- Bots ---

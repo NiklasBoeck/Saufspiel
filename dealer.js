@@ -135,71 +135,17 @@
     return `<div class="pc-row">${playingCardHtml(s.deck[s.deck.length - 1], "pc-big")}</div>`;
   }
 
-  function rankActions(s, guesser, allowed, sub) {
-    return RANKS.map((rank, i) => {
-      const v = i + 2;
-      const gone = playedCount(s, v) === 4;
-      return {
-        label: rank,
-        sub: gone ? "weg" : allowed(v) ? sub(v) : "",
-        act: { type: "guess", value: v },
-        by: guesser,
-        disabled: gone || !allowed(v),
-      };
-    });
-  }
-
   function dealerTagHtml(s, me) {
     const dealer = s.players[s.dealer];
     return `<p class="fd-dealer">🃏 Dealer: <b>${me === dealer ? "Du" : escapeHtml(dealer)}</b></p>`;
   }
 
-  function guessActions(s) {
-    const guesser = s.players[s.guesser];
-    if (s.stage === "guess1") return rankActions(s, guesser, () => true, (v) => `🍺${v}`);
-    const higher = s.hint === "hoeher";
-    return rankActions(s, guesser, (v) => (higher ? v > s.first : v < s.first), (v) => `🍺${Math.abs(v - s.first)}`);
-  }
-
   const bannerText = (s) => (s.hint === "hoeher" ? "Höher ⬆" : "Niedriger ⬇");
-  const hintText = (s) => (s.hint === "hoeher" ? "höher ⬆" : "niedriger ⬇");
 
-  // Ein Handy: Erst sehen alle den Tisch, dann bekommt nur der Dealer das Handy.
-  function tableView(s) {
-    const guesser = s.players[s.guesser];
-    const dealer = s.players[s.dealer];
-    return {
-      phase: "",
-      title: `${name(guesser)} ist dran mit Raten`,
-      body: statusHtml(s) + boardHtml(s) + `<p class="bf-text fd-center">Schaut euch an, was schon weg ist. Dann bekommt ${name(dealer)} das Handy.</p>`,
-      actions: [{ label: `📱 Handy an ${dealer} geben`, act: { type: "peek" } }],
-    };
-  }
-
-  function dealerOnlyView(s) {
-    const guesser = name(s.players[s.guesser]);
-    const second = s.stage === "guess2";
-    if (s.stage === "hint") {
-      return {
-        phase: "Erster Versuch",
-        title: `${guesser} tippt ${cardName(s.first)}`,
-        body: dealerTagHtml(s) + topCardHtml(s) + `<p class="bf-text fd-center">Drück den Knopf und sag ${guesser}, ob die Karte höher oder niedriger ist.</p>`,
-        actions: [sayAction(s)],
-      };
-    }
-    return {
-      phase: second ? "Zweiter Versuch" : "Erster Versuch",
-      title: second ? `Sag ${guesser}: <span class="fd-hint">${hintText(s)}</span>` : `${guesser}, sag deinen Tipp an!`,
-      body:
-        dealerTagHtml(s) +
-        topCardHtml(s) +
-        `<p class="bf-text fd-center">${
-          second ? `Erster Tipp war ${label(s.first)}. Tipp den zweiten Tipp von ${guesser} ein.` : `Tipp ein, was ${guesser} sagt.`
-        }</p>`,
-      actions: guessActions(s),
-      actionsClass: "fd-ranks",
-    };
-  }
+  // Ein Handy: Alle sehen nur den Tisch, die ratende Person tippt dort. Die Ansagen vom Dealer
+  // (höher/niedriger, richtig/falsch) macht die App selbst, sobald das „!“ durch ist.
+  const AUTO_MS = 2400;
+  const autoKey = (s) => `${s.played.length}-${s.stage}-${s.first}`;
 
   // Jeder sein Handy: Der Dealer sieht die oberste Karte, alle anderen den Tisch.
   // Nach dem ersten Fehlversuch: Der Dealer sagt mit dem Knopf an, ob die Karte höher oder niedriger ist.
@@ -215,7 +161,7 @@
   function checkView(s, me) {
     const guesser = name(s.players[s.guesser]);
     const tip = s.pending.guesses[s.pending.guesses.length - 1];
-    const isDealer = me ? me === s.players[s.dealer] : s.peek;
+    const isDealer = me === s.players[s.dealer];
     const two = s.pending.guesses.length === 2;
     return {
       phase: two ? "Zweiter Versuch" : "Erster Versuch",
@@ -223,7 +169,8 @@
       body: isDealer
         ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s, false)}${boardHtml(s, null, null, marksFor(s, two, tip), two ? bannerText(s) : "", topCard(s), tip)}`
         : statusHtml(s) + boardHtml(s, null, null, marksFor(s, two), two ? bannerText(s) : "", null, tip),
-      actions: [confirmAction(s)],
+      actions: me ? [confirmAction(s)] : [],
+      auto: me ? undefined : { key: autoKey(s), act: { type: "confirm" }, ms: AUTO_MS },
     };
   }
 
@@ -250,7 +197,8 @@
       phase: second ? "Zweiter Versuch" : "Erster Versuch",
       title,
       body,
-      actions: hint ? [sayAction(s)] : [],
+      actions: hint && me ? [sayAction(s)] : [],
+      auto: hint && !me ? { key: autoKey(s), act: { type: "say" }, ms: AUTO_MS } : undefined,
       turn: hint ? undefined : guesserName,
     };
   }
@@ -444,9 +392,7 @@
         case "guess1":
         case "hint":
         case "guess2":
-          // Ist der Dealer ein Bot, braucht niemand die Karte zu sehen: alle raten am Tisch.
-          if (me || isBot(s.players[s.dealer])) return guessView(s, me);
-          return s.peek ? dealerOnlyView(s) : tableView(s);
+          return guessView(s, me);
         case "check":
           return checkView(s, me);
         case "result": return resultView(s, me);
@@ -463,8 +409,7 @@
     },
 
     act(s, a) {
-      if (s.stage === "guess1" && a.type === "peek") s.peek = true;
-      else if ((s.stage === "guess1" || s.stage === "guess2") && a.type === "guess") guess(s, a.value);
+      if ((s.stage === "guess1" || s.stage === "guess2") && a.type === "guess") guess(s, a.value);
       else if (s.stage === "hint" && a.type === "say") {
         s.stage = "guess2";
       }
@@ -478,7 +423,6 @@
         else {
           s.guesser = nextGuesser(s, s.guesser);
           s.stage = "guess1";
-          s.peek = false;
           s.first = null;
         }
       }

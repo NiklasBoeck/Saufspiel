@@ -821,3 +821,4 @@ html.fit .disclaimer { font-size: clamp(0.65rem, 1.6dvh, 0.8rem); }
   html.fit .game-name { font-size: clamp(0.9rem, 4dvh, 1.15rem); }
   html.fit .game-desc { font-size: clamp(0.7rem, 3dvh, 0.88rem); }
 }
+.recommended { font-size: 0.68em; font-weight: 600; color: var(--primary); margin-left: 2px; white-space: nowrap; }
