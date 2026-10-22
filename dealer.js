@@ -36,11 +36,19 @@
     return `<div class="fd-card ${c.suit.red ? "red" : ""} ${isNew ? "new" : ""}" style="--j:${j}"><span>${c.rank}</span><span>${c.suit.symbol}</span></div>`;
   }
 
-  function boardHtml(s, fresh) {
+  // tap: { by, allowed(v) } macht die Stapel antippbar, damit die ratende Person direkt auf dem Tisch wählt.
+  function boardHtml(s, fresh, tap) {
     const pile = (v) => {
       const cards = s.played.filter((c) => c.value === v);
       const pips = Array.from({ length: 4 }, (_, i) => `<i class="${i < cards.length ? "on" : ""}"></i>`).join("");
-      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}">
+      let attrs = "";
+      if (tap) {
+        const ok = cards.length < 4 && tap.allowed(v);
+        attrs = ok
+          ? ` data-act='${JSON.stringify({ type: "guess", value: v })}' data-by="${escapeHtml(tap.by)}" role="button"`
+          : ` data-off`;
+      }
+      return `<div class="fd-pile ${cards.length === 4 ? "full" : ""}"${attrs}>
         <div class="fd-stack"><div class="fd-spot">${label(v)}</div>${cards.map((c, j) => tableCardHtml(c, j, fresh)).join("")}</div>
         <div class="fd-pips" title="${cards.length} von 4">${pips}</div>
       </div>`;
@@ -127,15 +135,20 @@
     const title = second
       ? `Nicht ${cardName(s.first)}! Die Karte ist <span class="fd-hint">${hintText(s)}</span>`
       : `${guesser} rät die oberste Karte`;
+    const guesserName = s.players[s.guesser];
+    const tap = { by: guesserName, allowed: second ? (v) => (s.hint === "hoeher" ? v > s.first : v < s.first) : () => true };
+    const myTurn = me ? me === guesserName : !isBot(guesserName); // ohne me: ein Handy, Dealer ist ein Bot
     const body = isDealer
       ? `${dealerTagHtml(s, me)}${topCardHtml(s)}${statusHtml(s)}`
-      : statusHtml(s) + boardHtml(s);
+      : statusHtml(s) +
+        boardHtml(s, null, tap) +
+        (myTurn ? `<p class="bf-text fd-center">👆 Tipp auf dem Tisch auf die Karte, die du rätst.</p>` : "");
     return {
       phase: `F*ck den Dealer · ${second ? "zweiter Versuch" : `noch ${s.deck.length} Karten`}`,
       title,
       body,
-      actions: guessActions(s),
-      actionsClass: "fd-ranks",
+      actions: [],
+      turn: guesserName,
     };
   }
 
@@ -214,6 +227,12 @@
       s.first = v;
       s.hint = top.value > v ? "hoeher" : "tiefer";
       s.stage = "guess2";
+      const up = s.hint === "hoeher";
+      notice(s, {
+        emoji: up ? "⬆️" : "⬇️",
+        title: up ? "Höher!" : "Niedriger!",
+        text: `${guesser} hat ${cardName(v)} getippt. Noch ein Versuch!`,
+      });
     } else {
       if (s.hint === "hoeher" ? v <= s.first : v >= s.first) return;
       if (v === top.value) resolve(s, "hit2", dealer, Math.abs(v - s.first), [s.first, v]);
