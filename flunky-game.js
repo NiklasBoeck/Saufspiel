@@ -132,6 +132,7 @@
       code: session.code,
       id: session.id,
       host: session.host,
+      state: session.host ? S : null,
       prefix: "sfb",
       onUp() {
         if (session.host) publishState();
@@ -140,29 +141,43 @@
       onChange: updateConn,
       onFail: (msg) => leaveToStart(msg),
       onAction: handleAction,
-      onState: onStateText,
+      onState: onHostState,
+      onTakeover: takeover,
+      onDemote(next) {
+        session.host = false;
+        hostTimers.forEach(clearTimeout);
+        hostTimers.length = 0;
+        onHostState(next);
+      },
     });
   }
 
-  // Gast: neuer Spielstand vom Host
-  function onStateText(text) {
-    if (!session || session.host) return;
-    if (!text) {
+  // Gast: neuer Spielstand vom Host (net.js hat Doppeltes und Veraltetes schon aussortiert)
+  function onHostState(next) {
+    if (!session) return;
+    if (!next) {
       if (S) leaveToStart("Der Host hat den Raum geschlossen.");
       return;
     }
-    let next;
-    try {
-      next = JSON.parse(text);
-    } catch {
-      return;
-    }
-    if (S && next.seq <= S.seq && next.hostId === S.hostId) return; // kam schon über den anderen Broker oder ist veraltet
     S = next;
+    saveSession();
     // Fehlen wir (z. B. weil der Host unser Beitreten verpasst hat)? Dann nochmal melden.
     const mine = S.players.find((p) => p.id === session.id);
     if ((!mine && S.phase === "lobby") || (mine && !mine.online)) sendJoin();
     onState();
+  }
+
+  // Der Host ist weg und dieses Handy übernimmt mit dem letzten Spielstand.
+  function takeover() {
+    const old = S.players.find((p) => p.id === S.hostId);
+    if (old) old.online = false;
+    session.host = true;
+    S.hostId = session.id;
+    S.epoch = (S.epoch || 0) + 1;
+    const mine = S.players.find((p) => p.id === session.id);
+    if (mine) mine.online = true;
+    publishState();
+    resumeHostTimers();
   }
 
   function send(action) {
@@ -229,7 +244,7 @@
   function publishState() {
     S.seq++;
     saveSession();
-    net?.publishState(JSON.stringify(S));
+    net?.publishState(S);
     onState();
   }
 
