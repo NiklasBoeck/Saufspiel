@@ -20,10 +20,7 @@ const Room = (() => {
   // { code, game, hostId, phase: "lobby" | "play", players: [{ id, name, online }], seq, gseq, g }
   // g = Spielstand des Spiels, gseq zählt nur Spielzüge (gegen doppelt gedrückte Knöpfe).
   let S = null;
-  let client = null;
-  let connected = false;
-  let hostOnline = true;
-  let notFoundTimer = null;
+  let net = null;
   let freshJoin = false; // erster Spielstand nach dem Beitreten: alte Trink-Meldung nicht nochmal zeigen
 
   function loadId() {
@@ -79,11 +76,7 @@ const Room = (() => {
     return String(name || "").trim().slice(0, 20) || "Spieler";
   }
 
-  // --- Verbindung ---
-
-  function topic(sub) {
-    return `${TOPIC_ROOT}/${session.code}/${sub}`;
-  }
+  // --- Verbindung (net.js) ---
 
   function brokerParam() {
     const b = new URLSearchParams(location.search).get("broker");
@@ -91,135 +84,73 @@ const Room = (() => {
   }
 
   function connect() {
-    const override = new URLSearchParams(location.search).get("broker");
-    const urls = override ? [override] : BROKERS;
-    let i = 0;
     setConn("Verbinde…");
-
-    const tryNext = () => {
-      if (i >= urls.length) {
-        leaveToStart("Keine Verbindung zum Spielserver. Ist das Internet an?");
-        return;
-      }
-      const url = urls[i++];
-      const will = session.host
-        ? { topic: topic("host"), payload: "offline", qos: 1, retain: true }
-        : { topic: topic("act"), payload: JSON.stringify({ type: "gone", from: session.id }), qos: 1, retain: false };
-      const c = mqtt.connect(url, {
-        clientId: `ssr_${session.id}_${randomString("abcdef0123456789", 6)}`,
-        clean: true,
-        keepalive: 20,
-        connectTimeout: 6000,
-        reconnectPeriod: 0, // erst nach der ersten Verbindung automatisch neu verbinden
-        will,
-      });
-      let ok = false;
-      const fail = () => {
-        if (ok || client !== c) return;
-        c.end(true);
-        client = null;
-        tryNext();
-      };
-      client = c;
-      c.on("error", fail);
-      c.on("close", () => {
-        if (!ok) return fail();
-        connected = false;
-        updateConn();
-      });
-      c.on("connect", () => {
-        ok = true;
-        c.options.reconnectPeriod = 2000;
-        connected = true;
-        onConnected();
-      });
-      c.on("message", onMessage);
-    };
-    tryNext();
+    net = RoomNet.open({
+      root: TOPIC_ROOT,
+      code: session.code,
+      id: session.id,
+      host: session.host,
+      prefix: "ssr",
+      onUp() {
+        if (session.host) publishState();
+        else sendJoin();
+      },
+      onChange: updateConn,
+      onFail: (msg) => leaveToStart(msg),
+      onAction: handle,
+      onState: onStateText,
+    });
   }
 
-  function onConnected() {
-    updateConn();
-    if (session.host) {
-      client.subscribe(topic("act"), { qos: 1 });
-      client.publish(topic("host"), "online", { qos: 1, retain: true });
-      publishState();
-    } else {
-      client.subscribe([topic("state"), topic("host")], { qos: 1 });
-      sendJoin();
-      if (!S) {
-        clearTimeout(notFoundTimer);
-        notFoundTimer = setTimeout(() => {
-          if (!S) leaveToStart(`Raum ${session.code} gibt es nicht (mehr).`);
-        }, 6000);
-      }
-    }
-  }
-
-  function onMessage(t, payload) {
-    if (!session) return;
-    const text = payload.toString();
-    if (t === topic("host")) {
-      const wasOnline = hostOnline;
-      hostOnline = text !== "offline";
-      if (hostOnline && !wasOnline) sendJoin();
-      updateConn();
+  // Gast: neuer Spielstand vom Host
+  function onStateText(text) {
+    if (!session || session.host) return;
+    if (!text) {
+      if (S) leaveToStart("Der Host hat den Raum geschlossen.");
       return;
     }
-    if (t === topic("state") && !session.host) {
-      if (!text) {
-        if (S) leaveToStart("Der Host hat den Raum geschlossen.");
-        return;
-      }
-      try {
-        const next = JSON.parse(text);
-        if (S && next.seq < S.seq && next.hostId === S.hostId) return; // veraltet
-        if (next.game !== session.game) {
-          session.game = next.game;
-          saveSession();
-        }
-        S = next;
-      } catch {
-        return;
-      }
-      clearTimeout(notFoundTimer);
-      onState();
+    let next;
+    try {
+      next = JSON.parse(text);
+    } catch {
       return;
     }
-    if (t === topic("act") && session.host) {
-      try {
-        handle(JSON.parse(text));
-      } catch {
-        // kaputte Nachricht ignorieren
-      }
+    if (S && next.seq <= S.seq && next.hostId === S.hostId) return; // kam schon über den anderen Broker oder ist veraltet
+    if (next.game !== session.game) {
+      session.game = next.game;
+      saveSession();
     }
+    S = next;
+    // Fehlen wir (z. B. weil der Host unser Beitreten verpasst hat)? Dann nochmal melden.
+    const mine = me();
+    if (!mine || !mine.online) sendJoin();
+    onState();
   }
 
   function send(action) {
     action.from = session.id;
     if (session.host) return handle(action);
-    if (client && connected) client.publish(topic("act"), JSON.stringify(action), { qos: 1 });
+    net?.send(action);
   }
 
+  let lastJoin = 0;
   function sendJoin() {
+    if (Date.now() - lastJoin < 1500) return;
+    lastJoin = Date.now();
     send({ type: "join", name: session.name });
   }
 
   function updateConn() {
-    if (!session) return;
-    const ok = connected && (session.host || hostOnline);
+    if (!session || !net) return;
+    const connected = net.connected;
+    const ok = connected && net.hostOnline;
     setConn(!connected ? "Verbindung weg, verbinde neu…" : ok ? `● verbunden · Raum ${session.code}` : "Host ist offline, warte…");
     document.querySelectorAll(".conn").forEach((el) => el.classList.toggle("bad", !ok));
   }
 
-  function disconnect() {
-    clearTimeout(notFoundTimer);
-    if (client) {
-      const c = client;
-      client = null;
-      c.end(false);
-    }
-    connected = false;
+  function disconnect(closeRoom) {
+    net?.close(closeRoom);
+    net = null;
   }
 
   // --- Host ---
@@ -240,7 +171,7 @@ const Room = (() => {
   function publishState() {
     S.seq++;
     saveSession();
-    if (client && connected) client.publish(topic("state"), JSON.stringify(S), { qos: 1, retain: true });
+    net?.publishState(JSON.stringify(S));
     onState();
   }
 
@@ -267,8 +198,12 @@ const Room = (() => {
         else p.online = false;
         break;
       case "gone":
-        if (!p) return;
+        if (!p || !p.online) return;
         p.online = false;
+        break;
+      case "hb":
+        if (!p || p.online) return; // Lebenszeichen: nur wer als offline galt, ist wieder da
+        p.online = true;
         break;
       case "bot-add":
         if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length >= MAX_PLAYERS) return;
@@ -395,10 +330,11 @@ const Room = (() => {
   // --- Ablauf ---
 
   function startSession(s, state) {
+    disconnect(false);
     session = s;
     S = state;
-    hostOnline = true;
     freshJoin = true;
+    lastJoin = 0;
     qrFor = null;
     store(NAME_KEY, s.name);
     saveSession();
@@ -418,7 +354,7 @@ const Room = (() => {
   }
 
   function endSession() {
-    disconnect();
+    disconnect(false);
     session = null;
     S = null;
     store(SESSION_KEY, null);
@@ -435,18 +371,10 @@ const Room = (() => {
   function leave() {
     const host = session?.host;
     if (!confirm(host ? "Raum schließen? Das Spiel endet dann für alle." : "Raum verlassen?")) return;
-    if (client && connected) {
-      if (host) {
-        client.publish(topic("state"), "", { qos: 1, retain: true });
-        client.publish(topic("host"), "", { qos: 1, retain: true });
-      } else {
-        send({ type: "leave" });
-      }
-    }
-    setTimeout(() => {
-      endSession();
-      showScreen("menu");
-    }, 300);
+    if (!host) send({ type: "leave" });
+    disconnect(host);
+    endSession();
+    showScreen("menu");
   }
 
   function showStart(error) {

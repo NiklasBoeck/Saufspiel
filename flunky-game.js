@@ -62,10 +62,7 @@
   const myId = loadId();
   let session = null; // { code, id, name, host }
   let S = null; // Spielstand: beim Host die Wahrheit, bei Gästen die letzte Kopie
-  let client = null;
-  let connected = false;
-  let hostOnline = true;
-  let notFoundTimer = null;
+  let net = null;
   const hostTimers = [];
 
   function loadId() {
@@ -127,117 +124,57 @@
 
   // --- Verbindung ---
 
-  function topic(sub) {
-    return `${TOPIC_ROOT}/${session.code}/${sub}`;
-  }
-
+  // Verbindung über net.js (zwei Broker, Lebenszeichen, Neuverbinden nach dem Sperrbildschirm)
   function connect() {
-    const override = new URLSearchParams(location.search).get("broker");
-    const urls = override ? [override] : BROKERS;
-    let i = 0;
     setConn("Verbinde…");
-
-    const tryNext = () => {
-      if (i >= urls.length) {
-        leaveToStart("Keine Verbindung zum Spielserver. Ist das Internet an?");
-        return;
-      }
-      const url = urls[i++];
-      const will = session.host
-        ? { topic: topic("host"), payload: "offline", qos: 1, retain: true }
-        : { topic: topic("act"), payload: JSON.stringify({ type: "gone", from: session.id }), qos: 1, retain: false };
-      const c = mqtt.connect(url, {
-        clientId: `sfb_${session.id}_${randomString("abcdef0123456789", 6)}`,
-        clean: true,
-        keepalive: 20,
-        connectTimeout: 6000,
-        reconnectPeriod: 0, // erst nach der ersten Verbindung automatisch neu verbinden
-        will,
-      });
-      let ok = false;
-      const fail = () => {
-        if (ok || client !== c) return;
-        c.end(true);
-        client = null;
-        tryNext();
-      };
-      client = c;
-      c.on("error", fail);
-      c.on("close", () => {
-        if (!ok) return fail();
-        connected = false;
-        updateConn();
-      });
-      c.on("connect", () => {
-        ok = true;
-        c.options.reconnectPeriod = 2000;
-        connected = true;
-        onConnected();
-      });
-      c.on("message", onMessage);
-    };
-    tryNext();
+    net = RoomNet.open({
+      root: TOPIC_ROOT,
+      code: session.code,
+      id: session.id,
+      host: session.host,
+      prefix: "sfb",
+      onUp() {
+        if (session.host) publishState();
+        else sendJoin();
+      },
+      onChange: updateConn,
+      onFail: (msg) => leaveToStart(msg),
+      onAction: handleAction,
+      onState: onStateText,
+    });
   }
 
-  function onConnected() {
-    updateConn();
-    if (session.host) {
-      client.subscribe(topic("act"), { qos: 1 });
-      client.publish(topic("host"), "online", { qos: 1, retain: true });
-      publishState();
-    } else {
-      client.subscribe([topic("state"), topic("host")], { qos: 1 });
-      sendJoin();
-      if (!S) {
-        clearTimeout(notFoundTimer);
-        notFoundTimer = setTimeout(() => {
-          if (!S) leaveToStart(`Raum ${session.code} gibt es nicht (mehr).`);
-        }, 6000);
-      }
-    }
-  }
-
-  function onMessage(t, payload) {
-    const text = payload.toString();
-    if (t === topic("host")) {
-      const wasOnline = hostOnline;
-      hostOnline = text !== "offline";
-      if (hostOnline && !wasOnline) sendJoin();
-      updateConn();
+  // Gast: neuer Spielstand vom Host
+  function onStateText(text) {
+    if (!session || session.host) return;
+    if (!text) {
+      if (S) leaveToStart("Der Host hat den Raum geschlossen.");
       return;
     }
-    if (t === topic("state")) {
-      if (!text) {
-        if (S) leaveToStart("Der Host hat den Raum geschlossen.");
-        return;
-      }
-      try {
-        const next = JSON.parse(text);
-        if (S && next.seq < S.seq && next.hostId === S.hostId) return; // veraltet
-        S = next;
-      } catch {
-        return;
-      }
-      clearTimeout(notFoundTimer);
-      onState();
+    let next;
+    try {
+      next = JSON.parse(text);
+    } catch {
       return;
     }
-    if (t === topic("act") && session.host) {
-      try {
-        handleAction(JSON.parse(text));
-      } catch {
-        // kaputte Nachricht ignorieren
-      }
-    }
+    if (S && next.seq <= S.seq && next.hostId === S.hostId) return; // kam schon über den anderen Broker oder ist veraltet
+    S = next;
+    // Fehlen wir (z. B. weil der Host unser Beitreten verpasst hat)? Dann nochmal melden.
+    const mine = S.players.find((p) => p.id === session.id);
+    if ((!mine && S.phase === "lobby") || (mine && !mine.online)) sendJoin();
+    onState();
   }
 
   function send(action) {
     action.from = session.id;
     if (session.host) return handleAction(action);
-    if (client && connected) client.publish(topic("act"), JSON.stringify(action), { qos: 1 });
+    net?.send(action);
   }
 
+  let lastJoin = 0;
   function sendJoin() {
+    if (Date.now() - lastJoin < 1500) return;
+    lastJoin = Date.now();
     send({ type: "join", name: session.name });
   }
 
@@ -245,23 +182,23 @@
     $("fb-conn").textContent = text;
   }
 
+  function isConnected() {
+    return !!net && net.connected;
+  }
+
   function updateConn() {
-    const ok = connected && (session?.host || hostOnline);
-    setConn(!connected ? "Verbindung weg, verbinde neu…" : ok ? "● verbunden" : "Host ist offline…");
+    if (!session || !net) return;
+    const ok = net.connected && net.hostOnline;
+    setConn(!net.connected ? "Verbindung weg, verbinde neu…" : ok ? "● verbunden" : "Host ist offline…");
     $("fb-conn2").classList.toggle("bad", !ok);
     if (S) renderStatus();
   }
 
-  function disconnect() {
-    clearTimeout(notFoundTimer);
+  function disconnect(closeRoom) {
     hostTimers.forEach(clearTimeout);
     hostTimers.length = 0;
-    if (client) {
-      const c = client;
-      client = null;
-      c.end(false);
-    }
-    connected = false;
+    net?.close(closeRoom);
+    net = null;
   }
 
   // --- Host: Spielregeln ---
@@ -292,7 +229,7 @@
   function publishState() {
     S.seq++;
     saveSession();
-    if (client && connected) client.publish(topic("state"), JSON.stringify(S), { qos: 1, retain: true });
+    net?.publishState(JSON.stringify(S));
     onState();
   }
 
@@ -318,8 +255,12 @@
         }
         break;
       case "gone":
-        if (!p) return;
+        if (!p || !p.online) return;
         p.online = false;
+        break;
+      case "hb":
+        if (!p || p.online) return; // Lebenszeichen: nur wer als offline galt, ist wieder da
+        p.online = true;
         break;
       case "leave":
         if (!p) return;
@@ -821,8 +762,8 @@
   function renderStatus() {
     if (!S || S.phase === "lobby" || S.phase === "teams") return;
     const el = $("fb-status");
-    if (connected && !session.host && !hostOnline) return (el.textContent = "Host ist offline, warte…");
-    if (!connected) return (el.textContent = "Verbindung weg, verbinde neu…");
+    if (isConnected() && !net.hostOnline) return (el.textContent = "Host ist offline, warte…");
+    if (!isConnected()) return (el.textContent = "Verbindung weg, verbinde neu…");
     const m = me();
     const teamOf = (id) => S.players.find((p) => p.id === id)?.team;
     let text = "";
@@ -1692,7 +1633,7 @@
   }
 
   function canThrow() {
-    return S && S.phase === "aim" && S.throwerId === session.id && pendingThrowSeq !== S.seq && connected;
+    return S && S.phase === "aim" && S.throwerId === session.id && pendingThrowSeq !== S.seq && isConnected();
   }
 
   canvas.addEventListener("pointerdown", (e) => {
@@ -1865,9 +1806,10 @@
   let createMax = 4;
 
   function startSession(s, state) {
+    disconnect(false);
     session = s;
     S = state;
-    hostOnline = true;
+    lastJoin = 0;
     lastPhase = null;
     shotSeenId = null;
     pendingThrowSeq = null;
@@ -1907,7 +1849,7 @@
   }
 
   function leaveToStart(error) {
-    disconnect();
+    disconnect(false);
     session = null;
     S = null;
     store(SESSION_KEY, null);
@@ -2009,15 +1951,9 @@
   function leave() {
     const host = session?.host;
     if (!confirm(host ? "Raum schließen? Das Spiel endet dann für alle." : "Spiel verlassen?")) return;
-    if (client && connected) {
-      if (host) {
-        client.publish(topic("state"), "", { qos: 1, retain: true });
-        client.publish(topic("host"), "", { qos: 1, retain: true });
-      } else {
-        send({ type: "leave" });
-      }
-    }
-    setTimeout(() => leaveToStart(), 300);
+    if (!host) send({ type: "leave" });
+    disconnect(host);
+    leaveToStart();
   }
   $("fb-lobby-leave").onclick = leave;
   $("fb-game-leave").onclick = leave;
