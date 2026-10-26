@@ -382,8 +382,8 @@ window.Hodenritter3D = (() => {
       addParty(scene, rnd, timeU);
       addBackdrop(scene, rnd, timeU);
 
-      const whiteBall = mesh(sphere(H.W_R, 28, 20), mat(0xfbfaf5, 0.28), 0, 0, 0);
-      const whiteRing = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.14, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }));
+      const whiteBall = mesh(sphere(H.W_R, 28, 20), mat(0xff1f3d, 0.25, { emissive: 0x7a0010, emissiveIntensity: 0.35 }), 0, 0, 0); // die Zielkugel: knallrot, damit man sie sieht
+      const whiteRing = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.14, 40), new THREE.MeshBasicMaterial({ color: 0xff4d6d, transparent: true, opacity: 0.5, depthWrite: false }));
       whiteRing.rotation.x = -Math.PI / 2;
       scene.add(whiteBall, whiteRing);
 
@@ -679,7 +679,6 @@ window.Hodenritter3D = (() => {
         bulbs.push(a.clone().lerp(b, u).add(new THREE.Vector3(0, -Math.sin(u * Math.PI) * sag, 0)));
       }
     };
-    strand(P(-10.5, -0.2, 2.7), P(10.5, -0.2, 2.7), 0.55, 56);
     strand(P(-11, -4.25, 2.95), P(11, -4.25, 2.95), 0.35, 48);
     const bulbCols = [0xffe08a, 0xff6b8b, 0x7ee0ff, 0xb6ff7a, 0xffb36b, 0xd9a6ff];
     const bulbMesh = new THREE.InstancedMesh(sphere(0.036, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), bulbs.length);
@@ -702,12 +701,6 @@ window.Hodenritter3D = (() => {
     glowGeo.setAttribute("color", new THREE.BufferAttribute(glowCol, 3));
     const glow = new THREE.Points(glowGeo, new THREE.PointsMaterial({ size: 0.26, map: glowTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.75 }));
     scene.add(glow);
-    const poleM = mat(0x8a5a35, 0.8);
-    for (const x of [-10.5, 10.5]) {
-      const pole = mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.8, 10), poleM, 0, 0, 0);
-      pole.position.copy(P(x, -0.2, 1.4));
-      scene.add(pole);
-    }
 
     // Hecke hinten: ein runder Wulst mit Blätterkugeln obendrauf
     const hy = H.FIELD.y1 + 0.75;
@@ -1689,7 +1682,7 @@ window.Hodenritter3D = (() => {
 
   // --- Kugeln ---
 
-  const BALL_COLORS = ["#ef4444", "#3b82f6", "#f59e0b", "#22c55e", "#a855f7", "#ec4899", "#14b8a6", "#f97316", "#eab308", "#6366f1", "#84cc16", "#06b6d4", "#e11d48", "#8b5cf6", "#10b981", "#f43f5e"];
+  const BALL_COLORS = ["#3b82f6", "#f59e0b", "#22c55e", "#a855f7", "#14b8a6", "#eab308", "#6366f1", "#84cc16", "#06b6d4", "#8b5cf6", "#10b981", "#0ea5e9", "#facc15", "#1d4ed8", "#65a30d", "#7c3aed"]; // ohne Rot: rot ist die Zielkugel
 
   function ballColor(name) {
     return BALL_COLORS[Math.max(0, S.players.indexOf(name)) % BALL_COLORS.length];
@@ -1963,7 +1956,7 @@ window.Hodenritter3D = (() => {
         return { pos: P(x + 0.7, -3.4, 2.35), look: P(x * 0.35 + fx * 0.65, fy * 0.85, 0), k: 2.5 };
       }
       case "result": {
-        // Von schräg oben auf die weiße Kugel, so dass die meisten Kugeln drauf sind
+        // Von schräg oben auf die rote Kugel, so dass die meisten Kugeln drauf sind
         const ds = [...balls].filter(([id]) => id !== "@w").map(([, b]) => Math.hypot(b.x - w.x, b.y - w.y)).sort((a, b) => a - b);
         const r = Math.min(3, Math.max(0.8, ds[Math.max(0, ds.length - 2)] ?? 1));
         const d = 0.9 + r * 1.5;
@@ -2535,7 +2528,7 @@ window.Hodenritter3D = (() => {
       }
     }
 
-    // Kugeln beschriften, im Ergebnis mit Abstand zur weißen Kugel
+    // Kugeln beschriften, im Ergebnis mit Abstand zur roten Kugel
     const wb = balls.get("@w");
     if (S.phase === "result" && wb && !playing) {
       const ws = project(P(wb.x, wb.y, 0.02));
@@ -2570,7 +2563,7 @@ window.Hodenritter3D = (() => {
         if (!s) continue;
         if (id === "@w") {
           const d = G.camera.position.distanceTo(P(b.x, b.y));
-          if (d > 4) label("⚪", s.x, s.y, { size: 12, bg: "rgba(255,255,255,0.25)" });
+          if (d > 4) label("🔴", s.x, s.y, { size: 12, bg: "rgba(255,255,255,0.25)" });
         } else if (!b.air) label(shortName(id), s.x, s.y, { avoid: true, size: 10, dot: ballColor(id) });
       }
     }

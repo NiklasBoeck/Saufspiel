@@ -1,9 +1,9 @@
 // Hodenritter: Boule im Garten. Alle sitzen auf Gartenstühlen in einer Reihe vor dem Rasen.
-// Wer die weiße Kugel hat, wirft sie auf den Rasen, dann werfen alle reihum (rechts daneben fängt an,
-// wer die weiße Kugel geworfen hat, wirft als Letztes). Wer am weitesten weg liegt und wer die weiße
+// Wer die rote Kugel hat, wirft sie auf den Rasen, dann werfen alle reihum (rechts daneben fängt an,
+// wer die rote Kugel geworfen hat, wirft als Letztes). Wer am weitesten weg liegt und wer die weiße
 // Kugel berührt hat, steht auf und trinkt ein halbes Bier. Der Weiteste muss danach eine Aufgabe
 // schaffen. Dann verbeugen sich alle, die aufgestanden sind, vor jedem, der noch sitzt. Wer am nächsten
-// dran war, bekommt die weiße Kugel und darf ein Hindernis auf den Rasen legen.
+// dran war, bekommt die rote Kugel und darf ein Hindernis auf den Rasen legen.
 //
 // Läuft wie die anderen Spiele über setup/view/act (ein Handy oder jeder sein Handy). Der Spielstand
 // enthält auch die Kugel-Physik: Der Host rechnet den Wurf aus und schickt die Bahnen mit, alle Handys
@@ -17,13 +17,13 @@
   const THROW_Y = -0.15; // hier verlässt die Kugel die Hand
   const RANGE = 14; // Flugweite bei voller Kraft
   const B_R = 0.065; // Boule-Kugel (etwas größer als echt, damit man sie sieht)
-  const W_R = 0.04; // weiße Kugel
+  const W_R = 0.04; // rote Kugel
   const DECEL = 2.3; // Bremsen im Gras (m/s²)
   const ROLL = { boule: 0.1, white: 0.2 }; // so viel der Flugweite rollt die Kugel nach
   const SPREAD_A = 0.02; // Streuung der Richtung (rad)
   const SPREAD_P = 0.035; // Streuung der Kraft (Anteil)
   const FIELD = { x: 7.1, y0: 0.05, y1: 15.7 }; // Zaun links/rechts, Terrassenkante, Hecke
-  const WHITE_MIN = 3; // so weit muss die weiße Kugel mindestens fliegen
+  const WHITE_MIN = 3; // so weit muss die rote Kugel mindestens fliegen
   const DRINK_SECS = 60;
   const MAX_OBSTACLES = 10;
   const TREE = { x: -5.6, y: 12.6, r: 0.2 }; // Apfelbaum im Rasen, auch ein Hindernis
@@ -42,8 +42,8 @@
   const TASKS = [
     { t: "Lauf einmal um alle Stühle herum.", s: 15, a: "chairs", g: "run" },
     { t: "Lauf bis zur Hecke, klatsch sie ab und komm zurück.", s: 20, a: "hedge", g: "run" },
-    { t: "Hol die weiße Kugel, aber rückwärts laufend.", s: 25, a: "white", g: "run" },
-    { t: "Dreh dich fünfmal im Kreis und lauf dann zur weißen Kugel.", s: 25, a: "spin", g: "spin" },
+    { t: "Hol die rote Kugel, aber rückwärts laufend.", s: 25, a: "white", g: "run" },
+    { t: "Dreh dich fünfmal im Kreis und lauf dann zur roten Kugel.", s: 25, a: "spin", g: "spin" },
     { t: "Hüpf auf einem Bein zur Rasenmitte und zurück.", s: 25, a: "hop", g: "hop" },
     { t: "Zehn Hampelmänner.", s: 15, a: "jacks", g: "jacks" },
     { t: "Zehn Kniebeugen, jedes Mal ganz runter.", s: 25, a: "squat", g: "squat" },
@@ -110,7 +110,7 @@
     return null;
   }
 
-  // Rechts neben dem, der die weiße Kugel hat, geht es los, er selbst wirft als Letztes.
+  // Rechts neben dem, der die rote Kugel hat, geht es los, er selbst wirft als Letztes.
   function throwOrder(s) {
     const n = s.players.length;
     return Array.from({ length: n }, (_, i) => s.players[(s.holder + 1 + i) % n]);
@@ -169,7 +169,7 @@
   }
 
   // shot: { id, from, ang, power, white }
-  // Ergebnis: neue Positionen, ob die weiße Kugel berührt wurde, und die Bahnen für die Animation.
+  // Ergebnis: neue Positionen, ob die rote Kugel berührt wurde, und die Bahnen für die Animation.
   function simulate(s, shot) {
     const d = shot.power * RANGE;
     const land = { x: shot.from.x + Math.sin(shot.ang) * d, y: shot.from.y + Math.cos(shot.ang) * d };
@@ -315,7 +315,7 @@
       const far = Math.hypot(w.x - seatX(s, i), w.y - THROW_Y);
       if (far < WHITE_MIN || w.y > FIELD.y1 - 0.2 || Math.abs(w.x) > FIELD.x - 0.2) {
         s.white = null;
-        notice(s, { emoji: "↩️", title: far < WHITE_MIN ? "Zu kurz!" : "Zu weit!", text: `${name} wirft die weiße Kugel nochmal.` });
+        notice(s, { emoji: "↩️", title: far < WHITE_MIN ? "Zu kurz!" : "Zu weit!", text: `${name} wirft die rote Kugel nochmal.` });
         return;
       }
       s.white = w;
@@ -476,7 +476,7 @@
         s.standing = s.players.filter((p) => p === far || s.touched.includes(p));
         // Der Weiteste zuerst, dann die anderen in Sitzreihenfolge
         s.standing.sort((x, y) => (x === far ? -1 : y === far ? 1 : 0));
-        const why = (p) => (p === far && s.touched.includes(p) ? "am weitesten weg und weiße Kugel berührt" : p === far ? "am weitesten weg" : "weiße Kugel berührt");
+        const why = (p) => (p === far && s.touched.includes(p) ? "am weitesten weg und rote Kugel berührt" : p === far ? "am weitesten weg" : "rote Kugel berührt");
         startDrink(s, s.standing.map((n) => ({ n, u: 1, why: `${why(n)}: aufstehen, 2 m vor die Reihe, max. 1 Minute` })), "task", "", "stand");
         return;
       }
@@ -566,7 +566,7 @@
     const dx = s.white.x - x0;
     const dy = s.white.y - THROW_Y;
     const D = Math.hypot(dx, dy);
-    // Kurz vor die weiße Kugel werfen, den Rest rollt sie
+    // Kurz vor die rote Kugel werfen, den Rest rollt sie
     const p = (D - 0.15) / (RANGE * (1 + ROLL.boule));
     return { type: "throw", k: s.k, a: Math.atan2(dx, dy) + gauss() * 0.03, p: p * (1 + gauss() * 0.055) };
   }
@@ -653,7 +653,7 @@
     switch (s.phase) {
       case "white": {
         const h = s.players[s.holder];
-        v.title = you(h) ? "Du wirfst die weiße Kugel!" : `${nm(h)} wirft die weiße Kugel`;
+        v.title = you(h) ? "Du wirfst die rote Kugel!" : `${nm(h)} wirft die rote Kugel`;
         if (!isBot(h)) {
           v.turn = h;
           if (!me || you(h)) hint = "Finger aufs Bild, nach unten ziehen (Kraft), zur Seite lenken, loslassen.";
@@ -663,10 +663,10 @@
       case "throw": {
         const t = thrower(s);
         v.phase = `Runde ${s.round} · Wurf ${s.turn + 1} von ${s.order.length}`;
-        v.title = you(t) ? "So nah wie möglich an die weiße Kugel!" : `${nm(t)} wirft`;
+        v.title = you(t) ? "So nah wie möglich an die rote Kugel!" : `${nm(t)} wirft`;
         if (!isBot(t)) {
           v.turn = t;
-          if (!me || you(t)) hint = "Ziehen und loslassen. Die weiße Kugel nicht berühren!";
+          if (!me || you(t)) hint = "Ziehen und loslassen. Die rote Kugel nicht berühren!";
         }
         break;
       }
@@ -674,7 +674,7 @@
         const { far, near } = s.result;
         const touched = s.touched;
         v.title = `${nm(far)} liegt am weitesten weg`;
-        hint = touched.length ? `Weiße Kugel berührt: ${touched.map(escapeHtml).join(", ")}. ` : "";
+        hint = touched.length ? `Rote Kugel berührt: ${touched.map(escapeHtml).join(", ")}. ` : "";
         hint += `Am nächsten dran: ${escapeHtml(near)}.`;
         v.actions.push({ label: "Weiter", act: { type: "next", k: s.k } });
         break;
@@ -724,7 +724,7 @@
         const { who, kind } = s.place;
         v.phase = "Hindernis";
         if (!kind) {
-          v.title = `${you(who) ? "Du bist" : `${nm(who)} ist`} am nächsten dran und ${you(who) ? "bekommst" : "bekommt"} die weiße Kugel`;
+          v.title = `${you(who) ? "Du bist" : `${nm(who)} ist`} am nächsten dran und ${you(who) ? "bekommst" : "bekommt"} die rote Kugel`;
           hint = "Leg ein Hindernis auf den Rasen:";
           if (!isBot(who)) {
             v.actionsClass = "hr-kinds";
@@ -804,14 +804,14 @@
     color: "#0d9488",
     privateAlerts: true,
     rules: [
-      "Alle sitzen in einer Reihe auf Gartenstühlen vor dem Rasen, jeder hat eine Kugel. Wer die weiße Kugel hat, wirft sie zuerst auf den Rasen.",
-      "Dann wirft der rechte Nachbar so nah wie möglich an die weiße Kugel, ohne sie zu berühren, danach der nächste. Wer die weiße Kugel geworfen hat, wirft als Letztes.",
+      "Alle sitzen in einer Reihe auf Gartenstühlen vor dem Rasen, jeder hat eine Kugel. Wer die rote Kugel hat, wirft sie zuerst auf den Rasen.",
+      "Dann wirft der rechte Nachbar so nah wie möglich an die rote Kugel, ohne sie zu berühren, danach der nächste. Wer die rote Kugel geworfen hat, wirft als Letztes.",
       "Werfen: Finger aufs Bild und nach unten ziehen, je weiter, desto fester. Nach rechts ziehen wirft nach rechts, nach links nach links. Loslassen wirft.",
-      "Wer am weitesten weg liegt und wer die weiße Kugel berührt hat, steht auf, stellt sich 2 Meter vor die Reihe und trinkt ein halbes Bier, höchstens 1 Minute.",
+      "Wer am weitesten weg liegt und wer die rote Kugel berührt hat, steht auf, stellt sich 2 Meter vor die Reihe und trinkt ein halbes Bier, höchstens 1 Minute.",
       "Der Weiteste macht danach eine Aufgabe als Mini-Spiel am Handy: tippen, wischen oder im richtigen Moment loslassen. Nicht in der Zeit geschafft: noch ein halbes.",
       "Dann verbeugt sich jeder, der aufgestanden ist, vor jedem, der noch sitzt, angefangen beim rechten Nachbarn. Leere Stühle werden übersprungen, und wer zusammen getrunken hat, verbeugt sich nicht voreinander.",
       "Lehnt jemand ab, trinken beide ein halbes im Stehen und die Verbeugungsrunde fängt von vorne an, ohne den Stuhl von dem, der abgelehnt hat. Wer jemanden ablehnt, der schon abgelehnt wurde, trinkt mehr: 1 Bier, beim dritten Mal anderthalb und so weiter.",
-      "Wer am nächsten an der weißen Kugel liegt (ohne sie zu berühren), bekommt sie für die nächste Runde und darf ein Hindernis auf den Rasen legen.",
+      "Wer am nächsten an der roten Kugel liegt (ohne sie zu berühren), bekommt sie für die nächste Runde und darf ein Hindernis auf den Rasen legen.",
     ],
     setup,
     view,
