@@ -1481,7 +1481,7 @@ window.Hodenritter3D = (() => {
       else if (isBot(T.who)) target = T.goal * (T.botFrac ?? 1) * Math.min(1, (now - (phaseSeen.get(phaseKey()) ?? now)) / (T.botMs || 1));
       else target = T.v ?? 0;
     }
-    if (tv.id !== `${T.id}:${T.stage}`) tv = { id: `${T.id}:${T.stage}`, v: target };
+    if (tv.id !== `${T.id}:${T.stage}`) tv = { id: `${T.id}:${T.stage}`, v: target, dt: tv.dt }; // dt behalten, sonst wird v NaN und die Figur bleibt stehen
     tv.v += (target - tv.v) * Math.min(1, tv.dt * 10);
     return tv.v;
   }

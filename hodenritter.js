@@ -385,7 +385,8 @@
 
   // Verbeugen: Wer aufgestanden ist, verbeugt sich der Reihe nach vor jedem, der sitzt.
   function startBow(s) {
-    if (!s.bow) s.bow = { queue: [...s.standing], ti: 0 };
+    // skip: wer mit dem Ritter zusammen getrunken hat, wird bei seiner Verbeugung übersprungen
+    if (!s.bow) s.bow = { queue: [...s.standing], ti: 0, skip: Object.fromEntries(s.standing.map((n) => [n, s.standing.filter((m) => m !== n)])) };
     s.phase = "bow";
     s.k++;
     checkBow(s);
@@ -400,7 +401,7 @@
     const out = [];
     for (let k = 1; k < n; k++) {
       const p = s.players[(i + k) % n];
-      if (!s.standing.includes(p)) out.push(p);
+      if (!s.standing.includes(p) && !s.bow.skip?.[cur]?.includes(p)) out.push(p);
     }
     return out;
   }
@@ -523,6 +524,8 @@
         const target = bowTargets(s)[s.bow.ti];
         const cost = refuseCost(s, cur);
         s.refused[cur] = (s.refused[cur] ?? 0) + 1;
+        // Die beiden haben zusammen getrunken: in der neuen Runde wird der Stuhl übersprungen
+        if (s.bow.skip) s.bow.skip[cur] = [...(s.bow.skip[cur] ?? []), target];
         s.bow.ti = 0; // Runde fängt von vorne an
         return startDrink(
           s,
@@ -806,8 +809,8 @@
       "Werfen: Finger aufs Bild und nach unten ziehen, je weiter, desto fester. Nach rechts ziehen wirft nach rechts, nach links nach links. Loslassen wirft.",
       "Wer am weitesten weg liegt und wer die weiße Kugel berührt hat, steht auf, stellt sich 2 Meter vor die Reihe und trinkt ein halbes Bier, höchstens 1 Minute.",
       "Der Weiteste macht danach eine Aufgabe als Mini-Spiel am Handy: tippen, wischen oder im richtigen Moment loslassen. Nicht in der Zeit geschafft: noch ein halbes.",
-      "Dann verbeugt sich jeder, der aufgestanden ist, vor jedem, der noch sitzt, angefangen beim rechten Nachbarn. Leere Stühle werden übersprungen.",
-      "Lehnt jemand ab, trinken beide ein halbes und die Verbeugungsrunde fängt von vorne an. Wer jemanden ablehnt, der schon abgelehnt wurde, trinkt mehr: 1 Bier, beim dritten Mal anderthalb und so weiter.",
+      "Dann verbeugt sich jeder, der aufgestanden ist, vor jedem, der noch sitzt, angefangen beim rechten Nachbarn. Leere Stühle werden übersprungen, und wer zusammen getrunken hat, verbeugt sich nicht voreinander.",
+      "Lehnt jemand ab, trinken beide ein halbes im Stehen und die Verbeugungsrunde fängt von vorne an, ohne den Stuhl von dem, der abgelehnt hat. Wer jemanden ablehnt, der schon abgelehnt wurde, trinkt mehr: 1 Bier, beim dritten Mal anderthalb und so weiter.",
       "Wer am nächsten an der weißen Kugel liegt (ohne sie zu berühren), bekommt sie für die nächste Runde und darf ein Hindernis auf den Rasen legen.",
     ],
     setup,
