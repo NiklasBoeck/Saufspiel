@@ -619,7 +619,7 @@
       case "throw": {
         const t = thrower(s);
         v.phase = `Runde ${s.round} · Wurf ${s.turn + 1} von ${s.order.length}`;
-        v.title = you(t) ? "Du bist dran: so nah wie möglich an die weiße Kugel!" : `${nm(t)} wirft`;
+        v.title = you(t) ? "So nah wie möglich an die weiße Kugel!" : `${nm(t)} wirft`;
         if (!isBot(t)) {
           v.turn = t;
           if (!me || you(t)) hint = "Ziehen und loslassen. Die weiße Kugel nicht berühren!";
@@ -639,7 +639,7 @@
         const open = s.drink.list.filter((d) => !d.done);
         const names = open.map((d) => (you(d.n) ? "Du" : nm(d.n)));
         v.phase = { stand: "Aufstehen und trinken", task: "Aufgabe nicht geschafft", refuse: "Abgelehnt" }[s.drink.kind];
-        v.title = `${names.join(" und ")} ${names.length === 1 && names[0] !== "Du" ? "trinkt" : "trinken"}`;
+        v.title = `${names.join(" und ")} ${names.length > 1 ? "trinken" : names[0] === "Du" ? "trinkst" : "trinkt"}`;
         hint = s.drink.kind === "stand" ? "Ein paar Meter weggehen und in max. 1 Minute austrinken." : `${escapeHtml(s.drink.why)}. Max. 1 Minute.`;
         for (const d of open) {
           if (isBot(d.n)) continue;

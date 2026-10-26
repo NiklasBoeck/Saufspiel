@@ -522,7 +522,7 @@ window.Hodenritter3D = (() => {
       }
     };
     strand(P(-10.5, -0.2, 2.7), P(10.5, -0.2, 2.7), 0.55, 70);
-    for (const x of [-7, 0, 7]) strand(P(x, -4.25, 2.9), P(x * 1.2, -0.2, 2.6 - 0.55 * (1 - (x / 10.5) ** 2)), 0.25, 14);
+    strand(P(-11, -4.25, 2.95), P(11, -4.25, 2.95), 0.35, 60); // am Haus entlang
     const bulbMesh = new THREE.InstancedMesh(sphere(0.032, 10, 8), new THREE.MeshStandardMaterial({ color: 0xfff1c1, emissive: 0xffc35a, emissiveIntensity: 2.2 }), bulbs.length);
     bulbs.forEach((p, i) => bulbMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
     scene.add(bulbMesh);
