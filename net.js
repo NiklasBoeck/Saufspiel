@@ -1,6 +1,6 @@
 // Verbindung für Räume mit mehreren Handys (room.js und Flunky Ball).
-// Jedes Handy ist gleichzeitig mit zwei öffentlichen MQTT-Brokern verbunden. Fällt einer aus oder ist er
-// für ein Handy nicht erreichbar, läuft alles über den anderen weiter. Wer online ist, merkt man an
+// Jedes Handy ist gleichzeitig mit allen Brokern in BROKERS verbunden. Fällt einer aus oder ist er
+// für ein Handy nicht erreichbar, läuft alles über die anderen weiter. Wer online ist, merkt man an
 // Lebenszeichen alle paar Sekunden. Kommt das Handy aus dem Hintergrund (Sperrbildschirm, WhatsApp),
 // verbindet es sofort neu, statt auf eine tote Verbindung zu warten.
 //
@@ -8,7 +8,9 @@
 // Jeder Spielstand trägt dafür eine Amtszeit (epoch): Wer übernimmt, zählt sie hoch. Kommt der alte
 // Host zurück, sieht er den Spielstand mit der höheren Amtszeit und wird ganz normal Gast.
 const RoomNet = (() => {
-  const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
+  // Eigener Broker bei HiveMQ Cloud. Der Zugang darf nur saufspiel-…/# lesen und schreiben, er steckt
+  // sowieso sichtbar in der App.
+  const BROKERS = [{ url: "wss://CLUSTER.hivemq.cloud:8884/mqtt", username: "USER", password: "PASS" }];
   const PING_MS = 4000; // so oft schickt jedes Handy ein Lebenszeichen
   const HOST_GONE_MS = 13000; // so lange ohne Lebenszeichen vom Host: „Host ist offline“
   const TAKEOVER_MS = 20000; // so lange ohne Host: der erste Gast übernimmt …
@@ -26,7 +28,7 @@ const RoomNet = (() => {
   // Für Tests: ?broker=ws://localhost:8888 (mehrere mit Komma getrennt)
   function brokerUrls() {
     const b = new URLSearchParams(location.search).get("broker");
-    return b ? b.split(",").filter(Boolean) : BROKERS;
+    return b ? b.split(",").filter(Boolean).map((url) => ({ url })) : BROKERS;
   }
 
   // Spielstände brauchen: { hostId, epoch, seq, players: [{ id, online, bot }] }
@@ -39,8 +41,7 @@ const RoomNet = (() => {
   //      onChange()       Verbindungsanzeige neu zeichnen
   //      onFail(msg) }    keine Verbindung oder Raum nicht gefunden
   function open(o) {
-    const urls = brokerUrls();
-    const links = urls.map((url) => ({ url, c: null, up: false }));
+    const links = brokerUrls().map((b) => ({ ...b, c: null, up: false }));
     const seenActs = new Set(); // Host: Aktions-Ids (jede kommt über beide Broker)
     const lastSeen = new Map(); // Host: Gast-Id → wann zuletzt was kam
     const gone = new Set();
@@ -66,6 +67,8 @@ const RoomNet = (() => {
       if (l.c) l.c.end(true);
       l.up = false;
       const c = mqtt.connect(l.url, {
+        username: l.username,
+        password: l.password,
         clientId: `${o.prefix}_${o.id}_${randomString("abcdef0123456789", 6)}`,
         clean: true,
         keepalive: 15,

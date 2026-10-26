@@ -4,7 +4,6 @@
 (() => {
   "use strict";
 
-  const BROKERS = ["wss://broker.hivemq.com:8884/mqtt", "wss://broker.emqx.io:8084/mqtt"];
   const TOPIC_ROOT = "saufspiel-flunky-v1";
   const SESSION_KEY = "flunky-session";
   const NAME_KEY = "flunky-name";

@@ -2,7 +2,6 @@
 // schickt ihn über einen öffentlichen MQTT-Broker an alle anderen, wie bei Flunky Ball.
 // Die anderen Handys schicken nur ihre Aktionen. Funktioniert mit jedem Spiel mit setup/view/act.
 const Room = (() => {
-  const BROKERS = ["wss://broker.hivemq.com:8884/mqtt", "wss://broker.emqx.io:8084/mqtt"];
   const TOPIC_ROOT = "saufspiel-room-v1";
   const SESSION_KEY = "saufspiel-room";
   const NAME_KEY = "saufspiel-name";
