@@ -379,6 +379,7 @@ window.Hodenritter3D = (() => {
       addGround(scene, renderer, rnd);
       const grass = addGrass(scene, rnd, timeU);
       addGarden(scene, rnd);
+      addParty(scene, rnd, timeU);
       addBackdrop(scene, rnd, timeU);
 
       const whiteBall = mesh(sphere(H.W_R, 28, 20), mat(0xfbfaf5, 0.28), 0, 0, 0);
@@ -498,7 +499,7 @@ window.Hodenritter3D = (() => {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.copy(P(0, 6));
-    ground.receiveShadow = true;
+    ground.receiveShadow = false; // keine Schatten auf dem Rasen (Lenas Wunsch), nur auf der Terrasse
     scene.add(ground);
 
     // Gemähte Streifen auf dem Spielrasen
@@ -517,7 +518,7 @@ window.Hodenritter3D = (() => {
     lawn.rotation.x = -Math.PI / 2;
     lawn.rotation.z = Math.PI / 2;
     lawn.position.copy(P(0, H.FIELD.y1 / 2, 0.002));
-    lawn.receiveShadow = true;
+    lawn.receiveShadow = false;
     scene.add(lawn);
   }
 
@@ -566,7 +567,7 @@ window.Hodenritter3D = (() => {
     }
     blades.count = Math.min(max, GRASS[Q]);
     blades.userData.max = max;
-    blades.receiveShadow = Q > 1;
+    blades.receiveShadow = false;
     scene.add(blades);
 
     // Gänseblümchen, Löwenzahn und ein paar bunte Blumen
@@ -680,7 +681,7 @@ window.Hodenritter3D = (() => {
     };
     strand(P(-10.5, -0.2, 2.7), P(10.5, -0.2, 2.7), 0.55, 56);
     strand(P(-11, -4.25, 2.95), P(11, -4.25, 2.95), 0.35, 48);
-    const bulbCols = [0xfff1c1, 0xffd27a, 0xffb3c7, 0xb8e1ff];
+    const bulbCols = [0xffe08a, 0xff6b8b, 0x7ee0ff, 0xb6ff7a, 0xffb36b, 0xd9a6ff];
     const bulbMesh = new THREE.InstancedMesh(sphere(0.036, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), bulbs.length);
     const bc = new THREE.Color();
     bulbs.forEach((p, i) => {
@@ -688,6 +689,19 @@ window.Hodenritter3D = (() => {
       bulbMesh.setColorAt(i, bc.set(bulbCols[i % bulbCols.length]));
     });
     scene.add(bulbMesh);
+    // Leuchten um jede Birne (ein Zeichenaufruf für alle)
+    const glowPos = new Float32Array(bulbs.length * 3);
+    const glowCol = new Float32Array(bulbs.length * 3);
+    bulbs.forEach((p, i) => {
+      glowPos.set([p.x, p.y, p.z], i * 3);
+      const c = bc.set(bulbCols[i % bulbCols.length]);
+      glowCol.set([c.r, c.g, c.b], i * 3);
+    });
+    const glowGeo = new THREE.BufferGeometry();
+    glowGeo.setAttribute("position", new THREE.BufferAttribute(glowPos, 3));
+    glowGeo.setAttribute("color", new THREE.BufferAttribute(glowCol, 3));
+    const glow = new THREE.Points(glowGeo, new THREE.PointsMaterial({ size: 0.26, map: glowTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.75 }));
+    scene.add(glow);
     const poleM = mat(0x8a5a35, 0.8);
     for (const x of [-10.5, 10.5]) {
       const pole = mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.8, 10), poleM, 0, 0, 0);
@@ -785,6 +799,105 @@ window.Hodenritter3D = (() => {
     crate2.position.copy(P(8.6, -2.6, 0.3));
     crate2.rotation.y = 0.15;
     scene.add(crate2);
+  }
+
+  function glowTex() {
+    const t = canvasTex(64, 64, (g, w, h) => {
+      const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+      gr.addColorStop(0, "rgba(255,255,255,1)");
+      gr.addColorStop(0.25, "rgba(255,255,255,0.55)");
+      gr.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = gr;
+      g.fillRect(0, 0, w, h);
+    });
+    t.colorSpace = THREE.NoColorSpace;
+    return t;
+  }
+
+  // Gartenparty: bunte Wimpelketten, Blumenbeete an den Zäunen, ein gestreifter Sonnenschirm
+  function addParty(scene, rnd, timeU) {
+    const FLAG = [0xff3b5c, 0xffc21a, 0x2ec4ff, 0x7bdc3a, 0xb15cff, 0xff8a1f];
+    const flagGeo = new THREE.BufferGeometry();
+    flagGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array([-0.11, 0, 0, 0.11, 0, 0, 0, -0.26, 0]), 3));
+    flagGeo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), 3));
+    const flags = [];
+    const line = (a, b, sag, n) => {
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n;
+        const p = a.clone().lerp(b, u).add(new THREE.Vector3(0, -Math.sin(u * Math.PI) * sag, 0));
+        flags.push({ p, ry: Math.atan2(b.x - a.x, b.z - a.z) - Math.PI / 2 });
+      }
+    };
+    // über beiden Zäunen am Rasen entlang und am Haus
+    for (const sx of [-1, 1]) line(P(sx * (H.FIELD.x + 0.45), -0.2, 2.3), P(sx * (H.FIELD.x + 0.45), H.FIELD.y1 + 0.3, 2.3), 0.5, 44);
+    line(P(-11, -4.1, 2.85), P(11, -4.1, 2.85), 0.3, 50);
+    const fm = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.6 });
+    fm.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = timeU;
+      sh.vertexShader = `uniform float uTime;\n${sh.vertexShader}`.replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+        vec4 fp = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        transformed.z += sin(uTime * 2.4 + fp.x * 1.3 + fp.z * 0.9) * 0.07 * (-position.y / 0.26);`
+      );
+    };
+    const flagMesh = new THREE.InstancedMesh(flagGeo, fm, flags.length);
+    const c = new THREE.Color();
+    flags.forEach((f, i) => {
+      flagMesh.setMatrixAt(i, M(f.p.x, f.p.y, f.p.z, 0, f.ry, 0));
+      flagMesh.setColorAt(i, c.set(FLAG[i % FLAG.length]));
+    });
+    scene.add(flagMesh);
+    // Schnüre der Wimpelketten: Masten an den Ecken
+    const poleM = mat(0x8a5a35, 0.8);
+    for (const sx of [-1, 1]) {
+      for (const y of [-0.2, H.FIELD.y1 + 0.3]) {
+        const pole = mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.4, 10), poleM, 0, 0, 0);
+        pole.position.copy(P(sx * (H.FIELD.x + 0.45), y, 1.2));
+        scene.add(pole);
+      }
+    }
+
+    // Blumenbeete außen an den Zäunen und vor der Hecke: grüne Büsche mit bunten Blüten
+    const BLOOM = [0xff4d6d, 0xffd23f, 0xc77dff, 0xff8fab, 0xff9f1c, 0xffffff, 0x4cc9f0];
+    const bushes = [];
+    const bloomAt = [];
+    const bushShade = leafShade("#7dd04a", "#2f7f2a");
+    const bed = (x, y) => {
+      const s = 0.28 + rnd() * 0.16;
+      bushes.push([BLOB, M(x, s * 0.55, -y, 0, rnd() * TAU, 0, s * 1.2, s, s), bushShade]);
+      for (let k = 0; k < 7; k++) {
+        const a = rnd() * TAU;
+        const b = rnd() * 1.2;
+        bloomAt.push([x + Math.cos(a) * Math.sin(b) * s * 1.15, s * 0.55 + Math.cos(b) * s * 0.95, -y + Math.sin(a) * Math.sin(b) * s]);
+      }
+    };
+    for (const sx of [-1, 1]) for (let i = 0; i < 26; i++) bed(sx * (H.FIELD.x + 0.95 + rnd() * 0.4), 0.3 + i * 0.6 + rnd() * 0.2);
+    for (let i = 0; i < 22; i++) bed(-6.8 + i * 0.65 + rnd() * 0.2, H.FIELD.y1 + 0.05);
+    const bushMesh = new THREE.Mesh(merge(bushes), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    scene.add(bushMesh);
+    const blooms = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.055, 1), mat(0xffffff, 0.5), bloomAt.length);
+    bloomAt.forEach(([x, y, z], i) => {
+      blooms.setMatrixAt(i, M(x, y, z));
+      blooms.setColorAt(i, c.set(BLOOM[Math.floor(rnd() * BLOOM.length)]));
+    });
+    scene.add(blooms);
+
+    // Sonnenschirm mit Streifen links auf der Terrasse
+    const stripes = canvasTex(256, 16, (g, w, h) => {
+      for (let i = 0; i < 12; i++) {
+        g.fillStyle = i % 2 ? "#ffffff" : "#ff4d6d";
+        g.fillRect((i * w) / 12, 0, w / 12 + 1, h);
+      }
+    });
+    const shade = new THREE.Group();
+    const canopy = mesh(new THREE.ConeGeometry(1.5, 0.55, 24, 1, true), rim(new THREE.MeshStandardMaterial({ map: stripes, side: THREE.DoubleSide, roughness: 0.7 })), 0, 2.35, 0);
+    shade.add(canopy);
+    shade.add(mesh(sphere(0.06, 12, 8), mat(0xffffff, 0.4), 0, 2.66, 0));
+    shade.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.4, 10), mat(0xf5f5f5, 0.4), 0, 1.2, 0));
+    shade.add(mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.08, 20), mat(0x374151, 0.6), 0, 0.04, 0));
+    shade.position.copy(P(-7.6, -2.9));
+    scene.add(shade);
   }
 
   function makeAppleTree(rnd) {
@@ -1195,7 +1308,7 @@ window.Hodenritter3D = (() => {
   // --- Posen: Gelenkwinkel ---
 
   const POSES = {
-    stand: { hipY: 0.95, pelvis: 0, spine: 0, chest: 0, neck: 0, headX: 0, headY: 0, lShX: -0.25, lShZ: 0.14, lEl: -1.1, rShX: 0.04, rShZ: -0.1, rEl: -0.18, lHip: 0, lHipZ: 0.03, lKnee: 0.04, rHip: 0, rHipZ: -0.03, rKnee: 0.04 },
+    stand: { bot: 1.15, botZ: 0, hipY: 0.95, pelvis: 0, spine: 0, chest: 0, neck: 0, headX: 0, headY: 0, lShX: -0.25, lShZ: 0.14, lEl: -1.1, rShX: 0.04, rShZ: -0.1, rEl: -0.18, lHip: 0, lHipZ: 0.03, lKnee: 0.04, rHip: 0, rHipZ: -0.03, rKnee: 0.04 },
   };
   POSES.sit = { ...POSES.stand, hipY: 0.53, spine: -0.12, chest: 0.06, lShX: -0.3, lShZ: -0.04, lEl: -1.2, rShX: -0.28, rShZ: 0.06, rEl: -1.15, lHip: -1.45, lHipZ: 0.1, lKnee: 1.42, rHip: -1.45, rHipZ: -0.1, rKnee: 1.42 };
   POSES.drink = { ...POSES.stand, spine: -0.08, headX: -0.4, lShX: -1.3, lShZ: 0.3, lEl: -1.75 };
@@ -1205,8 +1318,47 @@ window.Hodenritter3D = (() => {
   POSES.bow = { ...POSES.stand, hipY: 0.93, spine: 1.0, chest: 0.15, headX: 0.2, rShX: -0.55, rShZ: 0.55, rEl: -1.6, lShX: 0.55, lShZ: 0.1, lEl: -0.5, lHip: 0.15, lKnee: 0.2, rHip: -0.12, rKnee: 0.1 };
   POSES.cheerSit = { ...POSES.sit, lShX: -0.3, lShZ: 2.5, lEl: -0.35, rShZ: -2.6, rShX: -0.2, rEl: -0.3, spine: 0.02 };
   POSES.cheer = { ...POSES.stand, lShZ: 2.4, lEl: -0.4, rShZ: -2.5, rEl: -0.3 };
+  // Trinken im Stehen: Flasche in der linken Hand, rechte Hand in der Hüfte
+  const HIP = { rShX: 0.1, rShZ: -0.45, rEl: -1.5 };
+  // Arm und Flaschenwinkel ausgerechnet: der Flaschenhals sitzt genau am Mund (sip: leicht gekippt, chug: steil)
+  POSES.sip = { ...POSES.stand, ...HIP, lShX: -1.45, lShZ: -0.65, lEl: -1.5, bot: 1.1, botZ: 0.6, headX: -0.3 };
+  POSES.chug = { ...POSES.stand, ...HIP, lShX: -2.05, lShZ: -0.65, lEl: -1.2, bot: 0.9, botZ: 0.3, headX: -0.8, neck: -0.15, spine: -0.12, chest: -0.12 };
+  POSES.breath = { ...POSES.stand, ...HIP, lShX: -0.5, lShZ: -0.1, lEl: -1.6, headX: 0.12, spine: 0.06 };
+  POSES.empty = { ...POSES.stand, lShX: -0.1, lShZ: 2.7, lEl: -0.2, headX: -0.2, rShX: -0.3, rShZ: -2.4, rEl: -0.8 };
+  POSES.clapSit = { ...POSES.sit, lShX: -1.05, lShZ: -0.2, lEl: -0.9, rShX: -1.05, rShZ: 0.2, rEl: -0.9 };
   POSES.jacks = { ...POSES.stand };
   POSES.squat = { ...POSES.stand };
+
+  function mixPose(a, b, k) {
+    const o = {};
+    for (const key in a) o[key] = a[key] + ((b[key] ?? a[key]) - a[key]) * k;
+    return o;
+  }
+
+  // Trinken wie echt: ansetzen, immer steiler, Kopf in den Nacken, zwischendurch absetzen und durchatmen,
+  // am Ende die leere Flasche hochhalten. Bots wissen, wie lange sie brauchen, sonst rechnen wir mit gut 20 Sekunden.
+  function drinkPose(p, d, now) {
+    if (!d) return POSES.stand;
+    if (d.done) {
+      if (!p.doneAt) p.doneAt = now;
+      if (now - p.doneAt > 2800) return POSES.stand;
+      const w = Math.sin(now / 170 + p.seed) * 0.2;
+      return { ...POSES.empty, lShZ: POSES.empty.lShZ + w, rShZ: POSES.empty.rShZ + w };
+    }
+    p.doneAt = 0;
+    if (p.drinkKey !== S.drink.id) {
+      p.drinkKey = S.drink.id;
+      p.drinkAt = now;
+    }
+    const t = (now - p.drinkAt) / 1000;
+    const total = d.bot ? d.bot / 1000 : 22;
+    const u = Math.min(1, t / total);
+    const cyc = (t + p.seed) % 6.5;
+    if (t > 2.5 && cyc > 5.2 && u < 0.9) return POSES.breath;
+    const J = mixPose(POSES.sip, POSES.chug, Math.min(1, 0.2 + u * 0.95));
+    J.headX += Math.sin(now / 240 + p.seed) * 0.05; // schlucken
+    return J;
+  }
 
   function sitHipY(p) {
     const h = p.look.height / 1.78;
@@ -1230,6 +1382,7 @@ window.Hodenritter3D = (() => {
     p.legs[1].hip.rotation.set(J.rHip, 0, J.rHipZ);
     p.legs[1].knee.rotation.x = J.rKnee;
     p.legs[1].ankle.rotation.x = -(J.rHip + J.rKnee) * 0.85;
+    p.bottle.rotation.set(J.bot ?? 1.15, 0, J.botZ ?? 0); // Neigung der Flasche in der Hand
   }
 
   // --- Wer steht wo und macht was ---
@@ -1239,8 +1392,16 @@ window.Hodenritter3D = (() => {
     return { x: H.seatX(S, i), y: H.CHAIR_Y - 0.05 };
   }
 
-  // Wo die Aufgestandenen trinken: ein paar Meter rechts neben der Stuhlreihe
-  function drinkSpot(name) {
+  // Wo alle trinken: 2 m vor der Stuhlreihe nebeneinander, mit Blick zur Reihe
+  function frontSpot(name) {
+    const list = S.drink?.list ?? [];
+    const n = list.length;
+    const i = Math.max(0, list.findIndex((d) => d.n === name));
+    return { x: (i - (n - 1) / 2) * 1.0, y: H.CHAIR_Y + 2.0 };
+  }
+
+  // Wo die Aufgestandenen warten (Aufgabe, Verbeugen): rechts neben der Stuhlreihe
+  function waitSpot(name) {
     const list = S.standing?.length ? S.standing : [];
     const i = Math.max(0, list.indexOf(name));
     const right = H.seatX(S, S.players.length - 1);
@@ -1268,16 +1429,16 @@ window.Hodenritter3D = (() => {
         return { ...sit, pose: name === S.result.near ? "cheerSit" : "sit" };
       case "drink": {
         const d = S.drink.list.find((x) => x.n === name);
-        if (standing) {
-          const spot = drinkSpot(name);
-          if (S.drink.kind === "refuse" && name === S.bow?.queue[0]) {
-            const target = S.drink.list.find((x) => x.sit)?.n;
-            return { x: seatOf(target ?? name).x, y: H.CHAIR_Y + 0.95, face: Math.PI, pose: d && !d.done ? "drink" : "stand" };
-          }
-          return { x: spot.x, y: spot.y, face: -Math.PI / 2 + 0.3, pose: d && !d.done ? "drink" : "stand" };
+        if (d) {
+          const spot = frontSpot(name);
+          return { x: spot.x, y: spot.y, face: Math.PI, pose: "drink", drink: d };
         }
-        if (d && !d.done) return { ...sit, pose: "sitDrink" };
-        return sit;
+        if (standing) {
+          const spot = waitSpot(name);
+          return { x: spot.x, y: spot.y, face: -Math.PI / 2 + 0.3, pose: "stand" };
+        }
+        // Wer sitzen bleibt, feuert an: klatschen oder Arme hoch
+        return { ...sit, pose: hash(name) % 2 ? "clapSit" : "cheerSit" };
       }
       case "task": {
         if (name === S.task.who) {
@@ -1285,7 +1446,7 @@ window.Hodenritter3D = (() => {
           return taskPlan(now);
         }
         if (standing) {
-          const spot = drinkSpot(name);
+          const spot = waitSpot(name);
           return { x: spot.x, y: spot.y, face: -Math.PI / 2, pose: "stand" };
         }
         return { ...sit, pose: S.task.stage === "run" ? "cheerSit" : "sit" };
@@ -1298,7 +1459,7 @@ window.Hodenritter3D = (() => {
           return { x: ts.x, y: H.CHAIR_Y + 0.95, face: Math.PI, pose: "bow" };
         }
         if (standing) {
-          const spot = drinkSpot(name);
+          const spot = waitSpot(name);
           return { x: spot.x, y: spot.y, face: -Math.PI / 2, pose: "stand" };
         }
         return sit;
@@ -1450,15 +1611,22 @@ window.Hodenritter3D = (() => {
       // Pose
       const seated = p.mode === "seated" && plan.sit;
       let poseName = plan.pose;
-      if (!seated && (poseName === "sit" || poseName === "sitDrink" || poseName === "cheerSit")) poseName = "stand";
-      if (seated && !poseName.startsWith("sit") && poseName !== "cheerSit") poseName = "sit";
+      if (!seated && (poseName === "sit" || poseName === "sitDrink" || poseName === "cheerSit" || poseName === "clapSit")) poseName = "stand";
+      if (seated && !poseName.startsWith("sit") && poseName !== "cheerSit" && poseName !== "clapSit") poseName = "sit";
+      if (poseName === "drink" && dist > 0.15) poseName = "stand"; // erst hinstellen, dann trinken
       // Ab und zu einen Schluck nehmen, wer sitzt
       if (seated && poseName === "sit") {
         if (now > p.sipAt + 4000 && now < p.sipAt + 6200) poseName = "sitDrink";
         else if (now > p.sipAt + 6200) p.sipAt = now + 6000 + ((hash(name + Math.floor(now / 1000)) % 100) / 100) * 14000;
       }
       const target = { ...POSES[poseName] ?? POSES.stand };
-      if (poseName.startsWith("sit") || poseName === "cheerSit") target.hipY = sitHipY(p);
+      if (poseName.startsWith("sit") || poseName === "cheerSit" || poseName === "clapSit") target.hipY = sitHipY(p);
+      if (poseName === "clapSit") {
+        const c = Math.abs(Math.sin(now / 150 + p.seed));
+        target.lShZ = -0.08 - c * 0.3;
+        target.rShZ = 0.08 + c * 0.3;
+      }
+      if (poseName === "drink") Object.assign(target, drinkPose(p, plan.drink, now));
       if (poseName === "aim") {
         const k = aimPull ? aimPull.power : 0;
         if (name === H.thrower(S) && pulling()) {
@@ -1802,14 +1970,11 @@ window.Hodenritter3D = (() => {
         return { pos: P(w.x, w.y - d * 0.55, d * 1.25), look: P(w.x, w.y + 0.05, 0), k: 2.5 };
       }
       case "drink": {
-        // Nah an die Trinkenden, die Stuhlreihe dahinter
-        const pts = S.drink.list.map((d) => G.people.get(d.n)?.pos).filter(Boolean);
-        if (!pts.length) break;
-        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-        const spread = Math.max(1.2, ...pts.map((p) => Math.abs(p.x - cx) * 2 + 1));
-        const d = Math.max(2.6, fitDist(spread) * 1.1);
-        return { pos: P(cx - d * 0.35, cy + d * 0.95, 1.55), look: P(cx, cy, 1.0), k: 1.6 };
+        // Hinter der Stuhlreihe über den Köpfen: Blick aufs Feld, davor die Trinkenden
+        const n = S.drink.list.length;
+        const spread = n + 1.2;
+        const back = Math.max(3.1, fitDist(spread) * 0.95);
+        return { pos: P(0, H.CHAIR_Y + 2.0 - back, 2.15), look: P(0, H.CHAIR_Y + 3.2, 0.85), k: 1.6 };
       }
       case "bow": {
         const target = H.bowTargets(S)[S.bow.ti];
@@ -2535,7 +2700,7 @@ window.Hodenritter3D = (() => {
       const left = H.TASKS[S.task.i].s - t;
       clock = left > 0 ? `⏱ ${fmtClock(left)}` : "⏱ Zeit um!";
     }
-    if (clock) label(clock, w / 2, 44, { size: 20, bg: clock.includes("um") ? "rgba(185,28,28,0.9)" : "rgba(15,12,30,0.7)" });
+    if (clock) label(clock, mini ? w / 2 : w - 52, mini ? 44 : 74, { size: 20, bg: clock.includes("um") ? "rgba(185,28,28,0.9)" : "rgba(15,12,30,0.7)" });
 
     if (S.phase === "place" && canPlace() && !ghostAt) {
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
@@ -2637,6 +2802,7 @@ window.Hodenritter3D = (() => {
       },
       people: () => G.people,
       mini: () => mini && { ...mini },
+      applyPose,
       POSES,
     };
   }

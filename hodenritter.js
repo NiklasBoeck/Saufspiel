@@ -476,7 +476,7 @@
         // Der Weiteste zuerst, dann die anderen in Sitzreihenfolge
         s.standing.sort((x, y) => (x === far ? -1 : y === far ? 1 : 0));
         const why = (p) => (p === far && s.touched.includes(p) ? "am weitesten weg und weiße Kugel berührt" : p === far ? "am weitesten weg" : "weiße Kugel berührt");
-        startDrink(s, s.standing.map((n) => ({ n, u: 1, why: `${why(n)}: aufstehen, ein paar Meter weg, max. 1 Minute` })), "task", "", "stand");
+        startDrink(s, s.standing.map((n) => ({ n, u: 1, why: `${why(n)}: aufstehen, 2 m vor die Reihe, max. 1 Minute` })), "task", "", "stand");
         return;
       }
       case "empty": {
@@ -681,7 +681,7 @@
         const names = open.map((d) => (you(d.n) ? "Du" : nm(d.n)));
         v.phase = { stand: "Aufstehen und trinken", task: "Aufgabe nicht geschafft", refuse: "Abgelehnt" }[s.drink.kind];
         v.title = `${names.join(" und ")} ${names.length > 1 ? "trinken" : names[0] === "Du" ? "trinkst" : "trinkt"}`;
-        hint = s.drink.kind === "stand" ? "Ein paar Meter weggehen und in max. 1 Minute austrinken." : `${escapeHtml(s.drink.why)}. Max. 1 Minute.`;
+        hint = s.drink.kind === "stand" ? "Aufstehen, 2 Meter vor die Reihe stellen und in max. 1 Minute austrinken." : `${escapeHtml(s.drink.why)}. ${s.drink.kind === "refuse" ? "Beide stehen 2 Meter vor der Reihe und trinken im Stehen. " : ""}Max. 1 Minute.`;
         for (const d of open) {
           if (isBot(d.n)) continue;
           v.actions.push({ label: you(d.n) ? `${drinkEmoji(s)} Leer!` : `${escapeHtml(d.n)}: leer ✓`, sub: you(d.n) || !me ? beerText(s, d.u) : "", by: d.n, act: { type: "empty", id: s.drink.id, who: d.n } });
@@ -804,7 +804,7 @@
       "Alle sitzen in einer Reihe auf Gartenstühlen vor dem Rasen, jeder hat eine Kugel. Wer die weiße Kugel hat, wirft sie zuerst auf den Rasen.",
       "Dann wirft der rechte Nachbar so nah wie möglich an die weiße Kugel, ohne sie zu berühren, danach der nächste. Wer die weiße Kugel geworfen hat, wirft als Letztes.",
       "Werfen: Finger aufs Bild und nach unten ziehen, je weiter, desto fester. Nach rechts ziehen wirft nach rechts, nach links nach links. Loslassen wirft.",
-      "Wer am weitesten weg liegt und wer die weiße Kugel berührt hat, steht auf, geht ein paar Meter weg und trinkt ein halbes Bier, höchstens 1 Minute.",
+      "Wer am weitesten weg liegt und wer die weiße Kugel berührt hat, steht auf, stellt sich 2 Meter vor die Reihe und trinkt ein halbes Bier, höchstens 1 Minute.",
       "Der Weiteste macht danach eine Aufgabe als Mini-Spiel am Handy: tippen, wischen oder im richtigen Moment loslassen. Nicht in der Zeit geschafft: noch ein halbes.",
       "Dann verbeugt sich jeder, der aufgestanden ist, vor jedem, der noch sitzt, angefangen beim rechten Nachbarn. Leere Stühle werden übersprungen.",
       "Lehnt jemand ab, trinken beide ein halbes und die Verbeugungsrunde fängt von vorne an. Wer jemanden ablehnt, der schon abgelehnt wurde, trinkt mehr: 1 Bier, beim dritten Mal anderthalb und so weiter.",
