@@ -7,14 +7,19 @@ window.Hodenritter3D = (() => {
   const H = window.Hodenritter;
   const P = (x, y, h = 0) => new THREE.Vector3(x, h, -y);
   const TAU = Math.PI * 2;
-  // Für automatische Tests ohne Grafikkarte: ?lowgfx oder localStorage hr-lowgfx
-  const LOW = /[?&]lowgfx/.test(location.search) || (() => {
+  // Grafikstufe: 0 = sparsam (Tests ohne Grafikkarte, schwache Handys), 1 = Handy, 2 = voll.
+  // ?lowgfx oder localStorage hr-lowgfx erzwingt 0, hr-q merkt sich, wenn es auf diesem Gerät zu langsam war. ?q=2 zum Testen.
+  const store = (k, v) => {
     try {
-      return !!localStorage.getItem("hr-lowgfx");
-    } catch {
-      return false;
-    }
-  })();
+      if (v === undefined) return localStorage.getItem(k);
+      localStorage.setItem(k, v);
+    } catch {}
+    return null;
+  };
+  const MOBILE = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+  let Q = /[?&]lowgfx/.test(location.search) || store("hr-lowgfx") ? 0 : Math.min(MOBILE ? 1 : 2, Number(store("hr-q") ?? 2));
+  const qParam = /[?&]q=(\d)/.exec(location.search);
+  if (qParam) Q = Math.min(2, +qParam[1]);
 
   let S = null; // Spielstand
   let ME = null; // eigener Name (null: ein Handy)
@@ -48,10 +53,12 @@ window.Hodenritter3D = (() => {
     hud.className = "hr-hud";
     el.append(gl, hud);
     hctx = hud.getContext("2d");
+    watchContext();
     hud.addEventListener("pointerdown", onDown);
-    hud.addEventListener("pointermove", onMove);
-    hud.addEventListener("pointerup", onUp);
-    hud.addEventListener("pointercancel", onUp);
+    // Bewegen und Loslassen am ganzen Fenster: die App zeichnet neu, während der Finger noch drauf ist
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }
 
   // --- Kugel-Animation ---
@@ -149,11 +156,23 @@ window.Hodenritter3D = (() => {
     return t;
   }
 
+  // Comic-Look: helle Kante am Rand jeder Figur (wie Gegenlicht)
+  const RIM = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      "#include <opaque_fragment>",
+      "outgoingLight += vec3(1.0, 0.95, 0.88) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * 0.3;\n#include <opaque_fragment>"
+    );
+  };
+  function rim(m) {
+    m.onBeforeCompile = RIM;
+    return m;
+  }
+
   const matCache = new Map();
   function mat(color, rough = 0.7, extra) {
     const key = `${color}|${rough}|${extra ? JSON.stringify(extra) : ""}`;
     if (!extra && matCache.has(key)) return matCache.get(key);
-    const m = new THREE.MeshStandardMaterial({ color, roughness: rough, ...(extra || {}) });
+    const m = rim(new THREE.MeshStandardMaterial({ color, roughness: rough, ...(extra || {}) }));
     if (!extra) matCache.set(key, m);
     return m;
   }
@@ -215,8 +234,9 @@ window.Hodenritter3D = (() => {
   const capsule = (r, len, seg = 14) => new THREE.CapsuleGeometry(r, len, 6, seg);
   const sphere = (r, w = 24, h = 16) => new THREE.SphereGeometry(r, w, h);
 
-  // Mehrere Geometrien zu einer zusammenfassen (z. B. ein Stuhl = ein Zeichenaufruf)
-  function merge(parts) {
+  // Mehrere Geometrien zu einer zusammenfassen (z. B. ein Stuhl = ein Zeichenaufruf).
+  // parts: [Geometrie, Matrix, shade?]; shade(p, n) bzw. color(p, n) gibt eine Farbe je Ecke (Farbverläufe).
+  function merge(parts, color) {
     const list = parts.map(([g, m]) => {
       const ng = g.index ? g.toNonIndexed() : g.clone();
       ng.applyMatrix4(m);
@@ -225,16 +245,58 @@ window.Hodenritter3D = (() => {
     const count = list.reduce((n, g) => n + g.attributes.position.count, 0);
     const pos = new Float32Array(count * 3);
     const nor = new Float32Array(count * 3);
+    const uv = list.every((g) => g.attributes.uv) ? new Float32Array(count * 2) : null;
+    const shaded = color || parts.some((p) => p[2]);
+    const col = shaded ? new Float32Array(count * 3) : null;
+    const pv = new THREE.Vector3();
+    const nv = new THREE.Vector3();
     let o = 0;
-    for (const g of list) {
+    list.forEach((g, gi) => {
+      const n = g.attributes.position.count;
       pos.set(g.attributes.position.array, o * 3);
       nor.set(g.attributes.normal.array, o * 3);
-      o += g.attributes.position.count;
-    }
+      if (uv) uv.set(g.attributes.uv.array, o * 2);
+      if (col) {
+        const f = parts[gi][2] || color;
+        for (let i = 0; i < n; i++) {
+          let c = [1, 1, 1];
+          if (f) {
+            const cc = f(pv.fromBufferAttribute(g.attributes.position, i), nv.fromBufferAttribute(g.attributes.normal, i).normalize());
+            c = [cc.r, cc.g, cc.b];
+          }
+          col.set(c, (o + i) * 3);
+        }
+      }
+      o += n;
+    });
     const out = new THREE.BufferGeometry();
     out.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     out.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    if (uv) out.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    if (col) out.setAttribute("color", new THREE.BufferAttribute(col, 3));
     return out;
+  }
+
+  // Alle Teile einer Figur, die am selben Gelenk hängen und dasselbe Material haben, zu einem Teil zusammenlegen.
+  // Spart auf dem Handy Hunderte Zeichenaufrufe. keep: Teile, die einzeln bleiben müssen.
+  function compact(root, keep = []) {
+    root.traverse((node) => {
+      const groups = new Map();
+      for (const c of node.children) {
+        if (!c.isMesh || c.isInstancedMesh || c.children.length || keep.includes(c)) continue;
+        if (!groups.has(c.material)) groups.set(c.material, []);
+        groups.get(c.material).push(c);
+      }
+      for (const [material, list] of groups) {
+        if (list.length < 2) continue;
+        for (const c of list) c.updateMatrix();
+        const m = new THREE.Mesh(merge(list.map((c) => [c.geometry, c.matrix])), material);
+        m.castShadow = list.some((c) => c.castShadow);
+        m.receiveShadow = list.some((c) => c.receiveShadow);
+        for (const c of list) node.remove(c);
+        node.add(m);
+      }
+    });
   }
 
   function M(x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) {
@@ -265,49 +327,59 @@ window.Hodenritter3D = (() => {
 
   const SUN_DIR = new THREE.Vector3(-0.66, 0.5, -0.56).normalize(); // tief stehende Abendsonne links über dem Rasen
 
+  function pixelRatio() {
+    return Math.min(window.devicePixelRatio || 1, [1, 1.5, 2][Q]);
+  }
+
   function init() {
     try {
-      const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true, powerPreference: "high-performance" });
-      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-      renderer.shadowMap.enabled = !LOW;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: Q > 0, powerPreference: Q > 1 ? "high-performance" : "default" });
+      renderer.setPixelRatio(pixelRatio());
+      renderer.shadowMap.enabled = Q > 0;
+      renderer.shadowMap.type = Q > 1 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.05;
+      renderer.toneMappingExposure = 1.12;
 
       const scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(0xf3cfa6, 30, 95);
-      const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 300);
+      scene.fog = new THREE.Fog(0xc4e2ff, 45, 150);
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 320);
 
-      const sky = makeSky();
-      scene.add(sky);
+      scene.add(makeSky());
       // Umgebung für Spiegelungen auf den Stahlkugeln
       const envScene = new THREE.Scene();
       envScene.add(makeSky());
-      const envGround = new THREE.Mesh(new THREE.CircleGeometry(150, 32), new THREE.MeshBasicMaterial({ color: 0x3d6a2a }));
+      const envGround = new THREE.Mesh(new THREE.CircleGeometry(150, 32), new THREE.MeshBasicMaterial({ color: 0x4f9a33 }));
       envGround.rotation.x = -Math.PI / 2;
       envGround.position.y = -1;
       envScene.add(envGround);
       const pmrem = new THREE.PMREMGenerator(renderer);
       scene.environment = pmrem.fromScene(envScene, 0.02, 0.1, 500).texture;
-      scene.environmentIntensity = 0.6;
+      pmrem.dispose();
 
-      scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x8a7a55, 1.05));
-      const sun = new THREE.DirectionalLight(0xffd9a8, 3.0);
+      // Helles, freundliches Licht: blauer Himmel von oben, warmes Gras von unten, tief stehende Sonne
+      scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x7aa84a, 1.35));
+      const sun = new THREE.DirectionalLight(0xfff1d6, 2.7);
       sun.position.copy(P(0, 6.5).add(SUN_DIR.clone().multiplyScalar(30)));
       sun.target.position.copy(P(0, 6.5));
-      sun.castShadow = true;
-      sun.shadow.mapSize.set(2048, 2048);
-      Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 5, far: 70 });
-      sun.shadow.bias = -0.0004;
-      sun.shadow.normalBias = 0.025;
+      sun.castShadow = Q > 0;
+      sun.shadow.mapSize.set(Q > 1 ? 2048 : 1024, Q > 1 ? 2048 : 1024);
+      Object.assign(sun.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: 5, far: 70 });
+      sun.shadow.bias = -0.0005;
+      sun.shadow.normalBias = 0.03;
+      sun.shadow.radius = 3;
       scene.add(sun, sun.target);
+      // Gegenlicht vom Rasen her: helle Kanten an Figuren und Bäumen
+      const back = new THREE.DirectionalLight(0xbfe0ff, 0.9);
+      back.position.copy(P(4, 40, 12));
+      scene.add(back);
 
       const rnd = seeded(7);
       const timeU = { value: 0 };
       addGround(scene, renderer, rnd);
-      addGrass(scene, rnd, timeU);
+      const grass = addGrass(scene, rnd, timeU);
       addGarden(scene, rnd);
+      addBackdrop(scene, rnd, timeU);
 
       const whiteBall = mesh(sphere(H.W_R, 28, 20), mat(0xfbfaf5, 0.28), 0, 0, 0);
       const whiteRing = new THREE.Mesh(new THREE.RingGeometry(0.11, 0.14, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }));
@@ -315,12 +387,55 @@ window.Hodenritter3D = (() => {
       scene.add(whiteBall, whiteRing);
 
       const ray = new THREE.Raycaster();
-      G = { renderer, scene, camera, sun, timeU, whiteBall, whiteRing, ray, chairs: null, chairCount: 0, people: new Map(), balls: new Map(), obstacles: new Map(), ghost: null, ghostKind: null, cam: null, look: null, size: "" };
+      G = { renderer, scene, camera, sun, timeU, grass, whiteBall, whiteRing, ray, chairs: null, chairCount: 0, people: new Map(), balls: new Map(), obstacles: new Map(), ghost: null, ghostKind: null, cam: null, look: null, camT: null, lookT: null, size: { w: 1, h: 1 }, sizeKey: "", born: performance.now(), perf: { n: 0, t: 0 } };
     } catch (err) {
       console.error(err);
-      failed = true;
+      failed = String(err?.message || err);
       G = null;
     }
+  }
+
+  // Grafik zu langsam: eine Stufe runter (und fürs nächste Mal merken)
+  function setQuality(q) {
+    Q = Math.max(0, q);
+    store("hr-q", String(Q));
+    if (!G) return;
+    G.renderer.setPixelRatio(pixelRatio());
+    G.sizeKey = "";
+    const sh = Q > 0;
+    if (G.renderer.shadowMap.enabled !== sh) {
+      G.renderer.shadowMap.enabled = sh;
+      G.sun.castShadow = sh;
+      G.scene.traverse((o) => {
+        if (o.material) for (const m of [].concat(o.material)) m.needsUpdate = true;
+      });
+    }
+    if (G.grass) G.grass.count = Math.min(G.grass.userData.max, GRASS[Q]);
+  }
+
+  // Grafik abgestürzt (passiert auf iPhones, wenn der Speicher knapp wird): alles neu aufbauen, eine Stufe sparsamer
+  function rebuild() {
+    try {
+      G?.renderer.dispose();
+    } catch {}
+    G = null;
+    const fresh = document.createElement("canvas");
+    gl.replaceWith(fresh);
+    gl = fresh;
+    watchContext();
+    lost = 0;
+    Q = Math.max(0, Q - 1);
+    store("hr-q", String(Q));
+    init();
+  }
+
+  let lost = 0;
+  function watchContext() {
+    gl.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      lost = performance.now();
+    });
+    gl.addEventListener("webglcontextrestored", () => (lost = 0));
   }
 
   function makeSky() {
@@ -333,52 +448,54 @@ window.Hodenritter3D = (() => {
       fragmentShader: `varying vec3 vDir; uniform vec3 sunDir;
         void main(){
           float y = vDir.y;
-          vec3 top = vec3(0.20, 0.42, 0.78);
-          vec3 mid = vec3(0.55, 0.72, 0.92);
-          vec3 hor = vec3(1.0, 0.80, 0.58);
-          vec3 c = y > 0.18 ? mix(mid, top, smoothstep(0.18, 0.75, y)) : mix(hor, mid, smoothstep(-0.02, 0.18, y));
+          vec3 top = vec3(0.10, 0.38, 0.90);
+          vec3 mid = vec3(0.36, 0.66, 1.0);
+          vec3 hor = vec3(0.80, 0.91, 1.0);
+          vec3 c = y > 0.1 ? mix(mid, top, smoothstep(0.1, 0.75, y)) : mix(hor, mid, smoothstep(-0.04, 0.1, y));
           float d = max(dot(normalize(vDir), sunDir), 0.0);
-          c += vec3(1.0, 0.75, 0.45) * (pow(d, 12.0) * 0.35 + pow(d, 400.0) * 2.5);
+          c += vec3(1.0, 0.85, 0.55) * (pow(d, 10.0) * 0.3 + pow(d, 300.0) * 2.0);
           gl_FragColor = vec4(c, 1.0);
           #include <colorspace_fragment>
         }`,
     });
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), m);
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(220, 32, 16), m);
     sky.renderOrder = -1;
     return sky;
   }
 
-  function paintGrass(g, w, h, rnd, base, n) {
-    g.fillStyle = base;
-    g.fillRect(0, 0, w, h);
-    const greens = ["#3f7f2a", "#4f9334", "#5ea33d", "#467f2c", "#6aad47", "#37702a", "#7bb455"];
-    for (let i = 0; i < n; i++) {
-      const x = rnd() * w;
-      const y = rnd() * h;
-      g.strokeStyle = greens[Math.floor(rnd() * greens.length)];
-      g.globalAlpha = 0.3 + rnd() * 0.5;
-      g.lineWidth = 1 + rnd();
-      g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x + (rnd() - 0.5) * 4, y - 3 - rnd() * 6);
-      g.stroke();
-    }
-    // ein paar Kleeblätter und dunklere Stellen
-    for (let i = 0; i < n / 60; i++) {
-      g.fillStyle = rnd() < 0.5 ? "#2f6a22" : "#6aa83f";
-      g.globalAlpha = 0.25;
-      g.beginPath();
-      g.arc(rnd() * w, rnd() * h, 2 + rnd() * 6, 0, TAU);
-      g.fill();
-    }
-    g.globalAlpha = 1;
-  }
-
+  // Comic-Rasen: kräftiges Grün mit weichen hellen und dunklen Flecken statt Rauschen
   function addGround(scene, renderer, rnd) {
-    const aniso = renderer.capabilities.getMaxAnisotropy();
-    const grass = canvasTex(512, 512, (g, w, h) => paintGrass(g, w, h, rnd, "#4e8f35", 9000), [70, 70]);
-    grass.anisotropy = aniso;
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ map: grass, roughness: 0.95 }));
+    const grass = canvasTex(512, 512, (g, w, h) => {
+      g.fillStyle = "#5fb53a";
+      g.fillRect(0, 0, w, h);
+      const blob = (x, y, r, col, a) => {
+        for (const dx of [-w, 0, w]) {
+          for (const dy of [-h, 0, h]) {
+            const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, r);
+            gr.addColorStop(0, col.replace("A", a));
+            gr.addColorStop(1, col.replace("A", 0));
+            g.fillStyle = gr;
+            g.fillRect(x + dx - r, y + dy - r, r * 2, r * 2);
+          }
+        }
+      };
+      for (let i = 0; i < 40; i++) blob(rnd() * w, rnd() * h, 40 + rnd() * 90, rnd() < 0.5 ? "rgba(140,214,80,A)" : "rgba(52,128,38,A)", 0.35);
+      const greens = ["#6cc444", "#4fa532", "#7ccf4f", "#58ad38"];
+      for (let i = 0; i < 2500; i++) {
+        g.strokeStyle = greens[Math.floor(rnd() * greens.length)];
+        g.globalAlpha = 0.35;
+        g.lineWidth = 2;
+        const x = rnd() * w;
+        const y = rnd() * h;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + (rnd() - 0.5) * 3, y - 4 - rnd() * 4);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+    }, [36, 36]);
+    grass.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), new THREE.MeshStandardMaterial({ map: grass, roughness: 1 }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.copy(P(0, 6));
     ground.receiveShadow = true;
@@ -387,7 +504,7 @@ window.Hodenritter3D = (() => {
     // Gemähte Streifen auf dem Spielrasen
     const stripes = canvasTex(4, 32, (g, w, h) => {
       for (let i = 0; i < 16; i++) {
-        g.fillStyle = i % 2 ? "rgba(215,255,160,0.16)" : "rgba(20,60,10,0.10)";
+        g.fillStyle = i % 2 ? "rgba(220,255,150,0.18)" : "rgba(20,80,10,0.10)";
         g.fillRect(0, (i * h) / 16, w, h / 16);
       }
     });
@@ -395,7 +512,7 @@ window.Hodenritter3D = (() => {
     const lawnW = H.FIELD.x * 2 + 0.6;
     const lawn = new THREE.Mesh(
       new THREE.PlaneGeometry(H.FIELD.y1 + 0.6, lawnW),
-      new THREE.MeshStandardMaterial({ map: stripes, transparent: true, depthWrite: false, roughness: 0.9 })
+      new THREE.MeshStandardMaterial({ map: stripes, transparent: true, depthWrite: false, roughness: 1 })
     );
     lawn.rotation.x = -Math.PI / 2;
     lawn.rotation.z = Math.PI / 2;
@@ -404,116 +521,156 @@ window.Hodenritter3D = (() => {
     scene.add(lawn);
   }
 
-  // Grashalme, die sich im Wind wiegen. Vorne dichter, wo die Kamera nah ist.
+  // Grasbüschel (je drei Halme), unten dunkel, an den Spitzen hell, wiegen sich im Wind
+  const GRASS = [250, 2600, 8000];
   function addGrass(scene, rnd, timeU) {
-    const geo = new THREE.PlaneGeometry(0.03, 0.15, 1, 4);
-    geo.translate(0, 0.075, 0);
-    const pos = geo.attributes.position;
+    const blade = new THREE.PlaneGeometry(0.04, 0.11, 1, 4);
+    blade.translate(0, 0.055, 0);
+    const pos = blade.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const t = pos.getY(i) / 0.15;
-      pos.setX(i, pos.getX(i) * (1 - t * 0.9));
-      pos.setZ(i, t * t * 0.035);
+      const t = pos.getY(i) / 0.11;
+      pos.setX(i, pos.getX(i) * (1 - t * 0.92));
+      pos.setZ(i, t * t * 0.03);
     }
-    geo.computeVertexNormals();
-    const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.85 });
+    const tuft = merge(
+      [0, 1, 2].map((i) => [blade, M(Math.cos(i * 2.1) * 0.02, 0, Math.sin(i * 2.1) * 0.02, (i - 1) * 0.25, i * 2.1, (i - 1) * 0.2, 1, 0.8 + i * 0.15, 1)]),
+      (p) => {
+        const t = Math.min(1, p.y / 0.11);
+        return new THREE.Color(0.42 + t * 0.7, 0.5 + t * 0.62, 0.32 + t * 0.4);
+      }
+    );
+    const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.9, vertexColors: true });
     material.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = timeU;
       sh.vertexShader = `uniform float uTime;\n${sh.vertexShader}`.replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
-        float hh = clamp(position.y / 0.15, 0.0, 1.0);
+        float hh = clamp(position.y / 0.11, 0.0, 1.0);
         vec4 wp = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-        float sw = sin(uTime * 1.5 + wp.x * 0.8 + wp.z * 0.5) * 0.6 + sin(uTime * 3.1 + wp.x * 2.3 - wp.z) * 0.25;
-        transformed.x += sw * 0.035 * hh * hh;`
+        float sw = sin(uTime * 1.4 + wp.x * 0.7 + wp.z * 0.45) * 0.6 + sin(uTime * 2.9 + wp.x * 2.1 - wp.z) * 0.25;
+        transformed.x += sw * 0.028 * hh * hh;`
       );
     };
-    const count = LOW || /[?&]fewgrass/.test(location.search) ? 300 : 16000;
-    const blades = new THREE.InstancedMesh(geo, material, count);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
+    const max = /[?&]fewgrass/.test(location.search) ? GRASS[0] : GRASS[2];
+    const blades = new THREE.InstancedMesh(tuft, material, max);
     const col = new THREE.Color();
-    const greens = [0x4a8c33, 0x5a9c3c, 0x3f7d2b, 0x66a845, 0x548f36, 0x76b04d];
-    for (let i = 0; i < count; i++) {
-      const near = i < count * 0.55;
+    const greens = [0x6cc644, 0x5db83a, 0x7fd14f, 0x52ad34, 0x8fd65a];
+    for (let i = 0; i < max; i++) {
+      // vorne (nah an der Kamera) dichter
+      const near = i % 2 === 0;
       const x = (rnd() - 0.5) * (near ? 13 : 15);
       const y = near ? -0.1 + rnd() * rnd() * 7 : rnd() * 16.2;
-      e.set((rnd() - 0.5) * 0.5, rnd() * TAU, (rnd() - 0.5) * 0.5);
-      q.setFromEuler(e);
-      const sc = 0.6 + rnd() * 0.8;
-      m.compose(P(x, y), q, new THREE.Vector3(sc, sc * (0.7 + rnd() * 0.6), sc));
-      blades.setMatrixAt(i, m);
+      const sc = 0.65 + rnd() * 0.55;
+      blades.setMatrixAt(i, M(P(x, y).x, 0, P(x, y).z, 0, rnd() * TAU, 0, sc, sc * (0.7 + rnd() * 0.6), sc));
       blades.setColorAt(i, col.set(greens[Math.floor(rnd() * greens.length)]));
     }
-    blades.receiveShadow = true;
+    blades.count = Math.min(max, GRASS[Q]);
+    blades.userData.max = max;
+    blades.receiveShadow = Q > 1;
     scene.add(blades);
 
-    // Gänseblümchen und Löwenzahn
-    const flowers = new THREE.InstancedMesh(new THREE.CircleGeometry(0.018, 8), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), 700);
-    for (let i = 0; i < 700; i++) {
+    // Gänseblümchen, Löwenzahn und ein paar bunte Blumen
+    const flowers = new THREE.InstancedMesh(new THREE.CircleGeometry(0.022, 8), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), 600);
+    const fcol = [0xffffff, 0xffffff, 0xffffff, 0xffd21f, 0xff7eb6, 0xb69cff];
+    for (let i = 0; i < 600; i++) {
       const x = (rnd() - 0.5) * 14;
       const y = rnd() * 16;
-      q.setFromEuler(e.set(-Math.PI / 2 + (rnd() - 0.5) * 0.4, 0, rnd() * TAU));
-      m.compose(P(x, y, 0.05 + rnd() * 0.05), q, new THREE.Vector3(1, 1, 1).multiplyScalar(0.7 + rnd() * 0.6));
-      flowers.setMatrixAt(i, m);
-      flowers.setColorAt(i, col.set(rnd() < 0.75 ? 0xffffff : 0xffd21f));
+      const p = P(x, y, 0.06 + rnd() * 0.05);
+      flowers.setMatrixAt(i, M(p.x, p.y, p.z, -Math.PI / 2 + (rnd() - 0.5) * 0.4, 0, rnd() * TAU, 0.8 + rnd() * 0.6));
+      flowers.setColorAt(i, col.set(fcol[Math.floor(rnd() * fcol.length)]));
     }
     scene.add(flowers);
+    return blades;
   }
 
+  // Weiche, runde Blätterkugel (für Bäume, Hecke, Büsche): sanft verbeult, oben hell, unten dunkel
+  function blobGeo(detail = 3) {
+    const g = new THREE.IcosahedronGeometry(1, detail);
+    const p = g.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const k = 1 + Math.sin(v.x * 3.1 + v.y * 1.7) * 0.05 + Math.sin(v.z * 2.7 - v.y * 2.3) * 0.05;
+      p.setXYZ(i, v.x * k, v.y * k, v.z * k);
+    }
+    // Normalen der glatten Kugel behalten: so bleibt alles weich statt kantig
+    return g;
+  }
+  const leafShade = (light, dark) => {
+    const a = new THREE.Color(dark);
+    const b = new THREE.Color(light);
+    return (p, n) => a.clone().lerp(b, Math.min(1, Math.max(0, n.y * 0.6 + 0.45)));
+  };
+
+  // Ein Baum als zwei Teile: Stamm (braun) und Krone (Farbverlauf). Wird mit anderen Bäumen zusammengelegt.
+  function treeParts(rnd, size, x, y, rot, trunks, crowns) {
+    const at = P(x, y);
+    const T = (m) => new THREE.Matrix4().makeTranslation(at.x, 0, at.z).multiply(new THREE.Matrix4().makeRotationY(rot)).multiply(m);
+    trunks.push([new THREE.CylinderGeometry(0.1 * size, 0.2 * size, 2.0 * size, 12, 4), T(M(0, 1.0 * size, 0, 0, 0, (rnd() - 0.5) * 0.08))]);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * TAU + rnd();
+      trunks.push([new THREE.CylinderGeometry(0.035 * size, 0.07 * size, 1 * size, 8), T(M(Math.cos(a) * 0.22 * size, 1.9 * size, Math.sin(a) * 0.22 * size, Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7))]);
+    }
+    const hue = [["#9be05a", "#2f8a2a"], ["#a6e35f", "#3a8f2c"], ["#8fd24e", "#287a25"], ["#b5e86a", "#459a30"]][Math.floor(rnd() * 4)];
+    const shade = leafShade(hue[0], hue[1]);
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU + rnd();
+      const r = i ? 0.62 * size : 0;
+      const s = (i ? 0.72 + rnd() * 0.25 : 1.05) * size;
+      crowns.push([BLOB, T(M(Math.cos(a) * r, (2.45 + (i ? rnd() * 0.3 : 0.45)) * size, Math.sin(a) * r, 0, rnd() * TAU, 0, s, s * 0.88, s)), shade]);
+    }
+  }
+  let BLOB = null;
+
   function addGarden(scene, rnd) {
+    BLOB = blobGeo(2);
     // Terrasse aus Holzdielen unter den Stühlen
     const planks = canvasTex(256, 256, (g, w, h) => {
       for (let i = 0; i < 8; i++) {
-        const tone = 120 + Math.floor(rnd() * 40);
-        g.fillStyle = `rgb(${tone + 40},${tone - 5},${tone - 55})`;
+        const tone = 150 + Math.floor(rnd() * 30);
+        g.fillStyle = `rgb(${tone + 50},${tone - 5},${tone - 70})`;
         g.fillRect(0, (i * h) / 8, w, h / 8);
-        g.fillStyle = "rgba(60,30,10,0.55)";
-        g.fillRect(0, (i * h) / 8, w, 2);
-        for (let k = 0; k < 18; k++) {
-          g.strokeStyle = `rgba(80,45,15,${0.08 + rnd() * 0.12})`;
+        g.fillStyle = "rgba(90,45,15,0.6)";
+        g.fillRect(0, (i * h) / 8, w, 3);
+        g.fillStyle = "rgba(255,230,180,0.25)";
+        g.fillRect(0, (i * h) / 8 + 3, w, 2);
+        for (let k = 0; k < 8; k++) {
+          g.strokeStyle = `rgba(110,60,20,${0.06 + rnd() * 0.08})`;
+          g.lineWidth = 2;
           g.beginPath();
-          const y = (i * h) / 8 + 3 + rnd() * (h / 8 - 6);
+          const y = (i * h) / 8 + 6 + rnd() * (h / 8 - 10);
           g.moveTo(0, y);
           g.bezierCurveTo(w * 0.3, y + rnd() * 4 - 2, w * 0.6, y + rnd() * 4 - 2, w, y + rnd() * 2 - 1);
           g.stroke();
         }
-        g.fillStyle = "rgba(40,20,5,0.6)";
-        g.fillRect(Math.floor(rnd() * w), (i * h) / 8, 2, h / 8);
       }
     }, [5, 2]);
-    const deck = new THREE.Mesh(new THREE.BoxGeometry(24, 0.08, 4.2), new THREE.MeshStandardMaterial({ map: planks, roughness: 0.75 }));
-    deck.position.copy(P(0, -2.2, -0.035));
+    const deck = new THREE.Mesh(slab(24, 4.2, 0.06, 0.15, 0.03), new THREE.MeshStandardMaterial({ map: planks, roughness: 0.7 }));
+    deck.rotation.x = -Math.PI / 2;
+    deck.position.copy(P(0, -2.2, -0.045));
     deck.receiveShadow = true;
+    planks.repeat.set(5 / 24, 2 / 4.2);
     scene.add(deck);
 
     // Haus mit Terrassentür und Fenstern
-    const wallTex = canvasTex(256, 256, (g, w, h) => {
-      g.fillStyle = "#efe6d6";
-      g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 4000; i++) {
-        g.fillStyle = `rgba(${rnd() < 0.5 ? "120,100,80" : "255,255,255"},${rnd() * 0.08})`;
-        g.fillRect(rnd() * w, rnd() * h, 2, 2);
-      }
-    }, [6, 2]);
     const house = new THREE.Group();
-    const wall = mesh(new THREE.BoxGeometry(24, 3.4, 0.3), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 }), 0, 1.7, 0);
-    house.add(wall);
-    const glassM = new THREE.MeshStandardMaterial({ color: 0x1d2a3a, roughness: 0.08, metalness: 0.6 });
+    house.add(mesh(slab(24, 3.4, 0.3, 0.1, 0.04), mat(0xfbeedb, 0.85), 0, 1.7, 0));
+    const glassM = new THREE.MeshStandardMaterial({ color: 0x5aa0d8, roughness: 0.05, metalness: 0.4 });
     const frameM = mat(0xffffff, 0.5);
     for (const [x, w, h, y] of [[-2.2, 1.8, 2.2, 1.1], [-6.5, 1.2, 1.2, 1.8], [3.2, 1.2, 1.2, 1.8], [7.5, 1.2, 1.2, 1.8]]) {
-      house.add(mesh(new THREE.BoxGeometry(w + 0.12, h + 0.12, 0.06), frameM, x, y, 0.16));
-      house.add(mesh(new THREE.BoxGeometry(w, h, 0.07), glassM, x, y, 0.17));
-      house.add(mesh(new THREE.BoxGeometry(0.05, h, 0.08), frameM, x, y, 0.18));
+      house.add(mesh(slab(w + 0.16, h + 0.16, 0.05, 0.05, 0.02), frameM, x, y, 0.17));
+      house.add(mesh(new THREE.BoxGeometry(w, h, 0.07), glassM, x, y, 0.19, false));
+      house.add(mesh(new THREE.BoxGeometry(0.05, h, 0.08), frameM, x, y, 0.2, false));
+      if (h < 2) for (const s of [-1, 1]) house.add(mesh(slab(0.42, h + 0.1, 0.04, 0.03, 0.01), mat(0x2f9e8f, 0.6), x + s * (w / 2 + 0.26), y, 0.18));
     }
-    const roof = mesh(new THREE.BoxGeometry(24.6, 0.25, 1.6), mat(0x7a3b26, 0.8), 0, 3.5, 0.5);
-    roof.rotation.x = 0.35;
+    const roof = mesh(slab(24.8, 1.7, 0.22, 0.1, 0.06), mat(0xd9502b, 0.6), 0, 3.55, 0.55);
+    roof.rotation.x = Math.PI / 2 + 0.35;
     house.add(roof);
     house.position.copy(P(0, -4.45));
-    house.rotation.y = 0;
     scene.add(house);
 
-    // Lichterkette über der Terrasse: vom Haus nach vorne zu zwei Masten links und rechts
+    // Lichterkette über der Terrasse
     const bulbs = [];
     const strand = (a, b, sag, n) => {
       for (let i = 0; i <= n; i++) {
@@ -521,52 +678,48 @@ window.Hodenritter3D = (() => {
         bulbs.push(a.clone().lerp(b, u).add(new THREE.Vector3(0, -Math.sin(u * Math.PI) * sag, 0)));
       }
     };
-    strand(P(-10.5, -0.2, 2.7), P(10.5, -0.2, 2.7), 0.55, 70);
-    strand(P(-11, -4.25, 2.95), P(11, -4.25, 2.95), 0.35, 60); // am Haus entlang
-    const bulbMesh = new THREE.InstancedMesh(sphere(0.032, 10, 8), new THREE.MeshStandardMaterial({ color: 0xfff1c1, emissive: 0xffc35a, emissiveIntensity: 2.2 }), bulbs.length);
-    bulbs.forEach((p, i) => bulbMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z)));
+    strand(P(-10.5, -0.2, 2.7), P(10.5, -0.2, 2.7), 0.55, 56);
+    strand(P(-11, -4.25, 2.95), P(11, -4.25, 2.95), 0.35, 48);
+    const bulbCols = [0xfff1c1, 0xffd27a, 0xffb3c7, 0xb8e1ff];
+    const bulbMesh = new THREE.InstancedMesh(sphere(0.036, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), bulbs.length);
+    const bc = new THREE.Color();
+    bulbs.forEach((p, i) => {
+      bulbMesh.setMatrixAt(i, new THREE.Matrix4().makeTranslation(p.x, p.y, p.z));
+      bulbMesh.setColorAt(i, bc.set(bulbCols[i % bulbCols.length]));
+    });
     scene.add(bulbMesh);
-    const poleM = mat(0x4b3621, 0.8);
+    const poleM = mat(0x8a5a35, 0.8);
     for (const x of [-10.5, 10.5]) {
-      const pole = mesh(new THREE.CylinderGeometry(0.035, 0.045, 2.8, 8), poleM, 0, 0, 0);
+      const pole = mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.8, 10), poleM, 0, 0, 0);
       pole.position.copy(P(x, -0.2, 1.4));
       scene.add(pole);
     }
 
-    // Hecke hinten
-    const leafTex = canvasTex(256, 256, (g, w, h) => {
-      g.fillStyle = "#2f5e22";
-      g.fillRect(0, 0, w, h);
-      const cs = ["#3b7a2a", "#2a5a1d", "#4c8c34", "#24501a", "#5c9a3c"];
-      for (let i = 0; i < 2600; i++) {
-        g.fillStyle = cs[Math.floor(rnd() * cs.length)];
-        g.beginPath();
-        g.ellipse(rnd() * w, rnd() * h, 3 + rnd() * 4, 2 + rnd() * 2, rnd() * TAU, 0, TAU);
-        g.fill();
-      }
-    }, [8, 1]);
-    const hedgeM = new THREE.MeshStandardMaterial({ map: leafTex, roughness: 0.95 });
-    const hedge = mesh(new THREE.BoxGeometry(17, 1.7, 1.1), hedgeM, 0, 0, 0);
-    hedge.position.copy(P(0, H.FIELD.y1 + 0.75, 0.85));
-    scene.add(hedge);
-    const leafM = new THREE.MeshStandardMaterial({ map: leafTex, roughness: 0.95 });
-    const clump = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.5, 1), leafM, 70);
-    for (let i = 0; i < 70; i++) {
-      const x = -8.4 + (i / 69) * 16.8;
-      const s = 0.6 + rnd() * 0.5;
-      clump.setMatrixAt(i, M(x, 1.55 + rnd() * 0.15, -(H.FIELD.y1 + 0.75) + (rnd() - 0.5) * 0.4, rnd(), rnd(), rnd(), s * 1.1, s * 0.7, s));
+    // Hecke hinten: ein runder Wulst mit Blätterkugeln obendrauf
+    const hy = H.FIELD.y1 + 0.75;
+    const hedgeShade = leafShade("#8fd650", "#2d7d27");
+    const hedgeParts = [];
+    for (let i = 0; i < 34; i++) {
+      const x = -8.6 + (i / 33) * 17.2;
+      const s = 0.62 + rnd() * 0.22;
+      hedgeParts.push([BLOB, M(x, 0.75 + rnd() * 0.25, -hy + (rnd() - 0.5) * 0.3, 0, rnd() * TAU, 0, s * 1.15, s, s * 0.95), hedgeShade]);
     }
-    clump.castShadow = true;
-    clump.receiveShadow = true;
-    scene.add(clump);
+    for (let i = 0; i < 24; i++) {
+      const x = -8.3 + (i / 23) * 16.6;
+      hedgeParts.push([BLOB, M(x, 1.45 + rnd() * 0.2, -hy + (rnd() - 0.5) * 0.3, 0, rnd() * TAU, 0, 0.55 + rnd() * 0.2), hedgeShade]);
+    }
+    const hedge = new THREE.Mesh(merge(hedgeParts), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
+    hedge.castShadow = Q > 1;
+    hedge.receiveShadow = true;
+    scene.add(hedge);
 
-    // Holzzaun links und rechts
+    // Holzzaun links und rechts, runde Latten
     const picket = merge([
-      [new THREE.BoxGeometry(0.09, 1.1, 0.025), M(0, 0.55, 0)],
-      [new THREE.ConeGeometry(0.064, 0.08, 4), M(0, 1.14, 0, 0, Math.PI / 4, 0, 1, 1, 0.28)],
+      [slab(0.1, 1.05, 0.03, 0.04, 0.008), M(0, 0.52, 0)],
+      [new THREE.SphereGeometry(0.05, 12, 6, 0, TAU, 0, Math.PI / 2), M(0, 1.05, 0, 0, 0, 0, 1, 0.8, 0.35)],
     ]);
-    const nP = 110;
-    const fence = new THREE.InstancedMesh(picket, mat(0xb98a5a, 0.85), nP * 2);
+    const nP = 90;
+    const fence = new THREE.InstancedMesh(picket, mat(0xe8b77c, 0.75), nP * 2);
     let fi = 0;
     for (const side of [-1, 1]) {
       for (let i = 0; i < nP; i++) {
@@ -574,8 +727,9 @@ window.Hodenritter3D = (() => {
         fence.setMatrixAt(fi++, M(side * (H.FIELD.x + 0.45), 0, -y, 0, Math.PI / 2, (rnd() - 0.5) * 0.03));
       }
       for (const hgt of [0.3, 0.85]) {
-        const rail = mesh(new THREE.BoxGeometry(0.04, 0.07, H.FIELD.y1 + 0.3), mat(0x9c7148, 0.85), 0, 0, 0);
-        rail.position.copy(P(side * (H.FIELD.x + 0.42), (H.FIELD.y1 - 0.1) / 2, hgt));
+        const rail = mesh(new THREE.CapsuleGeometry(0.035, H.FIELD.y1 + 0.3, 4, 8), mat(0xc98f55, 0.8), 0, 0, 0);
+        rail.rotation.x = Math.PI / 2;
+        rail.position.copy(P(side * (H.FIELD.x + 0.41), (H.FIELD.y1 - 0.1) / 2, hgt));
         scene.add(rail);
       }
     }
@@ -583,34 +737,33 @@ window.Hodenritter3D = (() => {
     fence.receiveShadow = true;
     scene.add(fence);
 
-    // Apfelbaum im Rasen und große Bäume hinter Hecke und Zaun
-    scene.add(makeTree(rnd, 1.0, true, H.TREE.x, H.TREE.y));
-    for (let i = 0; i < 26; i++) {
-      const a = rnd() * TAU;
+    // Apfelbaum im Rasen (eigener, wirft Schatten) und große Bäume hinter Hecke und Zaun (alle in einem Zug)
+    scene.add(makeAppleTree(rnd));
+    const trunks = [];
+    const crowns = [];
+    for (let i = 0; i < 24; i++) {
       let x;
       let y;
-      if (i < 10) {
-        x = -14 + i * 3.1 + rnd();
+      if (i < 9) {
+        x = -14 + i * 3.4 + rnd();
         y = H.FIELD.y1 + 4 + rnd() * 6;
       } else {
         x = (rnd() < 0.5 ? -1 : 1) * (H.FIELD.x + 3 + rnd() * 8);
         y = -2 + rnd() * 22;
       }
-      scene.add(makeTree(rnd, 1.6 + rnd() * 1.3, false, x, y, a));
+      treeParts(rnd, 1.6 + rnd() * 1.3, x, y, rnd() * TAU, trunks, crowns);
     }
-    // Wald am Horizont
-    const far = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0x3e6b3a, roughness: 1, flatShading: true }), 80);
-    for (let i = 0; i < 80; i++) {
-      const a = (i / 80) * Math.PI - 0.0;
-      const r = 45 + rnd() * 12;
-      const s = 4 + rnd() * 5;
-      far.setMatrixAt(i, M(Math.cos(a) * r * 1.3, s * 0.6, -6 - Math.sin(a) * r, 0, rnd() * 3, 0, s, s * 1.3, s));
+    const trunkMesh = new THREE.Mesh(merge(trunks), mat(0x8a5634, 0.85));
+    const crownMesh = new THREE.Mesh(merge(crowns), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    for (const m of [trunkMesh, crownMesh]) {
+      m.castShadow = Q > 1;
+      m.receiveShadow = Q > 0;
+      scene.add(m);
     }
-    scene.add(far);
 
-    // Grill, Bierkasten und Beistelltisch auf der Terrasse
+    // Grill, Bierkasten auf der Terrasse
     const grill = new THREE.Group();
-    const grillM = mat(0x1d1d1f, 0.45, { metalness: 0.6 });
+    const grillM = mat(0x22252b, 0.4, { metalness: 0.5 });
     const bowl = mesh(new THREE.SphereGeometry(0.3, 24, 12, 0, TAU, Math.PI / 2, Math.PI / 2), grillM, 0, 0.85, 0);
     const lid = mesh(new THREE.SphereGeometry(0.3, 24, 12, 0, TAU, 0, Math.PI / 2), grillM, 0, 0.9, 0);
     lid.rotation.x = -0.9;
@@ -634,62 +787,77 @@ window.Hodenritter3D = (() => {
     scene.add(crate2);
   }
 
-  function makeTree(rnd, size, fruit, x, y, rot = 0) {
+  function makeAppleTree(rnd) {
+    const trunks = [];
+    const crowns = [];
+    treeParts(rnd, 1.0, 0, 0, 0, trunks, crowns);
     const tree = new THREE.Group();
-    const bark = canvasTex(64, 128, (g, w, h) => {
-      g.fillStyle = "#5b4130";
-      g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 60; i++) {
-        g.strokeStyle = `rgba(${rnd() < 0.5 ? "30,20,10" : "140,120,100"},0.5)`;
-        g.beginPath();
-        const xx = rnd() * w;
-        g.moveTo(xx, 0);
-        g.lineTo(xx + (rnd() - 0.5) * 10, h);
-        g.stroke();
-      }
-    });
-    const trunk = mesh(new THREE.CylinderGeometry(0.11 * size, 0.18 * size, 1.9 * size, 10), new THREE.MeshStandardMaterial({ map: bark, roughness: 0.95 }), 0, 0.95 * size, 0);
-    trunk.rotation.z = (rnd() - 0.5) * 0.1;
-    tree.add(trunk);
-    for (let i = 0; i < 3; i++) {
-      const br = mesh(new THREE.CylinderGeometry(0.03 * size, 0.06 * size, 1 * size, 6), trunk.material, 0, 0, 0);
-      const a = (i / 3) * TAU + rnd();
-      br.position.set(Math.cos(a) * 0.25 * size, 1.85 * size, Math.sin(a) * 0.25 * size);
-      br.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7);
-      tree.add(br);
+    const t = new THREE.Mesh(merge(trunks), mat(0x8a5634, 0.85));
+    const c = new THREE.Mesh(merge(crowns), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    for (const m of [t, c]) {
+      m.castShadow = true;
+      m.receiveShadow = true;
+      tree.add(m);
     }
-    const greens = [0x3f7f2e, 0x4b8d35, 0x356f27, 0x5b9a3c];
-    const leaf = new THREE.MeshStandardMaterial({ color: greens[Math.floor(rnd() * greens.length)], roughness: 0.9 });
-    const geo = new THREE.IcosahedronGeometry(1, 2);
-    const p = geo.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const k = 0.85 + rnd() * 0.3;
-      p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
-    }
-    geo.computeVertexNormals();
-    for (let i = 0; i < 7; i++) {
+    const apples = new THREE.InstancedMesh(sphere(0.05, 12, 8), mat(0xe0242a, 0.35), 40);
+    for (let i = 0; i < 40; i++) {
       const a = rnd() * TAU;
-      const r = i ? 0.55 * size : 0;
-      const s = (0.7 + rnd() * 0.35) * size;
-      const blob = mesh(geo, leaf, Math.cos(a) * r, (2.35 + rnd() * 0.5) * size + (i ? 0 : 0.3 * size), Math.sin(a) * r);
-      blob.scale.set(s, s * 0.8, s);
-      tree.add(blob);
+      const b = rnd() * Math.PI * 0.6;
+      const r = 1.08;
+      apples.setMatrixAt(i, new THREE.Matrix4().makeTranslation(Math.cos(a) * Math.sin(b) * r, 2.6 + Math.cos(b) * r * 0.8, Math.sin(a) * Math.sin(b) * r));
     }
-    if (fruit) {
-      const apples = new THREE.InstancedMesh(sphere(0.045, 10, 8), mat(0xc81e1e, 0.4), 40);
-      for (let i = 0; i < 40; i++) {
-        const a = rnd() * TAU;
-        const b = rnd() * Math.PI * 0.7;
-        const r = 1.0 * size;
-        apples.setMatrixAt(i, new THREE.Matrix4().makeTranslation(Math.cos(a) * Math.sin(b) * r, 2.45 * size + Math.cos(b) * r * 0.75, Math.sin(a) * Math.sin(b) * r));
-      }
-      tree.add(apples);
-      // Fallobst im Gras
-      for (let i = 0; i < 4; i++) tree.add(mesh(sphere(0.045, 10, 8), mat(0xb91c1c, 0.5), (rnd() - 0.5) * 1.6, 0.04, (rnd() - 0.5) * 1.6));
-    }
-    tree.position.copy(P(x, y));
-    tree.rotation.y = rot;
+    tree.add(apples);
+    // Fallobst im Gras
+    for (let i = 0; i < 4; i++) tree.add(mesh(sphere(0.05, 12, 8), mat(0xd11f25, 0.4), (rnd() - 0.5) * 1.6, 0.045, (rnd() - 0.5) * 1.6));
+    tree.position.copy(P(H.TREE.x, H.TREE.y));
     return tree;
+  }
+
+  // Hintergrund: sanfte Hügel, runde Baumgruppen am Horizont, dicke Wolken, die langsam ziehen
+  function addBackdrop(scene, rnd, timeU) {
+    const hillShade = (p, n) => new THREE.Color("#3f9a33").lerp(new THREE.Color("#8fd65a"), Math.min(1, Math.max(0, n.y * 0.8)));
+    const hills = [];
+    for (let i = 0; i < 9; i++) {
+      const a = 0.08 * Math.PI + (i / 8) * 0.84 * Math.PI + (rnd() - 0.5) * 0.15;
+      const r = 95 + rnd() * 30;
+      const s = 28 + rnd() * 22;
+      hills.push([new THREE.SphereGeometry(1, 40, 20, 0, TAU, 0, Math.PI / 2), M(Math.cos(a) * r * 1.3, -2, -Math.sin(a) * r + 5, 0, 0, 0, s * 1.6, s * (0.32 + rnd() * 0.18), s), hillShade]);
+    }
+    const hillMesh = new THREE.Mesh(merge(hills), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    scene.add(hillMesh);
+
+    const woods = [];
+    const shade = leafShade("#7cc94a", "#2a6e2a");
+    const small = blobGeo(1);
+    for (let i = 0; i < 70; i++) {
+      const a = (i / 70) * Math.PI * 1.1 - 0.05 * Math.PI;
+      const r = 42 + rnd() * 14;
+      const s = 3.5 + rnd() * 3.5;
+      woods.push([small, M(Math.cos(a) * r * 1.3, s * 0.75, -6 - Math.sin(a) * r, 0, rnd() * 3, 0, s, s * 1.15, s), shade]);
+    }
+    const woodMesh = new THREE.Mesh(merge(woods), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    scene.add(woodMesh);
+
+    // Wolken: unten leicht bläulich, oben strahlend weiß
+    const cloudShade = (p, n) => new THREE.Color("#c8d9f2").lerp(new THREE.Color("#ffffff"), Math.min(1, Math.max(0, n.y * 0.7 + 0.5)));
+    const puffs = [];
+    const cloudBlob = blobGeo(2);
+    for (let c = 0; c < 12; c++) {
+      const a = 0.1 * Math.PI + rnd() * 0.8 * Math.PI;
+      const r = 110 + rnd() * 50;
+      const cx = Math.cos(a) * r * 1.2;
+      const cz = -Math.sin(a) * r;
+      const cy = 30 + rnd() * 30;
+      const n = 4 + Math.floor(rnd() * 4);
+      for (let i = 0; i < n; i++) {
+        const mid = 1 - Math.abs(i - (n - 1) / 2) / n;
+        const s = (5 + rnd() * 3) * (0.6 + mid);
+        puffs.push([cloudBlob, M(cx + (i - (n - 1) / 2) * 6.5 + rnd() * 2, cy + mid * 3 + rnd() * 1.5, cz + (rnd() - 0.5) * 6, 0, rnd() * 3, 0, s * 1.2, s * 0.85, s), cloudShade]);
+      }
+    }
+    const clouds = new THREE.Mesh(merge(puffs), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+    clouds.onBeforeRender = () => (clouds.rotation.y = Math.sin(timeU.value * 0.004) * 0.08);
+    scene.add(clouds);
   }
 
   // --- Gartenstühle (weiße Plastikstühle), alle als ein Zeichenaufruf ---
@@ -718,7 +886,7 @@ window.Hodenritter3D = (() => {
     const n = S.players.length;
     if (G.chairCount === n) return;
     if (G.chairs) G.scene.remove(G.chairs);
-    G.chairs = new THREE.InstancedMesh(chairGeometry(), new THREE.MeshStandardMaterial({ color: 0xf2f1ec, roughness: 0.38 }), n);
+    G.chairs = new THREE.InstancedMesh(chairGeometry(), rim(new THREE.MeshStandardMaterial({ color: 0xf7f6f1, roughness: 0.35 })), n);
     for (let i = 0; i < n; i++) {
       const p = P(H.seatX(S, i), H.CHAIR_Y);
       G.chairs.setMatrixAt(i, M(p.x, 0, p.z, 0, Math.PI, 0));
@@ -808,8 +976,8 @@ window.Hodenritter3D = (() => {
     const sw = L.female ? 0.88 : 1.0 * L.build; // Schulterbreite
     const hw = L.female ? 1.08 : 0.98; // Hüftbreite
     const skin = mat(L.skin, 0.55);
-    const shirtM = L.stripes ? new THREE.MeshStandardMaterial({ map: stripeTex(L.shirt, L.shirt2), roughness: 0.8 }) : mat(L.shirt, 0.82);
-    const pantsM = L.bottom === "jeans" ? new THREE.MeshStandardMaterial({ map: jeansTex(L.pants), roughness: 0.85 }) : mat(L.pants, 0.85);
+    const shirtM = L.stripes ? rim(new THREE.MeshStandardMaterial({ map: stripeTex(L.shirt, L.shirt2), roughness: 0.8 })) : mat(L.shirt, 0.82);
+    const pantsM = L.bottom === "jeans" ? rim(new THREE.MeshStandardMaterial({ map: jeansTex(L.pants), roughness: 0.85 })) : mat(L.pants, 0.85);
     const hairM = mat(L.hair, 0.75);
     const shoeM = mat(L.shoes, 0.55);
     const soleM = mat("#f1f1f1", 0.6);
@@ -845,6 +1013,7 @@ window.Hodenritter3D = (() => {
     neck.add(mesh(new THREE.CylinderGeometry(0.047, 0.055, 0.12, 14), skin, 0, 0.03, 0));
     const head = new THREE.Group();
     head.position.y = 0.085;
+    head.scale.setScalar(1.12); // etwas größerer Kopf: comichafter
     neck.add(head);
     addTo(head, mesh(sphere(0.1, 32, 24), skin, 0, 0.1, 0)).scale.set(0.9, 1.08, 1.0);
     addTo(head, mesh(sphere(0.08, 24, 16), skin, 0, 0.045, 0.02)).scale.set(0.92, 0.8, 1.0);
@@ -853,10 +1022,10 @@ window.Hodenritter3D = (() => {
     head.add(nose);
     for (const s of [-1, 1]) {
       addTo(head, mesh(sphere(0.026, 12, 10), skin, s * 0.09, 0.095, -0.005)).scale.set(0.45, 1, 0.75);
-      head.add(mesh(sphere(0.0135, 14, 10), eyeM, s * 0.034, 0.112, 0.082, false));
-      head.add(mesh(sphere(0.0072, 12, 8), irisM, s * 0.034, 0.112, 0.0945, false));
-      head.add(mesh(sphere(0.0036, 8, 6), pupilM, s * 0.034, 0.112, 0.1012, false));
-      const lid = mesh(new THREE.SphereGeometry(0.0146, 14, 8, 0, TAU, 0, Math.PI * 0.42), skin, s * 0.034, 0.112, 0.082, false);
+      head.add(mesh(sphere(0.016, 14, 10), eyeM, s * 0.035, 0.112, 0.08, false));
+      head.add(mesh(sphere(0.0088, 12, 8), irisM, s * 0.035, 0.112, 0.0905, false));
+      head.add(mesh(sphere(0.0045, 8, 6), pupilM, s * 0.035, 0.112, 0.0985, false));
+      const lid = mesh(new THREE.SphereGeometry(0.0172, 14, 8, 0, TAU, 0, Math.PI * 0.4), skin, s * 0.035, 0.112, 0.08, false);
       lid.rotation.x = 0.55;
       head.add(lid);
       const brow = mesh(new THREE.BoxGeometry(0.034, 0.0065, 0.012), hairM, s * 0.035, 0.135, 0.091, false);
@@ -910,6 +1079,7 @@ window.Hodenritter3D = (() => {
       el.add(mesh(limbGeo(0.25, [[0, 0.036], [0.25, 0.037], [1, 0.024]]), sleeveLong ? shirtM : skin, 0, 0, 0));
       const hand = new THREE.Group();
       hand.position.y = -0.255;
+      hand.scale.setScalar(1.22);
       el.add(hand);
       addTo(hand, mesh(sphere(1, 14, 10), skin, 0, -0.035, 0.004)).scale.set(0.022, 0.048, 0.041);
       const fingers = mesh(capsule(0.019, 0.04, 10), skin, 0, -0.085, 0.006);
@@ -926,6 +1096,7 @@ window.Hodenritter3D = (() => {
     arms[0].hand.add(bottle);
     const ball = mesh(sphere(H.B_R, 20, 14), mat(0xbfc4ca, 0.3, { metalness: 1 }), 0, -0.085, 0.03);
     ball.visible = false;
+    ball.scale.setScalar(1 / 1.22);
     arms[1].hand.add(ball);
 
     // Beine
@@ -945,6 +1116,7 @@ window.Hodenritter3D = (() => {
       knee.add(shin);
       const ankle = new THREE.Group();
       ankle.position.y = -0.45;
+      ankle.scale.setScalar(1.15);
       knee.add(ankle);
       const shoe = mesh(capsule(0.046, 0.14), shoeM, 0, -0.022, 0.045);
       shoe.rotation.x = Math.PI / 2;
@@ -956,9 +1128,10 @@ window.Hodenritter3D = (() => {
 
     root.scale.setScalar(L.height / 1.78);
     root.traverse((o) => {
-      if (o.isMesh && o.castShadow) o.castShadow = o.geometry.parameters?.radius !== 0.0036;
+      if (o.isMesh && o.castShadow) o.castShadow = o.geometry.parameters?.radius !== 0.0045;
     });
-    const person = { root, hips, spine, chest, neck, head, arms, legs, bottle, ball, look: L, J: { ...POSES.stand }, pos: null, face: 0, mode: "seated", leg: null, walk: 0, moveW: 0, seed: (hash(name) % 1000) / 100, sipAt: 0 };
+    compact(root, [ball]);
+    const person = { root, hips, spine, chest, neck, head, arms, legs, bottle, ball, look: L, J: { ...POSES.stand }, pos: null, face: 0, mode: "seated", leg: null, walk: 0, moveW: 0, vel: 0, seed: (hash(name) % 1000) / 100, sipAt: 0 };
     return person;
   }
 
@@ -1108,8 +1281,8 @@ window.Hodenritter3D = (() => {
       }
       case "task": {
         if (name === S.task.who) {
-          if (S.task.stage === "ready") return { x: 0, y: 0.7, face: 0, pose: "stand" };
-          return taskPlan(H.TASKS[S.task.i].a, t);
+          if (S.task.stage === "ready") return { ...H.HOME, face: 0, pose: "stand" };
+          return taskPlan(now);
         }
         if (standing) {
           const spot = drinkSpot(name);
@@ -1136,45 +1309,63 @@ window.Hodenritter3D = (() => {
     return sit;
   }
 
-  // Wie die Aufgabe aussieht: ein Ziel, das sich bewegt (die Figur läuft hinterher), oder eine Übung auf der Stelle.
-  function taskPlan(kind, t) {
-    const home = { x: 0, y: 0.7 };
+  // Wie weit die Aufgabe ist (in Schritten, Drehungen, Hampelmännern …), weich geglättet.
+  // Eigenes Handy: das Mini-Spiel; Bot: nach Zeit; andere Handys: was das Handy mit der Aufgabe schickt.
+  let tv = { id: null, v: 0, dt: 0 };
+  function taskV(now) {
+    const T = S.task;
+    let target = 0;
+    if (T.stage === "run") {
+      if (mini) target = mini.v;
+      else if (isBot(T.who)) target = T.goal * (T.botFrac ?? 1) * Math.min(1, (now - (phaseSeen.get(phaseKey()) ?? now)) / (T.botMs || 1));
+      else target = T.v ?? 0;
+    }
+    if (tv.id !== `${T.id}:${T.stage}`) tv = { id: `${T.id}:${T.stage}`, v: target };
+    tv.v += (target - tv.v) * Math.min(1, tv.dt * 10);
+    return tv.v;
+  }
+
+  // Wo die Figur bei der Aufgabe gerade ist: der Weg hängt am Fortschritt, nicht an der Zeit.
+  function taskPlan(now) {
+    const T = S.task;
+    const v = taskV(now);
+    const goal = T.goal || 10;
+    const u = Math.min(1, v / goal);
+    const home = H.HOME;
     const white = S.white ?? { x: 0, y: 7 };
-    const shuttle = (to, speed) => {
-      const d = Math.hypot(to.x - home.x, to.y - home.y);
-      const u = ((t * speed) / d) % 2;
-      const k = u < 1 ? u : 2 - u;
-      return { x: home.x + (to.x - home.x) * k, y: home.y + (to.y - home.y) * k, back: u >= 1 };
-    };
-    switch (kind) {
+    const lerp2 = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
+    const shuttle = (to, uu) => ({ ...lerp2(home, to, uu < 0.5 ? uu * 2 : 2 - uu * 2), back: uu >= 0.5 });
+    const run = { pose: "stand", run: true };
+    switch (H.TASKS[T.i].a) {
       case "chairs": {
-        const rx = (S.players.length - 1) / 2 + 1.2;
-        const a = (t * 2.6) / rx - Math.PI / 2;
-        return { x: Math.cos(a) * rx, y: H.CHAIR_Y + Math.sin(a) * 1.7, pose: "stand", run: true };
+        const rx = ((S.players.length - 1) / 2) * H.SEAT_GAP + 1.2;
+        const a = Math.PI / 2 + u * TAU;
+        return { x: Math.cos(a) * rx, y: H.CHAIR_Y + Math.sin(a) * 1.7, ...run };
       }
       case "hedge":
-        return { ...shuttle({ x: 0.5, y: H.FIELD.y1 - 0.4 }, 3), pose: "stand", run: true };
+        return { ...shuttle({ x: 0.5, y: H.FIELD.y1 - 0.4 }, u), ...run };
       case "white": {
-        const p = shuttle(white, 1.6);
-        return { ...p, pose: "stand", run: true, backwards: !p.back };
+        const p = shuttle(white, u);
+        return { ...p, ...run, backwards: !p.back };
       }
       case "spin":
-        if (t < 3) return { x: home.x, y: home.y, face: t * 10.5, pose: "stand", spin: true };
-        return { ...shuttle(white, 2.2), pose: "stand", run: true };
+        if (v < 5) return { ...home, face: v * TAU, pose: "stand", spin: true };
+        return { ...lerp2(home, white, Math.min(1, (v - 5) / Math.max(1, goal - 5))), ...run };
       case "hop":
-        return { ...shuttle({ x: white.x * 0.5, y: Math.min(5, white.y) }, 1.3), pose: "stand", run: true, hop: true };
+        return { ...shuttle({ x: 0, y: 7.8 }, u), ...run, hop: true };
       case "tree": {
-        const tr = { x: H.TREE.x + 1.1, y: H.TREE.y };
-        if (t < 5.5) return { ...shuttle(tr, 2.6), pose: "stand", run: true };
-        const a = (t - 5.5) * 2.4;
-        return { x: H.TREE.x + Math.cos(a) * 1.1, y: H.TREE.y + Math.sin(a) * 1.1, pose: "stand", run: true };
+        const side = { x: H.TREE.x + 1.1, y: H.TREE.y };
+        if (u < 0.39) return { ...lerp2(home, side, u / 0.39), ...run };
+        if (u < 0.61) {
+          const a = ((u - 0.39) / 0.22) * TAU;
+          return { x: H.TREE.x + Math.cos(a) * 1.1, y: H.TREE.y + Math.sin(a) * 1.1, ...run };
+        }
+        return { ...lerp2(side, home, (u - 0.61) / 0.39), ...run };
       }
       case "jacks":
-        return { ...home, face: 0, pose: "jacks" };
+        return { ...home, face: 0, pose: "jacks", c: 0.5 - 0.5 * Math.cos(v * TAU) };
       case "squat":
-        return { ...home, face: 0, pose: "squat" };
-      case "sing":
-        return { ...home, face: Math.PI * 0.85, pose: "cheer" };
+        return { ...home, face: 0, pose: "squat", c: mini ? Math.min(1, mini.hold) : T.stage === "run" && v < goal ? (Math.sin(now / 420) + 1) / 2 : 0 };
     }
     return { ...home, face: 0, pose: "stand" };
   }
@@ -1196,6 +1387,7 @@ window.Hodenritter3D = (() => {
   }
 
   function updatePeople(now, dt) {
+    tv.dt = dt;
     const seen = new Set();
     for (const name of S.players) {
       seen.add(name);
@@ -1232,16 +1424,19 @@ window.Hodenritter3D = (() => {
       const dx = goal.x - p.pos.x;
       const dy = goal.y - p.pos.y;
       const dist = Math.hypot(dx, dy);
-      const speed = plan.run ? 3.4 : p.mode === "seated" || backIn || goal === front ? 0.9 : 1.5;
-      const step = Math.min(dist, speed * dt);
-      const moving = dist > 0.02;
-      if (dist > 0.001) {
+      const maxSpeed = plan.run ? (S.phase === "task" ? 5.5 : 3.4) : p.mode === "seated" || backIn || goal === front ? 0.9 : 1.5;
+      // Weich anlaufen und vor dem Ziel abbremsen statt ruckartig loszulaufen und stehenzubleiben
+      const want = dist > 0.004 ? Math.min(maxSpeed, dist * (plan.run ? 3 : 4) + 0.15) : 0;
+      p.vel += (want - p.vel) * Math.min(1, dt * 7);
+      const step = Math.min(dist, p.vel * dt);
+      if (dist > 0.0005) {
         p.pos.x += (dx / dist) * step;
         p.pos.y += (dy / dist) * step;
       }
-      const walking = dist > 0.05 || (plan.run && dist > 0.005);
-      p.moveW += ((walking ? 1 : 0) - p.moveW) * Math.min(1, dt * 6);
-      p.walk += dt * (plan.run ? 11 : 7) * (walking ? 1 : 0);
+      const walking = p.vel > 0.12;
+      p.moveW += (Math.min(1, p.vel / 0.8) - p.moveW) * Math.min(1, dt * 8);
+      // Schrittlänge passt zum Tempo: die Füße rutschen nicht
+      p.walk += dt * p.vel * (plan.run ? 3.3 : 4.6);
       let face = plan.face ?? p.face;
       if (plan.spin) face = plan.face;
       else if (walking && !backIn && (dist > 0.1 || plan.run)) face = Math.atan2(dx, dy) + (plan.backwards ? Math.PI : 0);
@@ -1277,11 +1472,11 @@ window.Hodenritter3D = (() => {
         target.headX = 0.1 + c * 0.2;
       }
       if (poseName === "jacks") {
-        const c = (Math.sin(now / 230) + 1) / 2;
+        const c = plan.c ?? (Math.sin(now / 230) + 1) / 2;
         Object.assign(target, { lShZ: 0.15 + c * 2.7, rShZ: -0.15 - c * 2.7, lShX: 0, rShX: 0, lEl: -0.15, rEl: -0.15, lHipZ: 0.03 + c * 0.32, rHipZ: -0.03 - c * 0.32, hipY: 0.95 - c * 0.03 });
       }
       if (poseName === "squat") {
-        const c = (Math.sin(now / 420) + 1) / 2;
+        const c = plan.c ?? (Math.sin(now / 420) + 1) / 2;
         Object.assign(target, { hipY: 0.95 - c * 0.42, lHip: -c * 1.45, rHip: -c * 1.45, lKnee: c * 2.05, rKnee: c * 2.05, spine: c * 0.4, lShX: -c * 1.4, rShX: -c * 1.4, lEl: -0.2, rEl: -0.1, lShZ: 0.1, rShZ: -0.1 });
       }
       if (poseName === "cheerSit" || poseName === "cheer") {
@@ -1499,15 +1694,17 @@ window.Hodenritter3D = (() => {
         break;
       }
       case "stein": {
-        const geo = new THREE.DodecahedronGeometry(0.2, 1);
+        const geo = new THREE.SphereGeometry(0.2, 24, 16);
         const p = geo.attributes.position;
-        const r = seeded(11);
         for (let i = 0; i < p.count; i++) {
-          const k = 0.85 + r() * 0.25;
-          p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.65, p.getZ(i) * k);
+          const x = p.getX(i);
+          const y = p.getY(i);
+          const z = p.getZ(i);
+          const k = 1 + Math.sin(x * 14 + z * 9) * 0.07 + Math.sin(z * 17 - y * 8) * 0.05;
+          p.setXYZ(i, x * k, y * k * 0.65, z * k);
         }
         geo.computeVertexNormals();
-        add(geo, mat("#8a8a86", 0.9, { flatShading: true }), 0, 0.07, 0);
+        add(geo, mat("#9a9a94", 0.8), 0, 0.07, 0);
         break;
       }
       case "huegel": {
@@ -1620,7 +1817,7 @@ window.Hodenritter3D = (() => {
         return { pos: P(tx + 1.9, H.CHAIR_Y + 2.6, 1.45), look: P(tx + 0.1, H.CHAIR_Y + 0.4, 0.85), k: 2 };
       }
       case "task": {
-        const still = ["jacks", "squat", "sing"].includes(H.TASKS[S.task.i].a);
+        const still = ["jacks", "squat"].includes(H.TASKS[S.task.i].a);
         if (S.task.stage === "run" && !still) return { pos: P(0, -4.2, 4.6), look: P(0, 5.5, 0), k: 1.5 };
         return { pos: P(1.2, 3.6, 1.6), look: P(0, 0.4, 0.9), k: 1.8 };
       }
@@ -1634,7 +1831,7 @@ window.Hodenritter3D = (() => {
 
   // --- Zielen, Platzieren ---
 
-  let aimStart = null; // { x, y } Bildschirm
+  let aimStart = null; // { x, y, id } Bildschirm
   let aimPull = null; // { dx, dy, power, angle }
   let aimAngle = null;
   let pendingK = null;
@@ -1660,51 +1857,255 @@ window.Hodenritter3D = (() => {
     return !!aimPull && aimPull.power > 0.03;
   }
 
+  // Wie weit man ziehen kann: viel Weg = feine Kraft-Dosierung
   function maxPull() {
-    return Math.min(hud.clientHeight * 0.42, 280);
+    return Math.max(140, Math.min(hud.clientHeight * 0.62, 380));
   }
 
   function onDown(e) {
+    if (mini) return miniDown(e);
     if (canThrow()) {
-      hud.setPointerCapture(e.pointerId);
-      aimStart = { x: e.clientX, y: e.clientY };
+      aimStart = { x: e.clientX, y: e.clientY, id: e.pointerId };
       aimPull = { dx: 0, dy: 0, power: 0, angle: 0 };
     } else if (canPlace()) {
-      hud.setPointerCapture(e.pointerId);
       ghostAt = groundAt(e);
+      aimStart = null;
     }
   }
 
   function onMove(e) {
+    if (mini) return miniMove(e);
     if (aimStart) {
+      if (e.pointerId !== aimStart.id) return;
       const dx = e.clientX - aimStart.x;
       const dy = e.clientY - aimStart.y;
-      const len = Math.hypot(dx, Math.max(0, dy));
       const power = Math.min(1, Math.max(0, dy) / maxPull());
-      const angle = Math.max(-0.75, Math.min(0.75, Math.atan2(-dx, Math.max(30, dy)) * 0.8));
-      aimPull = { dx, dy, power, angle, len };
+      // Finger nach rechts = Wurf nach rechts
+      const angle = Math.max(-0.75, Math.min(0.75, Math.atan2(dx, Math.max(40, dy)) * 0.8));
+      aimPull = { dx, dy, power, angle };
       aimAngle = angle;
-    } else if (ghostAt && canPlace()) ghostAt = groundAt(e);
+    } else if (ghostAt && canPlace()) ghostAt = groundAt(e) ?? ghostAt;
   }
 
   function onUp(e) {
+    if (mini) return miniUp(e);
     if (aimStart) {
+      if (e.pointerId !== aimStart.id) return;
       const pull = aimPull;
       aimStart = null;
       aimPull = null;
       if (e.type === "pointerup" && pull && pull.power >= 0.06 && canThrow()) {
         pendingK = S.k;
+        lastPower.set(H.thrower(S), pull.power);
         run.send({ type: "throw", k: S.k, a: pull.angle, p: pull.power });
       }
       return;
     }
     if (ghostAt && canPlace()) {
-      const at = groundAt(e);
+      const at = G && e.type === "pointerup" ? groundAt(e) : null;
       ghostAt = null;
-      if (e.type === "pointerup" && at) {
+      if (at) {
         pendingK = S.k;
         run.send({ type: "place", k: S.k, kind: S.place.kind, x: at.x, y: at.y });
       }
+    }
+  }
+
+  // --- Aufgabe als Mini-Spiel (nur auf dem Handy, das die Aufgabe macht) ---
+  // run/beer: abwechselnd links und rechts tippen; spin: Kreise ziehen, dann rennen;
+  // hop: im richtigen Moment tippen; jacks: hoch und runter wischen; squat: halten und im grünen Feld loslassen.
+  let mini = null;
+  const HOP_PERIOD = 0.9;
+
+  function syncMini(now) {
+    const mine = S.phase === "task" && S.task.stage === "run" && canAct(S.task.who);
+    if (!mine) {
+      mini = null;
+      return;
+    }
+    const id = `${S.task.id}:${S.k}`;
+    if (mini?.id === id) return;
+    mini = { id, g: H.TASKS[S.task.i].g, goal: S.task.goal, secs: H.TASKS[S.task.i].s, t0: phaseSeen.get(phaseKey()) ?? now, v: 0, side: null, lastTap: 0, slosh: 0, acc: 0, ang: null, swipeY: null, up: false, holding: null, hold: 0, msg: "", msgAt: 0, msgGood: true, sentV: 0, sentAt: 0, done: false, pads: { L: 0, R: 0 } };
+  }
+
+  function say(text, good = true) {
+    mini.msg = text;
+    mini.msgAt = performance.now();
+    mini.msgGood = good;
+  }
+
+  function buzz(ms) {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {}
+  }
+
+  function stageXY(e) {
+    const r = hud.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
+  }
+
+  function tapRun(e, now) {
+    const { x, w } = stageXY(e);
+    const side = x < w / 2 ? "L" : "R";
+    mini.pads[side] = now;
+    if (side === mini.side) {
+      say("Stolper! Abwechselnd tippen", false);
+      buzz(60);
+      return;
+    }
+    if (mini.g === "beer" && mini.lastTap) {
+      const gap = now - mini.lastTap;
+      mini.slosh += gap < 160 ? 0.2 : gap < 240 ? 0.1 : 0.035;
+      if (mini.slosh >= 1) {
+        say("Übergeschwappt! 🍺", false);
+        buzz(200);
+        return finishMini(false);
+      }
+    }
+    mini.lastTap = now;
+    mini.side = side;
+    mini.v += 1;
+    buzz(8);
+  }
+
+  function miniDown(e) {
+    if (mini.done) return;
+    const now = performance.now();
+    const p = stageXY(e);
+    switch (mini.g) {
+      case "run":
+      case "beer":
+        return tapRun(e, now);
+      case "spin":
+        if (mini.v >= 5) return tapRun(e, now);
+        mini.ang = Math.atan2(p.y - p.h / 2, p.x - p.w / 2);
+        mini.spinId = e.pointerId;
+        return;
+      case "hop": {
+        const b = hopBall(now);
+        if (b < 0.2) {
+          mini.v += 1;
+          say(["Hopp!", "Super!", "Weiter so!"][Math.floor(mini.v) % 3]);
+          buzz(15);
+        } else {
+          mini.v = Math.max(0, mini.v - 1);
+          say("Daneben! Erst unten tippen", false);
+          buzz(80);
+        }
+        return;
+      }
+      case "jacks":
+        mini.swipeY = p.y;
+        mini.swipeId = e.pointerId;
+        return;
+      case "squat":
+        if (mini.holding == null) {
+          mini.holding = e.pointerId;
+          mini.holdAt = now;
+          mini.hold = 0;
+        }
+        return;
+    }
+  }
+
+  function miniMove(e) {
+    if (mini.done) return;
+    const p = stageXY(e);
+    if (mini.g === "spin" && mini.v < 5 && mini.ang != null && e.pointerId === mini.spinId) {
+      // nur Bewegung weiter weg von der Mitte zählt, sonst dreht ein Wackeln in der Mitte wild
+      if (Math.hypot(p.x - p.w / 2, p.y - p.h / 2) < 30) return;
+      const a = Math.atan2(p.y - p.h / 2, p.x - p.w / 2);
+      let d = a - mini.ang;
+      d = ((d + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      mini.ang = a;
+      mini.acc += d;
+      const turns = Math.min(5, Math.abs(mini.acc) / TAU);
+      if (Math.floor(turns) > Math.floor(mini.v)) {
+        say(turns >= 5 ? "Schwindelig? Jetzt rennen!" : `${Math.floor(turns)} von 5`);
+        buzz(20);
+      }
+      mini.v = turns;
+    }
+    if (mini.g === "jacks" && mini.swipeY != null && e.pointerId === mini.swipeId) {
+      const need = Math.min(70, p.h * 0.14);
+      if (!mini.up && mini.swipeY - p.y > need) {
+        mini.up = true;
+        mini.v += 0.5;
+        mini.swipeY = p.y;
+        buzz(8);
+      } else if (mini.up && p.y - mini.swipeY > need) {
+        mini.up = false;
+        mini.v += 0.5;
+        mini.swipeY = p.y;
+        say(`${Math.round(mini.v)}!`);
+        buzz(15);
+      }
+      // Richtung wechselt erst, wenn der Finger umkehrt: Startpunkt mitziehen
+      if (!mini.up) mini.swipeY = Math.max(mini.swipeY, p.y);
+      else mini.swipeY = Math.min(mini.swipeY, p.y);
+    }
+  }
+
+  function miniUp(e) {
+    if (mini.done) return;
+    if (mini.g === "spin" && e.pointerId === mini.spinId) mini.ang = null;
+    if (mini.g === "jacks" && e.pointerId === mini.swipeId) mini.swipeY = null;
+    if (mini.g === "squat" && e.pointerId === mini.holding) {
+      mini.holding = null;
+      mini.hold = (performance.now() - mini.holdAt) / 800;
+      if (mini.hold >= 0.8 && mini.hold <= 1.25) {
+        mini.v += 1;
+        say(`${Math.round(mini.v)}!`);
+        buzz(15);
+      } else if (mini.hold < 0.8) say("Tiefer runter!", false);
+    }
+  }
+
+  // Ball für das Hüpfen: 0 = unten (jetzt tippen), 1 = oben
+  function hopBall(now) {
+    return Math.abs(Math.sin(((now - mini.t0) / 1000 / HOP_PERIOD) * Math.PI));
+  }
+
+  function finishMini(ok) {
+    if (mini.done) return;
+    mini.done = true;
+    if (ok) say("Geschafft! 🏅");
+    pendingK = S.k;
+    const k = S.k;
+    const v = mini.v;
+    // kurz stehen lassen, damit man das Ergebnis sieht
+    setTimeout(() => {
+      if (S && S.k === k && S.phase === "task") run.send({ type: "taskres", k, ok, v });
+    }, ok ? 700 : 1100);
+  }
+
+  function miniTick(now, dt) {
+    syncMini(now);
+    if (!mini || mini.done) return;
+    const left = mini.secs - (now - mini.t0) / 1000;
+    if (mini.g === "beer") mini.slosh = Math.max(0, mini.slosh - dt * 0.5);
+    if (mini.g === "squat") {
+      if (mini.holding != null) {
+        mini.hold = (now - mini.holdAt) / 800;
+        if (mini.hold > 1.4) {
+          mini.holding = null;
+          mini.hold = 0;
+          say("Umgekippt! Früher loslassen", false);
+          buzz(120);
+        }
+      } else mini.hold = Math.max(0, mini.hold - dt * 2.5);
+    }
+    if (mini.v >= mini.goal) return finishMini(true);
+    if (left <= 0) {
+      say("Zeit um!", false);
+      return finishMini(false);
+    }
+    // Mehrere Handys: die anderen sehen den Fortschritt
+    if (run?.me && mini.v !== mini.sentV && now - mini.sentAt > 450) {
+      mini.sentV = mini.v;
+      mini.sentAt = now;
+      run.send({ type: "taskprog", k: S.k, v: Math.round(mini.v * 10) / 10 });
     }
   }
 
@@ -1788,6 +2189,166 @@ window.Hodenritter3D = (() => {
     return t.length > 12 ? `${t.slice(0, 11)}…` : t;
   }
 
+  function roundRect(x, y, w, h, r) {
+    hctx.beginPath();
+    if (hctx.roundRect) hctx.roundRect(x, y, w, Math.max(0, h), Math.min(r, Math.max(0, h) / 2, w / 2));
+    else hctx.rect(x, y, w, Math.max(0, h));
+  }
+
+  const lastPower = new Map();
+
+  // Mini-Spiel zeichnen: Fortschritt oben, Bedienfeld je nach Aufgabe
+  function drawMini(now) {
+    const { w, h } = G.size;
+    const m = mini;
+    const spinning = m.g === "spin" && m.v < 5;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 160);
+
+    // Fortschritt
+    const bx = 16;
+    const bw = w - 32;
+    const by = 64;
+    const u = spinning ? m.v / 5 : m.g === "spin" ? (m.v - 5) / (m.goal - 5) : m.v / m.goal;
+    hctx.fillStyle = "rgba(15,12,30,0.6)";
+    roundRect(bx, by, bw, 16, 8);
+    hctx.fill();
+    const gr = hctx.createLinearGradient(bx, 0, bx + bw, 0);
+    gr.addColorStop(0, "#facc15");
+    gr.addColorStop(1, "#22c55e");
+    hctx.fillStyle = gr;
+    roundRect(bx + 2, by + 2, (bw - 4) * Math.min(1, Math.max(0, u)), 12, 6);
+    hctx.fill();
+    const icon = { run: "🏃", beer: "🍺", spin: spinning ? "🌀" : "🏃", hop: "🦶", jacks: "🙆", squat: "🏋️" }[m.g];
+    const count = spinning ? `${Math.floor(m.v)} von 5 Drehungen` : m.g === "spin" ? `${Math.floor(m.v - 5)} / ${m.goal - 5}` : `${Math.floor(m.v)} / ${m.goal}`;
+    label(`${icon} ${count}`, w / 2, by + 42, { size: 14 });
+    hctx.font = "700 18px system-ui, sans-serif";
+    hctx.textAlign = "right";
+    hctx.textBaseline = "middle";
+    hctx.fillText("🏁", bx + bw + 4, by + 8);
+
+    const cx = w / 2;
+    const cy = h * 0.58;
+    hctx.textAlign = "center";
+    hctx.textBaseline = "middle";
+    if (m.g === "run" || m.g === "beer" || (m.g === "spin" && !spinning)) {
+      // Zwei große Felder: das nächste leuchtet
+      const ph = Math.min(h * 0.3, 190);
+      const py = h - ph - 12;
+      for (const side of ["L", "R"]) {
+        const x = side === "L" ? 12 : w / 2 + 6;
+        const pw = w / 2 - 18;
+        const next = m.side !== side;
+        const hit = now - m.pads[side] < 120;
+        hctx.fillStyle = hit ? "rgba(250,204,21,0.75)" : next ? `rgba(255,255,255,${0.16 + pulse * 0.16})` : "rgba(15,12,30,0.35)";
+        roundRect(x, py, pw, ph, 22);
+        hctx.fill();
+        hctx.strokeStyle = next ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.25)";
+        hctx.lineWidth = 2;
+        hctx.stroke();
+        hctx.fillStyle = "#fff";
+        hctx.font = "800 30px system-ui, sans-serif";
+        hctx.fillText(side === "L" ? "👣" : "👣", x + pw / 2, py + ph / 2 - 10);
+        hctx.font = "800 15px system-ui, sans-serif";
+        hctx.fillText(side === "L" ? "LINKS" : "RECHTS", x + pw / 2, py + ph / 2 + 24);
+      }
+      if (m.g === "beer") {
+        // Bierglas: schwappt mit, rot kurz vorm Überlaufen
+        const gx = w - 44;
+        const gy = 100;
+        const gw = 30;
+        const gh = 50;
+        const wob = Math.sin(now / 70) * m.slosh * 14;
+        hctx.save();
+        hctx.beginPath();
+        hctx.rect(gx - gw / 2, gy, gw, gh);
+        hctx.clip();
+        hctx.fillStyle = "#f59e0b";
+        hctx.beginPath();
+        const top = gy + gh * (0.3 - m.slosh * 0.25);
+        hctx.moveTo(gx - gw / 2, top + wob);
+        hctx.lineTo(gx + gw / 2, top - wob);
+        hctx.lineTo(gx + gw / 2, gy + gh);
+        hctx.lineTo(gx - gw / 2, gy + gh);
+        hctx.fill();
+        hctx.fillStyle = "#fffbeb";
+        hctx.fillRect(gx - gw / 2, top - Math.abs(wob) - 7, gw, 8);
+        hctx.restore();
+        hctx.strokeStyle = m.slosh > 0.65 ? "#ef4444" : "rgba(255,255,255,0.9)";
+        hctx.lineWidth = 3;
+        hctx.strokeRect(gx - gw / 2, gy, gw, gh);
+        if (m.slosh > 0.6) label("Ruhig!", gx, gy + gh + 22, { size: 12, bg: "rgba(185,28,28,0.9)" });
+      }
+    } else if (spinning) {
+      const r = Math.min(w, h) * 0.26;
+      hctx.strokeStyle = "rgba(255,255,255,0.45)";
+      hctx.lineWidth = 10;
+      hctx.beginPath();
+      hctx.arc(cx, h / 2, r, 0, TAU);
+      hctx.stroke();
+      hctx.strokeStyle = "#facc15";
+      hctx.beginPath();
+      hctx.arc(cx, h / 2, r, -Math.PI / 2, -Math.PI / 2 + (m.v % 1) * TAU * Math.sign(m.acc || 1), m.acc < 0);
+      hctx.stroke();
+      const a = now / 300;
+      hctx.fillStyle = "#fff";
+      hctx.beginPath();
+      hctx.arc(cx + Math.cos(a) * r, h / 2 + Math.sin(a) * r, 12, 0, TAU);
+      hctx.fill();
+      hctx.font = "800 15px system-ui, sans-serif";
+      hctx.fillText("Kreise ziehen", cx, h / 2);
+    } else if (m.g === "hop") {
+      const y0 = h * 0.32;
+      const y1 = h * 0.8;
+      hctx.fillStyle = "rgba(15,12,30,0.45)";
+      roundRect(cx - 26, y0 - 24, 52, y1 - y0 + 48, 26);
+      hctx.fill();
+      hctx.fillStyle = "rgba(34,197,94,0.75)";
+      roundRect(cx - 26, y1 - (y1 - y0) * 0.2 - 4, 52, (y1 - y0) * 0.2 + 28, 20);
+      hctx.fill();
+      const by2 = y1 - hopBall(now) * (y1 - y0);
+      hctx.fillStyle = "#fff";
+      hctx.beginPath();
+      hctx.arc(cx, by2, 18, 0, TAU);
+      hctx.fill();
+      hctx.font = "800 15px system-ui, sans-serif";
+      hctx.fillStyle = "#fff";
+      hctx.fillText("Tippen, wenn er unten ist!", cx, y0 - 40);
+    } else if (m.g === "jacks") {
+      const dy = (m.up ? 1 : -1) * (6 + pulse * 10);
+      hctx.font = "800 64px system-ui, sans-serif";
+      hctx.fillStyle = "#fff";
+      hctx.fillText(m.up ? "⬇️" : "⬆️", cx, cy + dy);
+      label(m.up ? "Jetzt runter wischen" : "Hoch wischen", cx, cy + 70, { size: 15 });
+    } else if (m.g === "squat") {
+      const y0 = h * 0.3;
+      const y1 = h * 0.82;
+      const sc = (v) => y0 + ((y1 - y0) * v) / 1.4;
+      hctx.fillStyle = "rgba(15,12,30,0.5)";
+      roundRect(cx - 22, y0, 44, y1 - y0, 14);
+      hctx.fill();
+      hctx.fillStyle = "rgba(34,197,94,0.8)";
+      hctx.fillRect(cx - 22, sc(0.8), 44, sc(1.25) - sc(0.8));
+      hctx.fillStyle = "rgba(239,68,68,0.8)";
+      hctx.fillRect(cx - 22, sc(1.25), 44, y1 - sc(1.25));
+      hctx.fillStyle = "#fff";
+      hctx.fillRect(cx - 30, sc(Math.min(1.4, m.hold)) - 3, 60, 6);
+      label(m.holding != null ? "…und im Grünen loslassen!" : "Finger drauf halten", cx, y0 - 14, { size: 14 });
+    }
+
+    // Kurze Meldung
+    const age = now - m.msgAt;
+    if (m.msg && age < 900) {
+      hctx.globalAlpha = 1 - age / 900;
+      hctx.font = `900 ${28 + (1 - age / 900) * 8}px system-ui, sans-serif`;
+      hctx.lineWidth = 6;
+      hctx.strokeStyle = "rgba(15,12,30,0.75)";
+      hctx.strokeText(m.msg, cx, h * 0.4 - age / 30);
+      hctx.fillStyle = m.msgGood ? "#bbf7d0" : "#fecaca";
+      hctx.fillText(m.msg, cx, h * 0.4 - age / 30);
+      hctx.globalAlpha = 1;
+    }
+  }
+
   function drawHud(now, balls) {
     const { w, h } = G.size;
     hctx.clearRect(0, 0, w, h);
@@ -1795,7 +2356,7 @@ window.Hodenritter3D = (() => {
     const t = phaseSeen.has(phaseKey()) ? (now - phaseSeen.get(phaseKey())) / 1000 : 0;
 
     // Namen über den Köpfen
-    const showNames = S.phase !== "result" && S.phase !== "place";
+    const showNames = S.phase !== "result" && S.phase !== "place" && !mini;
     if (showNames) {
       for (const [name, p] of G.people) {
         const head = p.root.position.clone();
@@ -1849,48 +2410,113 @@ window.Hodenritter3D = (() => {
       }
     }
 
-    // Zielhilfe: Richtung auf dem Rasen und Kraftbalken
+    // Zielhilfe: Richtung auf dem Rasen und Kraftbalken (ohne Meter: wie weit es geht, muss man selbst fühlen)
     if (aimPull && canThrow()) {
       const thr = H.thrower(S);
       const x0 = H.seatX(S, S.players.indexOf(thr));
       const a = aimPull.angle;
-      hctx.strokeStyle = "rgba(255,255,255,0.85)";
+      hctx.strokeStyle = "rgba(255,255,255,0.9)";
       hctx.lineWidth = 3;
       hctx.setLineDash([8, 8]);
+      hctx.lineDashOffset = -now / 40;
       hctx.beginPath();
       let first = true;
-      for (let d = 0.3; d <= 4; d += 0.3) {
+      let tip = null;
+      for (let d = 0.3; d <= 3.6; d += 0.3) {
         const s = project(P(x0 + Math.sin(a) * d, H.THROW_Y + Math.cos(a) * d, 0.01));
         if (!s) continue;
         if (first) hctx.moveTo(s.x, s.y);
         else hctx.lineTo(s.x, s.y);
         first = false;
+        tip = s;
       }
       hctx.stroke();
       hctx.setLineDash([]);
-      // Kraft
-      const bh = Math.min(h * 0.5, 220);
-      const bx = w - 26;
+      hctx.lineDashOffset = 0;
+      if (tip) {
+        const back = project(P(x0 + Math.sin(a) * 3.2, H.THROW_Y + Math.cos(a) * 3.2, 0.01));
+        if (back) {
+          const ang = Math.atan2(tip.y - back.y, tip.x - back.x);
+          hctx.fillStyle = "rgba(255,255,255,0.95)";
+          hctx.beginPath();
+          hctx.moveTo(tip.x + Math.cos(ang) * 10, tip.y + Math.sin(ang) * 10);
+          hctx.lineTo(tip.x + Math.cos(ang + 2.5) * 12, tip.y + Math.sin(ang + 2.5) * 12);
+          hctx.lineTo(tip.x + Math.cos(ang - 2.5) * 12, tip.y + Math.sin(ang - 2.5) * 12);
+          hctx.fill();
+        }
+      }
+      // Gummiband vom Startpunkt zum Finger
+      const r = hud.getBoundingClientRect();
+      const sx = aimStart.x - r.left;
+      const sy = aimStart.y - r.top;
+      hctx.strokeStyle = "rgba(255,255,255,0.5)";
+      hctx.lineWidth = 2;
+      hctx.beginPath();
+      hctx.arc(sx, sy, 9, 0, TAU);
+      hctx.moveTo(sx, sy);
+      hctx.lineTo(sx + aimPull.dx, sy + Math.max(0, aimPull.dy));
+      hctx.stroke();
+
+      // Kraftbalken: groß, mit Strichen und dem letzten eigenen Wurf als Vergleich
+      const bh = Math.min(h * 0.62, 300);
+      const bw = 22;
+      const bx = w - 30;
       const by = h / 2 + bh / 2;
-      hctx.fillStyle = "rgba(15,12,30,0.55)";
-      hctx.fillRect(bx - 9, by - bh - 4, 18, bh + 8);
+      hctx.fillStyle = "rgba(15,12,30,0.6)";
+      roundRect(bx - bw / 2 - 5, by - bh - 5, bw + 10, bh + 10, 10);
+      hctx.fill();
       const grad = hctx.createLinearGradient(0, by, 0, by - bh);
       grad.addColorStop(0, "#22c55e");
-      grad.addColorStop(0.6, "#facc15");
+      grad.addColorStop(0.55, "#facc15");
       grad.addColorStop(1, "#ef4444");
       hctx.fillStyle = grad;
-      hctx.fillRect(bx - 5, by - bh * aimPull.power, 10, bh * aimPull.power);
+      roundRect(bx - bw / 2, by - bh * aimPull.power, bw, bh * aimPull.power, 6);
+      hctx.fill();
+      hctx.strokeStyle = "rgba(255,255,255,0.35)";
+      hctx.lineWidth = 1;
+      for (let i = 1; i < 10; i++) {
+        hctx.beginPath();
+        hctx.moveTo(bx - bw / 2, by - (bh * i) / 10);
+        hctx.lineTo(bx - bw / 2 + (i % 5 ? 6 : bw), by - (bh * i) / 10);
+        hctx.stroke();
+      }
+      const lp = lastPower.get(thr);
+      if (lp) {
+        const ly = by - bh * lp;
+        hctx.strokeStyle = "#fff";
+        hctx.lineWidth = 2;
+        hctx.setLineDash([3, 3]);
+        hctx.beginPath();
+        hctx.moveTo(bx - bw / 2 - 8, ly);
+        hctx.lineTo(bx + bw / 2 + 2, ly);
+        hctx.stroke();
+        hctx.setLineDash([]);
+        hctx.fillStyle = "#fff";
+        hctx.font = "600 10px system-ui, sans-serif";
+        hctx.textAlign = "right";
+        hctx.textBaseline = "middle";
+        hctx.fillText("letzter", bx - bw / 2 - 10, ly);
+      }
+      // Pfeil an der aktuellen Kraft
+      const py = by - bh * aimPull.power;
       hctx.fillStyle = "#fff";
-      hctx.font = "700 12px system-ui, sans-serif";
+      hctx.beginPath();
+      hctx.moveTo(bx - bw / 2 - 2, py);
+      hctx.lineTo(bx - bw / 2 - 12, py - 7);
+      hctx.lineTo(bx - bw / 2 - 12, py + 7);
+      hctx.fill();
+      hctx.font = "800 13px system-ui, sans-serif";
       hctx.textAlign = "center";
-      hctx.fillText("Kraft", bx, by + 18);
-    } else if (canThrow() && !playing) {
+      hctx.textBaseline = "alphabetic";
+      hctx.fillText("Kraft", bx, by + 22);
+    } else if (canThrow() && !playing && !mini) {
       // Hinweis zum Werfen
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
       hctx.globalAlpha = pulse;
-      label("👆 nach unten ziehen und loslassen", w / 2, h - 14, { size: 13 });
+      label(w < 420 ? "👆 runterziehen, lenken, loslassen" : "👆 nach unten ziehen, zur Seite lenken, loslassen", w / 2, h - 14, { size: 13 });
       hctx.globalAlpha = 1;
     }
+    if (mini) drawMini(now);
 
     // Uhr beim Trinken und bei der Aufgabe
     let clock = null;
@@ -1928,7 +2554,8 @@ window.Hodenritter3D = (() => {
     raf = 0;
     if (!el || !el.isConnected || !S) return; // Spiel verlassen: Schleife ruht bis zum nächsten mount()
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - (lastNow || now)) / 1000);
+    const raw = (now - (lastNow || now)) / 1000;
+    const dt = Math.min(0.1, raw);
     lastNow = now;
     const w = el.clientWidth;
     const h = el.clientHeight;
@@ -1939,12 +2566,14 @@ window.Hodenritter3D = (() => {
       hud.height = Math.round(h * dpr);
     }
     hctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (!G) {
+    if (G && lost && now - lost > 2500) rebuild();
+    if (!G || lost) {
       hctx.clearRect(0, 0, w, h);
       hctx.fillStyle = "#fff";
       hctx.font = "600 15px system-ui, sans-serif";
       hctx.textAlign = "center";
-      hctx.fillText(failed ? "3D geht auf diesem Gerät leider nicht." : "Lädt…", w / 2, h / 2);
+      const msg = failed ? ["3D geht auf diesem Gerät leider nicht.", "Seite neu laden hilft manchmal."] : lost ? ["Grafik startet neu…"] : ["Lädt…"];
+      msg.forEach((m, i) => hctx.fillText(m, w / 2, h / 2 + i * 22));
       return;
     }
     const size = `${w}x${h}`;
@@ -1958,8 +2587,19 @@ window.Hodenritter3D = (() => {
     G.camera.updateProjectionMatrix();
     G.timeU.value = now / 1000;
 
+    // Zu langsam? Eine Stufe runter (erst nach dem Einschwingen, Hintergrund-Pausen zählen nicht)
+    if (raw > 0 && raw < 0.5 && now - G.born > 4000) {
+      G.perf.n++;
+      G.perf.t += raw;
+      if (G.perf.t > 3) {
+        if (G.perf.t / G.perf.n > 0.045 && Q > 0) setQuality(Q - 1);
+        G.perf = { n: 0, t: 0 };
+      }
+    }
+
     syncChairs();
     const balls = updateBalls(now);
+    miniTick(now, dt);
     updatePeople(now, dt);
     updateObstacles(now);
     updateGhost();
@@ -1968,10 +2608,16 @@ window.Hodenritter3D = (() => {
     if (!G.cam) {
       G.cam = tgt.pos.clone();
       G.look = tgt.look.clone();
+      G.camT = tgt.pos.clone();
+      G.lookT = tgt.look.clone();
     }
-    const k = 1 - Math.exp(-dt * (tgt.k ?? 2));
-    G.cam.lerp(tgt.pos, k);
-    G.look.lerp(tgt.look, k * 1.2);
+    // Zweistufig geglättet: die Kamera fährt weich an und bremst weich ab
+    const k = 1 - Math.exp(-dt * (tgt.k ?? 2) * 1.6);
+    G.camT.lerp(tgt.pos, k);
+    G.lookT.lerp(tgt.look, k * 1.2);
+    const k2 = 1 - Math.exp(-dt * (debugCam ? 50 : 6));
+    G.cam.lerp(G.camT, k2);
+    G.look.lerp(G.lookT, k2);
     G.camera.position.copy(G.cam);
     G.camera.lookAt(G.look);
 
@@ -1990,6 +2636,7 @@ window.Hodenritter3D = (() => {
         debugCam = pos ? { pos: P(...pos), look: P(...look) } : null;
       },
       people: () => G.people,
+      mini: () => mini && { ...mini },
       POSES,
     };
   }

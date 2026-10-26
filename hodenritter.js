@@ -38,21 +38,53 @@
     huegel: { label: "Maulwurfshügel", emoji: "🟤", r: 0.23 },
   };
 
-  // a = wie die Figur die Aufgabe in 3D macht
+  // a = wie die Figur die Aufgabe in 3D macht, g = Mini-Spiel am Handy (hodenritter-3d.js)
   const TASKS = [
-    { t: "Lauf einmal um alle Stühle herum.", s: 20, a: "chairs" },
-    { t: "Lauf bis zur Hecke, klatsch sie ab und komm zurück.", s: 20, a: "hedge" },
-    { t: "Hol die weiße Kugel, aber rückwärts laufend.", s: 25, a: "white" },
-    { t: "Dreh dich fünfmal im Kreis und lauf dann geradeaus zur weißen Kugel.", s: 25, a: "spin" },
-    { t: "Hüpf auf einem Bein bis zur nächsten Kugel und zurück.", s: 30, a: "hop" },
-    { t: "Zehn Hampelmänner und dabei laut mitzählen.", s: 15, a: "jacks" },
-    { t: "Schubkarre: Einer hält deine Beine, du läufst fünf Meter auf den Händen.", s: 30, a: "squat" },
-    { t: "Lauf einmal um den Apfelbaum und gib unterwegs jedem ein High Five.", s: 30, a: "tree" },
-    { t: "Sing den Refrain von einem Lied, das sich die anderen aussuchen.", s: 30, a: "sing" },
-    { t: "Zehn Kniebeugen und dabei das Alphabet rückwärts von Z bis P.", s: 30, a: "squat" },
-    { t: "Ein Purzelbaum auf dem Rasen.", s: 15, a: "squat" },
-    { t: "Lauf zur Hecke und zurück, ohne dass dein Bier überschwappt.", s: 25, a: "hedge" },
+    { t: "Lauf einmal um alle Stühle herum.", s: 15, a: "chairs", g: "run" },
+    { t: "Lauf bis zur Hecke, klatsch sie ab und komm zurück.", s: 20, a: "hedge", g: "run" },
+    { t: "Hol die weiße Kugel, aber rückwärts laufend.", s: 25, a: "white", g: "run" },
+    { t: "Dreh dich fünfmal im Kreis und lauf dann zur weißen Kugel.", s: 25, a: "spin", g: "spin" },
+    { t: "Hüpf auf einem Bein zur Rasenmitte und zurück.", s: 25, a: "hop", g: "hop" },
+    { t: "Zehn Hampelmänner.", s: 15, a: "jacks", g: "jacks" },
+    { t: "Zehn Kniebeugen, jedes Mal ganz runter.", s: 25, a: "squat", g: "squat" },
+    { t: "Lauf einmal um den Apfelbaum und zurück.", s: 30, a: "tree", g: "run" },
+    { t: "Lauf zur Hecke und zurück, ohne dass dein Bier überschwappt.", s: 30, a: "hedge", g: "beer" },
   ];
+  const HOW = {
+    run: "Tippe abwechselnd links und rechts, so schnell du kannst.",
+    beer: "Tippe abwechselnd links und rechts, aber nicht zu hektisch, sonst schwappt das Bier über.",
+    spin: "Zieh mit dem Finger fünf Kreise, dann tippe abwechselnd links und rechts.",
+    hop: "Tippe genau dann, wenn der Ball unten im grünen Feld ist.",
+    jacks: "Wisch hoch und wieder runter: das ist ein Hampelmann.",
+    squat: "Finger halten, bis der Balken im grünen Feld ist, dann loslassen.",
+  };
+  const HOME = { x: 0, y: 0.7 }; // hier startet die Aufgabe
+  const STEP = 0.5; // Meter pro Tipper
+
+  // Ziel der Aufgabe in Schritten (Tipper, Drehungen, Hampelmänner …), für alle Handys gleich
+  function taskGoal(s, i) {
+    const w = s.white ?? { x: 0, y: 7 };
+    const to = (p) => Math.hypot(p.x - HOME.x, p.y - HOME.y);
+    switch (TASKS[i].a) {
+      case "chairs": {
+        const rx = ((s.players.length - 1) / 2) * SEAT_GAP + 1.2;
+        const ry = 1.7;
+        return Math.round((Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)))) / STEP);
+      }
+      case "hedge":
+        return Math.round((2 * (FIELD.y1 - 0.4 - HOME.y)) / STEP);
+      case "white":
+        return Math.max(16, Math.round((2 * to(w)) / 0.35));
+      case "spin":
+        return 5 + Math.max(6, Math.round(to(w) / STEP));
+      case "hop":
+        return 14;
+      case "tree":
+        return Math.round((2 * Math.hypot(TREE.x + 1.1 - HOME.x, TREE.y - HOME.y) + 2 * Math.PI * 1.1) / STEP);
+    }
+    return 10;
+  }
+
 
   // --- Hilfen ---
   const rid = () => Math.random().toString(36).slice(2, 9);
@@ -340,10 +372,12 @@
     while (i === s.lastTask && TASKS.length > 1);
     s.lastTask = i;
     const who = s.result.far;
-    s.task = { who, i, stage: "ready", id: rid() };
+    s.task = { who, i, stage: "ready", id: rid(), goal: taskGoal(s, i), v: 0 };
     if (isBot(who)) {
+      // Bots schaffen es in 65 % der Fälle, sonst kommen sie nur ein Stück weit
       s.task.botOk = Math.random() < 0.65;
-      s.task.botMs = Math.round(TASKS[i].s * 1000 * (0.35 + Math.random() * 0.3));
+      s.task.botMs = s.task.botOk ? Math.round(TASKS[i].s * 1000 * (0.45 + Math.random() * 0.4)) : TASKS[i].s * 1000;
+      s.task.botFrac = s.task.botOk ? 1 : 0.45 + Math.random() * 0.45;
     }
     s.phase = "task";
     s.k++;
@@ -465,8 +499,14 @@
         s.task.stage = "run";
         s.k++;
         return;
+      case "taskprog":
+        // Fortschritt vom Handy, das die Aufgabe macht (ohne k++, damit es nicht mit taskres kollidiert)
+        if (a.k !== s.k || s.phase !== "task" || s.task.stage !== "run") return;
+        s.task.v = clamp(Number(a.v) || 0, 0, s.task.goal);
+        return;
       case "taskres":
         if (a.k !== s.k || s.phase !== "task" || s.task.stage !== "run") return;
+        s.task.v = a.ok ? s.task.goal : clamp(Number(a.v ?? s.task.v) || 0, 0, s.task.goal);
         if (a.ok) {
           notice(s, { emoji: "🏅", title: "Geschafft!", text: `${s.task.who} darf sich jetzt verbeugen.` });
           return startBow(s);
@@ -554,7 +594,8 @@
         return { key: `d${s.drink.id}`, id: open.n, wait: open.bot, act: () => ({ type: "empty", id: s.drink.id, who: open.n }) };
       }
       case "task":
-        if (!isBot(s.task.who)) return null;
+        // Fällt das Handy mit der Aufgabe aus, endet sie nach Ablauf der Zeit von selbst
+        if (!isBot(s.task.who)) return s.task.stage === "run" ? { key: `k${s.k}`, wait: (TASKS[s.task.i].s + 10) * 1000, act: () => ({ type: "taskres", k: s.k, ok: false }) } : null;
         if (s.task.stage === "ready") return { key: `k${s.k}`, wait: 3000, act: () => ({ type: "taskgo", k: s.k }) };
         return { key: `k${s.k}`, wait: s.task.botMs, act: () => ({ type: "taskres", k: s.k, ok: s.task.botOk }) };
       case "bow": {
@@ -612,7 +653,7 @@
         v.title = you(h) ? "Du wirfst die weiße Kugel!" : `${nm(h)} wirft die weiße Kugel`;
         if (!isBot(h)) {
           v.turn = h;
-          if (!me || you(h)) hint = "Finger aufs Bild, nach unten ziehen, loslassen.";
+          if (!me || you(h)) hint = "Finger aufs Bild, nach unten ziehen (Kraft), zur Seite lenken, loslassen.";
         }
         break;
       }
@@ -652,19 +693,14 @@
         const task = TASKS[t.i];
         v.phase = "Aufgabe";
         v.title = `${you(t.who) ? "Deine Aufgabe" : `Aufgabe für ${nm(t.who)}`}: ${escapeHtml(task.t)}`;
+        const mine = !isBot(t.who) && (!me || you(t.who));
         if (t.stage === "ready") {
-          hint = `Zeit: ${task.s} Sekunden. Oder denkt euch selbst was aus.`;
+          hint = `Ziel in ${task.s} Sekunden schaffen, sonst noch ${beerText(s, 1)}.${mine ? ` ${HOW[task.g]}` : ""}`;
           if (!isBot(t.who)) {
-            v.actions.push({ label: "Los! ⏱", act: { type: "taskgo", k: s.k } });
-            v.actions.push({ label: "Andere Aufgabe", ghost: true, act: { type: "tasknew", k: s.k } });
+            v.actions.push({ label: "Los! ⏱", by: t.who, act: { type: "taskgo", k: s.k } });
+            v.actions.push({ label: "Andere Aufgabe", ghost: true, by: t.who, act: { type: "tasknew", k: s.k } });
           }
-        } else {
-          hint = `Nicht geschafft: noch ${beerText(s, 1)}.`;
-          if (!isBot(t.who)) {
-            v.actions.push({ label: "Geschafft ✓", act: { type: "taskres", k: s.k, ok: true } });
-            v.actions.push({ label: "Nicht geschafft ✗", ghost: true, act: { type: "taskres", k: s.k, ok: false } });
-          }
-        }
+        } else hint = mine ? HOW[task.g] : `${escapeHtml(t.who)} gibt alles. Nicht geschafft: noch ${beerText(s, 1)}.`;
         break;
       }
       case "bow": {
@@ -760,16 +796,16 @@
 
   registerGame("hodenritter", {
     label: "Hodenritter",
-    emoji: "⚪",
-    description: "Boule im Garten. Wer am weitesten weg liegt, trinkt und muss sich vor allen verbeugen.",
-    color: "#16a34a",
+    emoji: "🛡️",
+    description: "Boule im Garten. Der Weiteste trinkt und verbeugt sich.",
+    color: "#0d9488",
     privateAlerts: true,
     rules: [
       "Alle sitzen in einer Reihe auf Gartenstühlen vor dem Rasen, jeder hat eine Kugel. Wer die weiße Kugel hat, wirft sie zuerst auf den Rasen.",
       "Dann wirft der rechte Nachbar so nah wie möglich an die weiße Kugel, ohne sie zu berühren, danach der nächste. Wer die weiße Kugel geworfen hat, wirft als Letztes.",
-      "Werfen: Finger aufs Bild, nach unten ziehen (je weiter, desto fester) und loslassen. Zur Seite ziehen lenkt.",
+      "Werfen: Finger aufs Bild und nach unten ziehen, je weiter, desto fester. Nach rechts ziehen wirft nach rechts, nach links nach links. Loslassen wirft.",
       "Wer am weitesten weg liegt und wer die weiße Kugel berührt hat, steht auf, geht ein paar Meter weg und trinkt ein halbes Bier, höchstens 1 Minute.",
-      "Der Weiteste macht danach eine Aufgabe (die App schlägt eine vor, ihr dürft euch auch selbst was ausdenken). Nicht geschafft: noch ein halbes.",
+      "Der Weiteste macht danach eine Aufgabe als Mini-Spiel am Handy: tippen, wischen oder im richtigen Moment loslassen. Nicht in der Zeit geschafft: noch ein halbes.",
       "Dann verbeugt sich jeder, der aufgestanden ist, vor jedem, der noch sitzt, angefangen beim rechten Nachbarn. Leere Stühle werden übersprungen.",
       "Lehnt jemand ab, trinken beide ein halbes und die Verbeugungsrunde fängt von vorne an. Wer jemanden ablehnt, der schon abgelehnt wurde, trinkt mehr: 1 Bier, beim dritten Mal anderthalb und so weiter.",
       "Wer am nächsten an der weißen Kugel liegt (ohne sie zu berühren), bekommt sie für die nächste Runde und darf ein Hindernis auf den Rasen legen.",
@@ -781,5 +817,5 @@
   });
 
   // Für hodenritter-3d.js und Tests
-  window.Hodenritter = { SEAT_GAP, CHAIR_Y, THROW_Y, RANGE, B_R, W_R, FIELD, TREE, KINDS, TASKS, DRINK_SECS, seatX, thrower, bowTargets, beerOf, act, setup };
+  window.Hodenritter = { HOME, STEP, taskGoal, SEAT_GAP, CHAIR_Y, THROW_Y, RANGE, B_R, W_R, FIELD, TREE, KINDS, TASKS, DRINK_SECS, seatX, thrower, bowTargets, beerOf, act, setup };
 })();

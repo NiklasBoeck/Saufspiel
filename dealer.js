@@ -377,7 +377,7 @@
   registerGame("dealer", {
     label: "F*ck den Dealer",
     emoji: "🎴",
-    description: "Errate die oberste Karte, sonst trinkst du. Der Dealer trinkt, wenn du triffst.",
+    description: "Errate die Karte oder trink. Triffst du, trinkt der Dealer.",
     color: "#dc2626",
     fit: true,
     privateAlerts: true,
