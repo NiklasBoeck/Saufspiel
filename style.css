@@ -945,12 +945,34 @@ html[data-game="hodenritter"] .bf-body { position: relative; justify-content: st
 .bf-actions.hr-kinds { grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .hr-kinds .btn { padding: 6px 2px; font-size: 1.4rem; line-height: 1.1; }
 .hr-kinds .btn small { display: block; font-size: 0.62rem; font-weight: 600; margin-top: 2px; }
-html.fit[data-game="hodenritter"] .bf-title { font-size: clamp(1rem, 2.4dvh, 1.3rem); }
-html.fit[data-game="hodenritter"] .hr-hint { font-size: clamp(0.75rem, 1.8dvh, 0.9rem); }
-html.fit[data-game="hodenritter"] .hr-kinds .btn { padding: clamp(2px, 0.8dvh, 8px) 2px; font-size: clamp(1rem, 2.6dvh, 1.4rem); }
+/* Vollbild: das 3D-Bild liegt hinter allem. Oben schweben klein Runde, Titel und Namen,
+   unten Hinweis und Knöpfe. Nur die Knöpfe fangen Finger ab, sonst geht alles ans Spielfeld. */
+html[data-game="hodenritter"] .hr-view { position: fixed; inset: 0; z-index: 0; min-height: 0; border-radius: 0; box-shadow: none; pointer-events: auto; }
+html[data-game="hodenritter"] .game-bar { position: fixed; z-index: 3; top: calc(6px + env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); pointer-events: none; }
+html[data-game="hodenritter"] .game-bar > * { pointer-events: auto; }
+html[data-game="hodenritter"] .game-bar .btn { min-width: 38px; height: 38px; padding: 0 10px; border-radius: 999px; background: rgb(15 12 30 / 0.5); color: #fff; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+html[data-game="hodenritter"] .game-title { visibility: hidden; }
+html[data-game="hodenritter"] .conn { position: fixed; z-index: 3; bottom: calc(4px + env(safe-area-inset-bottom)); left: 0; right: 0; margin: 0; font-size: 0.7rem; pointer-events: none; text-shadow: 0 1px 2px rgb(0 0 0 / 0.8); }
+html[data-game="hodenritter"] .bf {
+  position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; gap: 4px; pointer-events: none;
+  padding: calc(8px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+html[data-game="hodenritter"] .bf::before { content: ""; position: absolute; inset: 0 0 auto; height: calc(96px + env(safe-area-inset-top)); background: linear-gradient(rgb(15 12 30 / 0.55), transparent); pointer-events: none; }
+html[data-game="hodenritter"] .bf > * { position: relative; margin: 0; }
+html[data-game="hodenritter"] .bf > :not(.bf-body), html[data-game="hodenritter"] .bf-body > :not(.hr-view) { z-index: 1; }
+html[data-game="hodenritter"] .bf-phase, html[data-game="hodenritter"] .bf-title, html[data-game="hodenritter"] .your-turn { padding: 0 48px; text-align: center; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.75); }
+html[data-game="hodenritter"] .bf-phase { font-size: 0.68rem; opacity: 0.9; line-height: 1.3; }
+html[data-game="hodenritter"] .bf-title { font-size: clamp(0.9rem, 2.2vmin, 1.1rem); line-height: 1.25; }
+html[data-game="hodenritter"] .your-turn { font-size: 0.75rem; }
+html[data-game="hodenritter"] .bf > .bf-body { height: auto; grid-row: auto; }
+html[data-game="hodenritter"] .bf-body { flex: 1; display: flex; flex-direction: column; gap: 6px; overflow: visible; min-height: 0; }
+html[data-game="hodenritter"] .hr-chips { position: relative; inset: auto; justify-content: center; }
+html[data-game="hodenritter"] .hr-hint { margin-top: auto; align-self: center; max-width: 620px; padding: 5px 12px; border-radius: 12px; background: rgb(15 12 30 / 0.55); color: #fff; font-size: 0.8rem; text-align: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+html.fit[data-game="hodenritter"] .bf > .bf-actions, html[data-game="hodenritter"] .bf > .bf-actions { pointer-events: auto; width: 100%; max-width: 620px; align-self: center; margin: 0; }
+html[data-game="hodenritter"] .bf-actions .wait { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.75); }
+html[data-game="hodenritter"] .hr-kinds .btn { padding: 4px 2px; font-size: 1.25rem; }
 @media (min-aspect-ratio: 6 / 5) {
-  html.fit[data-game="hodenritter"] .bf { grid-template-columns: minmax(0, 2.2fr) minmax(200px, 1fr); }
-  html.fit[data-game="hodenritter"] .bf-body { overflow: hidden; }
-  html.fit[data-game="hodenritter"] .hr-kinds .btn { font-size: clamp(0.95rem, 4dvh, 1.3rem); }
+  html.fit[data-game="hodenritter"] .bf > .bf-actions { max-width: 760px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  html.fit[data-game="hodenritter"] .bf > .bf-actions.hr-kinds { grid-template-columns: repeat(8, 1fr); }
 }
 html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-top: 2px; font-size: 0.72rem; font-weight: 600; opacity: 0.85; }

@@ -349,7 +349,7 @@
       next,
       why,
       kind,
-      list: list.map(({ n, u, sit }) => ({ n, u, sit: !!sit, done: false, bot: isBot(n) ? Math.round(7000 + Math.random() * 16000) : 0 })),
+      list: list.map(({ n, u, sit, why: w }) => ({ n, u, sit: !!sit, why: w ?? why, done: false, bot: isBot(n) ? Math.round(7000 + Math.random() * 16000) : 0 })),
     };
     list.forEach(({ n, u }) => (s.tally[n] = (s.tally[n] ?? 0) + u));
     drink(
@@ -477,7 +477,7 @@
         // Der Weiteste zuerst, dann die anderen in Sitzreihenfolge
         s.standing.sort((x, y) => (x === far ? -1 : y === far ? 1 : 0));
         const why = (p) => (p === far && s.touched.includes(p) ? "am weitesten weg und rote Kugel berührt" : p === far ? "am weitesten weg" : "rote Kugel berührt");
-        startDrink(s, s.standing.map((n) => ({ n, u: 1, why: `${why(n)}: aufstehen, 2 m vor die Reihe, max. 1 Minute` })), "task", "", "stand");
+        startDrink(s, s.standing.map((n) => ({ n, u: 1, why: why(n) })), "task", "", "stand");
         return;
       }
       case "empty": {
@@ -656,7 +656,6 @@
         v.title = you(h) ? "Du wirfst die rote Kugel!" : `${nm(h)} wirft die rote Kugel`;
         if (!isBot(h)) {
           v.turn = h;
-          if (!me || you(h)) hint = "Finger aufs Bild, nach unten ziehen (Kraft), zur Seite lenken, loslassen.";
         }
         break;
       }
@@ -666,7 +665,6 @@
         v.title = you(t) ? "So nah wie möglich an die rote Kugel!" : `${nm(t)} wirft`;
         if (!isBot(t)) {
           v.turn = t;
-          if (!me || you(t)) hint = "Ziehen und loslassen. Die rote Kugel nicht berühren!";
         }
         break;
       }
@@ -684,7 +682,12 @@
         const names = open.map((d) => (you(d.n) ? "Du" : nm(d.n)));
         v.phase = { stand: "Aufstehen und trinken", task: "Aufgabe nicht geschafft", refuse: "Abgelehnt" }[s.drink.kind];
         v.title = `${names.join(" und ")} ${names.length > 1 ? "trinken" : names[0] === "Du" ? "trinkst" : "trinkt"}`;
-        hint = s.drink.kind === "stand" ? "Aufstehen, 2 Meter vor die Reihe stellen und in max. 1 Minute austrinken." : `${escapeHtml(s.drink.why)}. ${s.drink.kind === "refuse" ? "Beide stehen 2 Meter vor der Reihe und trinken im Stehen. " : ""}Max. 1 Minute.`;
+        // nur warum und wie viel
+        {
+          const whys = [...new Set(open.map((d) => d.why ?? s.drink.why))];
+          const amounts = open.map((d) => `${escapeHtml(d.n)}: ${beerText(s, d.u)}`);
+          hint = whys.length === 1 ? `${escapeHtml(whys[0])}. ${amounts.join(" · ")}` : open.map((d) => `${escapeHtml(d.n)}: ${beerText(s, d.u)}, ${escapeHtml(d.why ?? s.drink.why)}`).join(" · ");
+        }
         for (const d of open) {
           if (isBot(d.n)) continue;
           v.actions.push({ label: you(d.n) ? `${drinkEmoji(s)} Leer!` : `${escapeHtml(d.n)}: leer ✓`, sub: you(d.n) || !me ? beerText(s, d.u) : "", by: d.n, act: { type: "empty", id: s.drink.id, who: d.n } });
@@ -741,7 +744,8 @@
         break;
       }
     }
-    v.body = `<div class="hr-view"><div class="hr-mount"></div>${chipsHtml(s)}</div>${hint ? `<p class="hr-hint">${hint}</p>` : ""}`;
+    // Vollbild: das 3D-Bild liegt hinter allem, Infos schweben oben, Hinweis und Knöpfe unten (style.css)
+    v.body = `<div class="hr-view"><div class="hr-mount"></div></div>${chipsHtml(s)}${hint ? `<p class="hr-hint">${hint}</p>` : ""}`;
     return v;
   }
 
@@ -806,7 +810,7 @@
     rules: [
       "Alle sitzen in einer Reihe auf Gartenstühlen vor dem Rasen, jeder hat eine Kugel. Wer die rote Kugel hat, wirft sie zuerst auf den Rasen.",
       "Dann wirft der rechte Nachbar so nah wie möglich an die rote Kugel, ohne sie zu berühren, danach der nächste. Wer die rote Kugel geworfen hat, wirft als Letztes.",
-      "Werfen: Finger aufs Bild und nach unten ziehen, je weiter, desto fester. Nach rechts ziehen wirft nach rechts, nach links nach links. Loslassen wirft.",
+      "Werfen: Finger aufs Bild und nach unten ziehen, je weiter, desto fester. Zur Seite ziehen lenkt wie bei einer Steinschleuder: nach rechts ziehen wirft nach links. Loslassen wirft.",
       "Wer am weitesten weg liegt und wer die rote Kugel berührt hat, steht auf, stellt sich 2 Meter vor die Reihe und trinkt ein halbes Bier, höchstens 1 Minute.",
       "Der Weiteste macht danach eine Aufgabe als Mini-Spiel am Handy: tippen, wischen oder im richtigen Moment loslassen. Nicht in der Zeit geschafft: noch ein halbes.",
       "Dann verbeugt sich jeder, der aufgestanden ist, vor jedem, der noch sitzt, angefangen beim rechten Nachbarn. Leere Stühle werden übersprungen, und wer zusammen getrunken hat, verbeugt sich nicht voreinander.",

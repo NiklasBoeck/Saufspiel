@@ -1005,7 +1005,7 @@ window.Hodenritter3D = (() => {
 
   // --- Menschen ---
 
-  const SKINS = ["#f3d2bd", "#eac0a2", "#e0ac86", "#c98e66", "#a86f4c", "#7c4f34", "#5a3825", "#f6dccb"];
+  const SKINS = ["#f1c3a1", "#e8b08a", "#dc9a70", "#c4825a", "#a26745", "#7f4f34", "#5f3b27", "#f4cbad"];
   const HAIRS = ["#1d1611", "#3b2717", "#5c3b22", "#7a5230", "#a87444", "#d0a868", "#e7cf9c", "#8a3b1c", "#9a9a9a", "#2b2b2b"];
   const SHIRTS = ["#e8e8e8", "#1f2937", "#b91c1c", "#1d4ed8", "#15803d", "#f59e0b", "#7c3aed", "#db2777", "#0e7490", "#f97316", "#64748b", "#fde68a", "#a3e635", "#38bdf8"];
   const IRIS = ["#4b3621", "#2f6fa3", "#3d7a4d", "#6b4e2e", "#7a8c99"];
@@ -1087,10 +1087,10 @@ window.Hodenritter3D = (() => {
     const hairM = mat(L.hair, 0.75);
     const shoeM = mat(L.shoes, 0.55);
     const soleM = mat("#f1f1f1", 0.6);
-    const lipM = mat(new THREE.Color(L.skin).lerp(new THREE.Color("#a3473f"), 0.45).getStyle(), 0.5);
+    const lipM = mat(new THREE.Color(L.skin).lerp(new THREE.Color("#7a2230"), 0.6).getStyle(), 0.5);
     const eyeM = mat("#f8f8f5", 0.25);
     const irisM = mat(L.iris, 0.3);
-    const pupilM = mat("#0b0b0b", 0.2);
+    const pupilM = mat("#0b0b0b", 0.15);
 
     const root = new THREE.Group();
     const hips = new THREE.Group();
@@ -1123,24 +1123,28 @@ window.Hodenritter3D = (() => {
     neck.add(head);
     addTo(head, mesh(sphere(0.1, 32, 24), skin, 0, 0.1, 0)).scale.set(0.9, 1.08, 1.0);
     addTo(head, mesh(sphere(0.08, 24, 16), skin, 0, 0.045, 0.02)).scale.set(0.92, 0.8, 1.0);
-    const nose = mesh(capsule(0.0115, 0.03, 10), skin, 0, 0.088, 0.096);
-    nose.rotation.x = 0.4;
-    head.add(nose);
+    // Freundliches Comic-Gesicht: große Augen mit Glanzpunkt, kräftige Brauen, Lächeln, rote Wangen
+    addTo(head, mesh(sphere(0.016, 14, 10), skin, 0, 0.085, 0.097)).scale.set(0.9, 0.85, 0.9);
+    const shine = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const blush = new THREE.MeshBasicMaterial({ color: new THREE.Color(L.skin).lerp(new THREE.Color("#ff6b7a"), 0.45), transparent: true, opacity: 0.45, depthWrite: false });
     for (const s of [-1, 1]) {
       addTo(head, mesh(sphere(0.026, 12, 10), skin, s * 0.09, 0.095, -0.005)).scale.set(0.45, 1, 0.75);
-      head.add(mesh(sphere(0.016, 14, 10), eyeM, s * 0.035, 0.112, 0.08, false));
-      head.add(mesh(sphere(0.0088, 12, 8), irisM, s * 0.035, 0.112, 0.0905, false));
-      head.add(mesh(sphere(0.0045, 8, 6), pupilM, s * 0.035, 0.112, 0.0985, false));
-      const lid = mesh(new THREE.SphereGeometry(0.0172, 14, 8, 0, TAU, 0, Math.PI * 0.4), skin, s * 0.035, 0.112, 0.08, false);
-      lid.rotation.x = 0.55;
-      head.add(lid);
-      const brow = mesh(new THREE.BoxGeometry(0.034, 0.0065, 0.012), hairM, s * 0.035, 0.135, 0.091, false);
-      brow.rotation.z = -s * 0.12;
+      addTo(head, mesh(sphere(0.019, 16, 12), eyeM, s * 0.036, 0.113, 0.083, false)).scale.set(0.95, 1.2, 0.62);
+      addTo(head, mesh(sphere(0.0118, 14, 10), irisM, s * 0.035, 0.111, 0.0915, false)).scale.set(1, 1.12, 0.5);
+      addTo(head, mesh(sphere(0.0064, 10, 8), pupilM, s * 0.035, 0.111, 0.0955, false)).scale.set(1, 1.1, 0.5);
+      head.add(mesh(sphere(0.0032, 8, 6), shine, s * 0.035 + 0.004, 0.117, 0.0985, false));
+      const brow = mesh(capsule(0.0045, 0.026, 8), hairM, s * 0.036, 0.139, 0.093, false);
+      brow.rotation.z = Math.PI / 2 - s * 0.18;
       head.add(brow);
+      const cheek = mesh(new THREE.CircleGeometry(0.014, 16), blush, s * 0.056, 0.07, 0.087, false);
+      cheek.rotation.y = s * 0.55;
+      head.add(cheek);
     }
-    const lips = mesh(capsule(0.0065, 0.024, 8), lipM, 0, 0.05, 0.093, false);
-    lips.rotation.z = Math.PI / 2;
-    head.add(lips);
+    // Lächeln als Bogen
+    const smile = mesh(new THREE.TorusGeometry(0.019, 0.0042, 8, 20, Math.PI * 0.8), lipM, 0, 0.062, 0.096, false);
+    smile.rotation.z = Math.PI + Math.PI * 0.1;
+    smile.rotation.x = -0.25;
+    head.add(smile);
     addHair(head, L, hairM);
     if (L.beard) {
       const beard = mesh(new THREE.SphereGeometry(0.084, 24, 12, 0, TAU, Math.PI * 0.45, Math.PI * 0.55), hairM, 0, 0.065, 0.012);
@@ -2024,7 +2028,7 @@ window.Hodenritter3D = (() => {
     if (mini) return miniDown(e);
     if (canThrow()) {
       aimStart = { x: e.clientX, y: e.clientY, id: e.pointerId };
-      aimPull = { dx: 0, dy: 0, power: 0, angle: 0 };
+      aimPull = { dx: 0, dy: 0, power: 0, angle: aimAngle ?? 0, tp: 0, ta: aimAngle ?? 0 };
     } else if (canPlace()) {
       ghostAt = groundAt(e);
       aimStart = null;
@@ -2037,11 +2041,12 @@ window.Hodenritter3D = (() => {
       if (e.pointerId !== aimStart.id) return;
       const dx = e.clientX - aimStart.x;
       const dy = e.clientY - aimStart.y;
-      const power = Math.min(1, Math.max(0, dy) / maxPull());
-      // Finger nach rechts = Wurf nach rechts
-      const angle = Math.max(-0.75, Math.min(0.75, Math.atan2(dx, Math.max(40, dy)) * 0.8));
-      aimPull = { dx, dy, power, angle };
-      aimAngle = angle;
+      const tp = Math.min(1, Math.max(0, dy) / maxPull());
+      // Wie eine Steinschleuder (Lenas Wunsch): Finger nach rechts = Wurf nach links. Etwas weniger empfindlich als 1:1.
+      const ta = Math.max(-0.75, Math.min(0.75, Math.atan2(-dx, Math.max(70, dy)) * 0.7));
+      if (Math.floor(tp * 10) !== Math.floor(aimPull.tp * 10)) buzz(4); // fühlbare Stufen beim Ziehen
+      // Angezeigt wird weich nachgeführt (frame), geworfen wird mit dem, was der Finger sagt
+      Object.assign(aimPull, { dx, dy, tp, ta });
     } else if (ghostAt && canPlace()) ghostAt = groundAt(e) ?? ghostAt;
   }
 
@@ -2052,10 +2057,11 @@ window.Hodenritter3D = (() => {
       const pull = aimPull;
       aimStart = null;
       aimPull = null;
-      if (e.type === "pointerup" && pull && pull.power >= 0.06 && canThrow()) {
+      if (e.type === "pointerup" && pull && pull.tp >= 0.06 && canThrow()) {
         pendingK = S.k;
-        lastPower.set(H.thrower(S), pull.power);
-        run.send({ type: "throw", k: S.k, a: pull.angle, p: pull.power });
+        aimAngle = pull.ta;
+        lastPower.set(H.thrower(S), pull.tp);
+        run.send({ type: "throw", k: S.k, a: pull.ta, p: pull.tp });
       }
       return;
     }
@@ -2356,8 +2362,21 @@ window.Hodenritter3D = (() => {
   const lastPower = new Map();
 
   // Mini-Spiel zeichnen: Fortschritt oben, Bedienfeld je nach Aufgabe
+  // Freier Bereich des Spielfelds zwischen den Infos oben und Hinweis/Knöpfen unten (Vollbild)
+  function insets(now) {
+    if (G.ins && now - G.ins.at < 300) return G.ins;
+    const r = hud.getBoundingClientRect();
+    const box = (sel) => [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).filter((b) => b.height > 0);
+    const top = Math.max(0, ...box("#game-root .bf-phase, #game-root .bf-title, #game-root .hr-chips, #game-root .your-turn").map((b) => b.bottom - r.top));
+    const bottom = Math.min(r.height, ...box("#game-root .hr-hint, #game-root .bf-actions").map((b) => b.top - r.top));
+    G.ins = { top: Math.min(top, r.height * 0.4), bottom: Math.max(bottom, r.height * 0.55), at: now };
+    return G.ins;
+  }
+
   function drawMini(now) {
-    const { w, h } = G.size;
+    const { w } = G.size;
+    const { top: T, bottom: B } = insets(now);
+    const hh = B - T;
     const m = mini;
     const spinning = m.g === "spin" && m.v < 5;
     const pulse = 0.5 + 0.5 * Math.sin(now / 160);
@@ -2365,7 +2384,7 @@ window.Hodenritter3D = (() => {
     // Fortschritt
     const bx = 16;
     const bw = w - 32;
-    const by = 64;
+    const by = T + 8;
     const u = spinning ? m.v / 5 : m.g === "spin" ? (m.v - 5) / (m.goal - 5) : m.v / m.goal;
     hctx.fillStyle = "rgba(15,12,30,0.6)";
     roundRect(bx, by, bw, 16, 8);
@@ -2385,13 +2404,13 @@ window.Hodenritter3D = (() => {
     hctx.fillText("🏁", bx + bw + 4, by + 8);
 
     const cx = w / 2;
-    const cy = h * 0.58;
+    const cy = T + hh * 0.58;
     hctx.textAlign = "center";
     hctx.textBaseline = "middle";
     if (m.g === "run" || m.g === "beer" || (m.g === "spin" && !spinning)) {
       // Zwei große Felder: das nächste leuchtet
-      const ph = Math.min(h * 0.3, 190);
-      const py = h - ph - 12;
+      const ph = Math.min(hh * 0.3, 190);
+      const py = B - ph - 8;
       for (const side of ["L", "R"]) {
         const x = side === "L" ? 12 : w / 2 + 6;
         const pw = w / 2 - 18;
@@ -2412,7 +2431,7 @@ window.Hodenritter3D = (() => {
       if (m.g === "beer") {
         // Bierglas: schwappt mit, rot kurz vorm Überlaufen
         const gx = w - 44;
-        const gy = 100;
+        const gy = T + 56;
         const gw = 30;
         const gh = 50;
         const wob = Math.sin(now / 70) * m.slosh * 14;
@@ -2437,26 +2456,27 @@ window.Hodenritter3D = (() => {
         if (m.slosh > 0.6) label("Ruhig!", gx, gy + gh + 22, { size: 12, bg: "rgba(185,28,28,0.9)" });
       }
     } else if (spinning) {
-      const r = Math.min(w, h) * 0.26;
+      const r = Math.min(w, hh) * 0.26;
+      const h2 = T + hh / 2;
       hctx.strokeStyle = "rgba(255,255,255,0.45)";
       hctx.lineWidth = 10;
       hctx.beginPath();
-      hctx.arc(cx, h / 2, r, 0, TAU);
+      hctx.arc(cx, h2, r, 0, TAU);
       hctx.stroke();
       hctx.strokeStyle = "#facc15";
       hctx.beginPath();
-      hctx.arc(cx, h / 2, r, -Math.PI / 2, -Math.PI / 2 + (m.v % 1) * TAU * Math.sign(m.acc || 1), m.acc < 0);
+      hctx.arc(cx, h2, r, -Math.PI / 2, -Math.PI / 2 + (m.v % 1) * TAU * Math.sign(m.acc || 1), m.acc < 0);
       hctx.stroke();
       const a = now / 300;
       hctx.fillStyle = "#fff";
       hctx.beginPath();
-      hctx.arc(cx + Math.cos(a) * r, h / 2 + Math.sin(a) * r, 12, 0, TAU);
+      hctx.arc(cx + Math.cos(a) * r, h2 + Math.sin(a) * r, 12, 0, TAU);
       hctx.fill();
       hctx.font = "800 15px system-ui, sans-serif";
-      hctx.fillText("Kreise ziehen", cx, h / 2);
+      hctx.fillText("Kreise ziehen", cx, h2);
     } else if (m.g === "hop") {
-      const y0 = h * 0.32;
-      const y1 = h * 0.8;
+      const y0 = T + hh * 0.3;
+      const y1 = T + hh * 0.8;
       hctx.fillStyle = "rgba(15,12,30,0.45)";
       roundRect(cx - 26, y0 - 24, 52, y1 - y0 + 48, 26);
       hctx.fill();
@@ -2478,8 +2498,8 @@ window.Hodenritter3D = (() => {
       hctx.fillText(m.up ? "⬇️" : "⬆️", cx, cy + dy);
       label(m.up ? "Jetzt runter wischen" : "Hoch wischen", cx, cy + 70, { size: 15 });
     } else if (m.g === "squat") {
-      const y0 = h * 0.3;
-      const y1 = h * 0.82;
+      const y0 = T + hh * 0.25;
+      const y1 = T + hh * 0.82;
       const sc = (v) => y0 + ((y1 - y0) * v) / 1.4;
       hctx.fillStyle = "rgba(15,12,30,0.5)";
       roundRect(cx - 22, y0, 44, y1 - y0, 14);
@@ -2500,9 +2520,9 @@ window.Hodenritter3D = (() => {
       hctx.font = `900 ${28 + (1 - age / 900) * 8}px system-ui, sans-serif`;
       hctx.lineWidth = 6;
       hctx.strokeStyle = "rgba(15,12,30,0.75)";
-      hctx.strokeText(m.msg, cx, h * 0.4 - age / 30);
+      hctx.strokeText(m.msg, cx, T + hh * 0.35 - age / 30);
       hctx.fillStyle = m.msgGood ? "#bbf7d0" : "#fecaca";
-      hctx.fillText(m.msg, cx, h * 0.4 - age / 30);
+      hctx.fillText(m.msg, cx, T + hh * 0.35 - age / 30);
       hctx.globalAlpha = 1;
     }
   }
@@ -2616,10 +2636,11 @@ window.Hodenritter3D = (() => {
       hctx.stroke();
 
       // Kraftbalken: groß, mit Strichen und dem letzten eigenen Wurf als Vergleich
-      const bh = Math.min(h * 0.62, 300);
+      const { top: T, bottom: B } = insets(now);
+      const bh = Math.min((B - T) * 0.7, 300);
       const bw = 22;
       const bx = w - 30;
-      const by = h / 2 + bh / 2;
+      const by = (T + B) / 2 + bh / 2;
       hctx.fillStyle = "rgba(15,12,30,0.6)";
       roundRect(bx - bw / 2 - 5, by - bh - 5, bw + 10, bh + 10, 10);
       hctx.fill();
@@ -2671,7 +2692,7 @@ window.Hodenritter3D = (() => {
       // Hinweis zum Werfen
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
       hctx.globalAlpha = pulse;
-      label(w < 420 ? "👆 runterziehen, lenken, loslassen" : "👆 nach unten ziehen, zur Seite lenken, loslassen", w / 2, h - 14, { size: 13 });
+      label(w < 420 ? "👆 runterziehen, lenken, loslassen" : "👆 nach unten ziehen, zur Seite lenken, loslassen", w / 2, insets(now).bottom - 8, { size: 13 });
       hctx.globalAlpha = 1;
     }
     if (mini) drawMini(now);
@@ -2693,12 +2714,12 @@ window.Hodenritter3D = (() => {
       const left = H.TASKS[S.task.i].s - t;
       clock = left > 0 ? `⏱ ${fmtClock(left)}` : "⏱ Zeit um!";
     }
-    if (clock) label(clock, mini ? w / 2 : w - 52, mini ? 44 : 74, { size: 20, bg: clock.includes("um") ? "rgba(185,28,28,0.9)" : "rgba(15,12,30,0.7)" });
+    if (clock) label(clock, w - 52, insets(now).top + (mini ? 70 : 34), { size: 20, bg: clock.includes("um") ? "rgba(185,28,28,0.9)" : "rgba(15,12,30,0.7)" });
 
     if (S.phase === "place" && canPlace() && !ghostAt) {
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
       hctx.globalAlpha = pulse;
-      label("👆 auf den Rasen tippen", w / 2, h - 14, { size: 13 });
+      label("👆 auf den Rasen tippen", w / 2, insets(now).bottom - 8, { size: 13 });
       hctx.globalAlpha = 1;
     }
   }
@@ -2755,6 +2776,13 @@ window.Hodenritter3D = (() => {
       }
     }
 
+    if (aimPull) {
+      // Zielen weich nachführen: kein Zittern, keine Sprünge
+      const k = 1 - Math.exp(-dt * 16);
+      aimPull.power += (aimPull.tp - aimPull.power) * k;
+      aimPull.angle += (aimPull.ta - aimPull.angle) * k;
+      aimAngle = aimPull.angle;
+    }
     syncChairs();
     const balls = updateBalls(now);
     miniTick(now, dt);
