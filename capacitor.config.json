@@ -1,0 +1,9 @@
+{
+  "appId": "de.saufomat.app",
+  "appName": "Saufomat",
+  "webDir": "www",
+  "backgroundColor": "#1b1033",
+  "ios": {
+    "contentInset": "never"
+  }
+}

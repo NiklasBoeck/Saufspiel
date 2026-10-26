@@ -235,12 +235,12 @@
   function endView(s) {
     const ranking = [...s.players].sort((a, b) => s.tally[b] - s.tally[a]);
     const rows = ranking
-      .map((p, i) => `<li><span>${i === 0 ? "👑 " : ""}${name(p)}</span><b>${sips(s.tally[p])}</b></li>`)
+      .map((p) => `<li><span>${name(p)}</span><b>${sips(s.tally[p])}</b></li>`)
       .join("");
     return {
       phase: "",
       title: "Alle Karten gespielt! 🎉",
-      body: `${boardHtml(s)}${top(`<p class="bf-text fd-center">Wer hat am meisten getrunken?</p><ul class="fd-tally">${rows}</ul>`)}`,
+      body: `${boardHtml(s)}${top(`<p class="bf-text fd-center">Schlucke in dieser Runde</p><ul class="fd-tally">${rows}</ul>`)}`,
       actions: [
         { label: "Nochmal spielen", act: { type: "restart" } },
         { label: "Zum Menü", exit: true, ghost: true },
@@ -253,13 +253,13 @@
   function resolve(s, kind, who, n, guesses) {
     const card = s.deck.pop();
     s.played.push(card);
-    s.tally[who] += n;
+    s.tally[who] += LEVELS[levelOf(s)].scale(n); // so viele, wie die Trink-Meldung sagt
     s.result = { id: Math.random().toString(36).slice(2), kind, who, n, card, guesses };
     const items = [{ who, n, text: kind === "miss" ? "fürs Danebenraten" : `als Dealer, ${label(card.value)} wurde erraten` }];
     if (playedCount(s, card.value) === 4) {
       // Alle 4 Karten eines Werts liegen: Die Karten werden umgedreht und alle trinken einen.
       s.result.completed = card.value;
-      for (const p of s.players) s.tally[p] += 1;
+      for (const p of s.players) s.tally[p] += LEVELS[levelOf(s)].scale(1);
       items.push({ who: ALL, n: 1, text: `Alle ${{ 11: "Buben", 12: "Damen", 13: "Könige", 14: "Asse" }[card.value] || card.value + "er"} sind durch!` });
     }
 
@@ -381,6 +381,13 @@
     color: "#dc2626",
     fit: true,
     privateAlerts: true,
+    rules: [
+      "Einer ist Dealer und hält den Stapel (die App), alle anderen raten reihum die oberste Karte (2 bis Ass, Ass zählt 14).",
+      "Erster Tipp richtig: Der Dealer trinkt so viele Schlucke, wie die Karte wert ist. Daneben: Der Dealer sagt „höher“ oder „niedriger“.",
+      "Zweiter Tipp richtig: Der Dealer trinkt den Abstand zwischen deinen beiden Tipps. Wieder daneben: Du trinkst den Abstand zwischen deinem Tipp und der Karte.",
+      "Sind alle 4 Karten eines Werts weg, trinken alle einen Schluck.",
+      "Liegt der Tisch dreimal hintereinander falsch, wechselt der Dealer zur nächsten Person.",
+    ],
 
     setup(players) {
       const dealer = Math.floor(Math.random() * players.length);

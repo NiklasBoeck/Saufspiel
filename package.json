@@ -1,0 +1,22 @@
+{
+  "name": "saufomat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Saufomat: Partyspiel-App. Die Web-App läuft ohne Build, das hier ist nur für die Store-Apps (Capacitor).",
+  "scripts": {
+    "www": "node scripts/copy-www.mjs",
+    "sync": "npm run www && cap sync",
+    "icons": "capacitor-assets generate --ios --android --iconBackgroundColor '#1b1033' --splashBackgroundColor '#1b1033'",
+    "ios": "npm run sync && cap open ios",
+    "android": "npm run sync && cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3"
+  }
+}

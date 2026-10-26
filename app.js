@@ -84,12 +84,78 @@ function openGame(key) {
   showScreen("mode");
 }
 
+// --- Einstellungen ---
+
+function renderSettingsBtn() {
+  $("settings-btn").textContent = `${LEVELS[Settings.level].emoji} ⚙️`;
+  $("settings-btn").title = `Stufe: ${LEVELS[Settings.level].label}`;
+}
+
+function renderLevels() {
+  const list = $("level-list");
+  list.innerHTML = "";
+  for (const [key, l] of Object.entries(LEVELS)) {
+    const tile = document.createElement("button");
+    tile.className = `mode-tile level-tile ${key === Settings.level ? "picked" : ""}`;
+    tile.setAttribute("aria-pressed", key === Settings.level);
+    tile.innerHTML = `
+      <span class="mode-emoji">${l.emoji}</span>
+      <span class="game-info">
+        <span class="game-name">${escapeHtml(l.label)}</span>
+        <span class="game-desc">${escapeHtml(l.desc)}</span>
+      </span>`;
+    tile.onclick = () => {
+      Settings.level = key;
+      renderLevels();
+      renderSettingsBtn();
+    };
+    list.appendChild(tile);
+  }
+}
+
+$("settings-btn").onclick = () => {
+  renderLevels();
+  showScreen("settings");
+};
+$("settings-back").onclick = () => showScreen("menu");
+
+// --- Spielregeln: „?“ oben rechts in jedem Spiel ---
+
+function showRules() {
+  const game = GAMES[currentGame];
+  $("rules-title").textContent = `So geht ${game.label}`;
+  $("rules-list").replaceChildren(
+    ...(game.rules ?? []).map((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      return li;
+    })
+  );
+  $("rules").hidden = false;
+  $("rules-ok").focus();
+}
+$("rules-ok").onclick = () => ($("rules").hidden = true);
+$("rules").onclick = (e) => e.target === $("rules") && ($("rules").hidden = true);
+
+document.querySelectorAll(".screen:not(#screen-settings) .game-bar").forEach((bar) => {
+  const btn = document.createElement("button");
+  btn.className = "btn ghost small rules-btn";
+  btn.textContent = "?";
+  btn.setAttribute("aria-label", "Spielregeln");
+  btn.onclick = showRules;
+  bar.appendChild(btn);
+});
+
 $("mode-back").onclick = () => showScreen("menu");
 $("mode-one").onclick = () => {
   renderPlayers();
   showScreen("players");
 };
-$("mode-multi").onclick = () => Room.open(currentGame);
+$("mode-multi").onclick = () => {
+  // Ohne Internet geht nur ein Handy, die Räume laufen über einen Server.
+  if (!navigator.onLine) return showToast({ notice: { emoji: "📵", title: "Kein Internet.", text: "Ohne Netz geht nur „Ein Handy“." } });
+  Room.open(currentGame);
+};
 
 // --- Spieler (ein Handy) ---
 
@@ -141,7 +207,7 @@ $("start-btn").onclick = () => {
   const key = currentGame;
   const local = {
     key,
-    s: GAMES[key].setup([...state.players]),
+    s: newGame(key, [...state.players]),
     me: null,
     send(action) {
       local.s = applyAction(key, local.s, action, null);
@@ -160,7 +226,7 @@ $("start-btn").onclick = () => {
 // Eine Aktion auf den Spielstand anwenden. Beim Mehr-Handy-Spiel macht das nur der Host.
 function applyAction(key, s, action, by) {
   const game = GAMES[key];
-  if (action.type === "restart") return game.setup(s.players);
+  if (action.type === "restart") return newGame(key, s.players, s.level);
   s.alert = null;
   game.act(s, action, by);
   return s;
@@ -174,6 +240,7 @@ function canPress(a) {
 
 function playGame(r) {
   run = r;
+  playLevel = r.s.level ?? null; // Stufe kommt vom Host, damit alle dasselbe sehen
   setGame(r.key);
   // fit: Spiel passt immer genau auf den Bildschirm, nichts scrollt.
   document.documentElement.classList.toggle("fit", GAMES[r.key].fit !== false);
@@ -291,7 +358,7 @@ function checkAlert(s) {
   if (run.me && GAMES[run.key].privateAlerts && !alert.items.some((it) => it.who === run.me || it.who === ALL)) {
     return showToast(alert);
   }
-  showDrinkAlert(alert.items);
+  showDrinkAlert(alert.items, LEVELS[alert.level] ? alert.level : "normal");
 }
 
 let toastTimer = null;
@@ -299,7 +366,7 @@ function showToast(alert) {
   const n = alert.notice;
   const text = n
     ? `${n.emoji ?? ""} ${n.title} ${n.text ?? ""}`
-    : "🍺 " + alert.items.map((it) => `${it.who === ALL ? "Alle" : it.who} ${it.give ? "verteilt" : it.who === ALL ? "trinken" : "trinkt"}${it.n ? ` ${sips(it.n)}` : ""}`).join(", ");
+    : `${alert.level === "alkoholfrei" ? "🥤" : "🍺"} ` + alert.items.map((it) => `${it.who === ALL ? "Alle" : it.who} ${it.give ? "verteilt" : it.who === ALL ? "trinken" : "trinkt"}${it.n ? ` ${sips(it.n)}` : ""}`).join(", ");
   const el = $("toast");
   el.textContent = text.trim();
   el.hidden = false;
@@ -310,7 +377,7 @@ function showToast(alert) {
   toastTimer = setTimeout(() => (el.hidden = true), 4500);
 }
 
-function showDrinkAlert(items) {
+function showDrinkAlert(items, level) {
   $("toast").hidden = true;
   const me = run.me;
   const mine = (it) => !!me && (it.who === me || it.who === ALL);
@@ -319,8 +386,9 @@ function showDrinkAlert(items) {
   const meGives = items.some((it) => it.give && mine(it));
 
   // Beim Trinken stoßen zwei Biergläser an, danach erscheint die Zahl der Schlucke.
+  const glass = level === "alkoholfrei" ? "🥤" : "🍺";
   if (drinks) {
-    $("da-emoji").innerHTML = `<span class="cheers"><i><b>🍺</b></i><i>🍺</i><s>✨</s></span>`;
+    $("da-emoji").innerHTML = `<span class="cheers"><i><b>${glass}</b></i><i>${glass}</i><s>✨</s></span>`;
   } else {
     $("da-emoji").textContent = "🫵";
   }
@@ -350,7 +418,10 @@ function showDrinkAlert(items) {
       return li;
     })
   );
-  $("da-ok").textContent = "Prost! 🍻";
+  // Bei einer anderen Stufe als Normal steht klein dabei, was gilt.
+  $("da-level").textContent = level === "normal" ? "" : `${LEVELS[level].emoji} ${LEVELS[level].label}${level === "alkoholfrei" ? ": Limo, Wasser, was ihr wollt" : ""}`;
+  $("da-level").hidden = level === "normal";
+  $("da-ok").textContent = level === "alkoholfrei" ? "Prost! 🥤" : "Prost! 🍻";
   $("drink-alert").hidden = false;
   $("da-ok").focus();
   vibrate(meDrinks || !me ? [300, 100, 300] : 120);
@@ -392,4 +463,5 @@ window.addEventListener("resize", onScreenSize);
 screen.orientation?.addEventListener?.("change", onScreenSize);
 
 renderGames();
+renderSettingsBtn();
 Room.boot();

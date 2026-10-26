@@ -226,7 +226,7 @@ const Room = (() => {
       case "start":
         if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length < MIN_PLAYERS) return;
         S.phase = "play";
-        S.g = GAMES[S.game].setup(S.players.map((x) => x.name));
+        S.g = newGame(S.game, S.players.map((x) => x.name));
         S.gseq++;
         break;
       case "play":

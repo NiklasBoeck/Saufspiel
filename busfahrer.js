@@ -278,6 +278,12 @@
     emoji: "🚌",
     description: "Raten, Pyramide, und wer verliert, fährt Bus.",
     color: "#16a34a",
+    rules: [
+      "Fragerunde: Reihum bekommt jeder 4 Karten. Vor jeder Karte rätst du: Rot oder Schwarz, höher oder tiefer als die erste, zwischen deinen ersten beiden oder außerhalb, und welche Farbe.",
+      "Richtig geraten: Du verteilst so viele Schlucke, wie die Frage zählt (1 bis 4). Falsch: Du trinkst sie selbst. Gleiche Werte zählen als falsch.",
+      "Pyramide: 10 Karten werden nacheinander aufgedeckt. Wer den gleichen Wert auf der Hand hat, legt ihn ab und verteilt Schlucke, unten 1 pro Karte, ganz oben 4.",
+      "Busfahrt: Wer am Ende die meisten Karten übrig hat, fährt Bus. 5 Karten in einer Reihe, immer höher oder tiefer raten. Bei einem Fehler trinkst du so viele Schlucke, wie du schon geschafft hast, und fängst von vorne an.",
+    ],
 
     setup(players) {
       const s = { players, deck: newDeck(), hands: {}, round: 0, turn: 0, stage: "ask" };

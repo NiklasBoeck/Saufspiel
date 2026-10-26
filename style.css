@@ -863,3 +863,68 @@ html.fit .disclaimer { font-size: clamp(0.65rem, 1.6dvh, 0.8rem); }
   html.fit[data-game="dealer"] .fd-table.has-banner { padding-top: 32px; }
   html.fit[data-game="dealer"] .fd-banner { top: 4px; font-size: 0.95rem; }
 }
+
+/* --- Einstellungen, Regeln, Info-Seite --- */
+#screen-menu { position: relative; }
+.settings-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 999px;
+  background: rgb(42 27 77 / 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.level-list { display: flex; flex-direction: column; gap: 10px; }
+.level-tile.picked { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary), 0 10px 30px -12px rgb(0 0 0 / 0.6); }
+.hint.small-text { font-size: 0.8rem; }
+.info-link { text-align: center; text-decoration: none; font-size: 0.95rem; margin-top: auto; }
+.bar-spacer { width: 52px; }
+.rules-btn { width: 52px; font-weight: 800; }
+
+.rules-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgb(10 5 25 / 0.82);
+  animation: da-fade 0.15s ease-out;
+}
+.rules-sheet[hidden] { display: none; }
+.rules-box {
+  width: 100%;
+  max-width: 440px;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 20px;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
+}
+.rules-box h2 { margin: 0; font-size: 1.4rem; }
+#rules-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; line-height: 1.45; color: var(--muted); }
+.da-level { margin: -4px 0 0; font-size: 0.85rem; font-weight: 700; opacity: 0.8; }
+
+.info-page { display: flex; flex-direction: column; gap: 18px; line-height: 1.55; }
+.info-page h2 { margin: 0 0 8px; font-size: 1.4rem; }
+.info-page h3 { margin: 16px 0 4px; font-size: 1.05rem; }
+.info-page p, .info-page li { color: var(--muted); }
+.info-page p { margin: 0 0 8px; }
+.info-page ul { margin: 0; padding-left: 20px; }
+.info-page a { color: var(--primary); }
+.info-page section { scroll-margin-top: 16px; }
+.info-nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.info-nav a { padding: 8px 14px; border-radius: 999px; background: var(--surface); color: var(--text); text-decoration: none; font-size: 0.9rem; }
+.info-date { font-size: 0.8rem; }
+#app.info-page { max-width: 640px; }
+.info-page .game-bar a { text-decoration: none; color: var(--text); }

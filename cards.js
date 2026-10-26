@@ -105,6 +105,11 @@ registerCardGame("niewieder", {
   label: "Ich hab noch nie",
   emoji: "🙊",
   description: "Wer’s schon mal gemacht hat, trinkt.",
+  rules: [
+    "Die App zeigt einen Satz, der mit „Ich hab noch nie …“ anfängt.",
+    "Wer das schon mal gemacht hat, trinkt einen Schluck. Ehrlich sein!",
+    "Wer will, erzählt die Geschichte dazu. Dann die nächste Karte.",
+  ],
   color: "#7c3aed",
   note: "Wer’s schon mal gemacht hat, trinkt!",
   botChance: 0.4,
@@ -247,6 +252,11 @@ registerCardGame("pflicht", {
   label: "Pflicht",
   emoji: "🎯",
   description: "Aufgabe erfüllen oder trinken.",
+  rules: [
+    "Die App zieht eine Aufgabe für eine zufällige Person.",
+    "Schaffst du sie, ist alles gut. Wenn nicht, trinkst du, was unter der Karte steht.",
+    "Niemand muss etwas machen, was er nicht will. Dann eben trinken oder die Karte überspringen.",
+  ],
   color: "#db2777",
   cards: [
     { text: "{p}, erzähl einen Witz.", drink: "Wenn keiner lacht, trinkt {p} 2 Schlucke.", fail: 2 },

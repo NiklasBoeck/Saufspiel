@@ -107,6 +107,14 @@
     emoji: "🃏",
     description: "Reihum Karten ziehen, jede Karte hat ihre Aufgabe.",
     color: "#ea580c",
+    rules: [
+      "Gespielt wird mit 32 Karten (7 bis Ass). Reihum zieht jeder eine Karte, jede Karte hat ihre Aufgabe.",
+      "Ass: Wasserfall. Alle setzen an, wer gezogen hat, fängt an. Du darfst erst aufhören, wenn die Person vor dir aufgehört hat.",
+      "König: 10 Schlucke verteilen. 9: 9 Schlucke verteilen.",
+      "Dame: Neue Regel, die ab jetzt für alle gilt. Bube: Busfahrt, höher oder tiefer raten bis zum Ende der Reihe.",
+      "10: Kategorie. Reihum nennt jeder etwas dazu, wer nichts mehr weiß oder etwas doppelt sagt, trinkt.",
+      "8: Klokarte. Nur wer eine Klokarte hat, darf aufs Klo. 7: Zählen und bei jeder 7er-Zahl „Plopp“ sagen, wer sich vertut, trinkt.",
+    ],
 
     setup(players) {
       return { players, deck: newDeck(), turn: 0, stage: "turn" };

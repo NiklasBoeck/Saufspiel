@@ -24,7 +24,10 @@ python3 -m http.server 8000
 - `room.js`: Jeder sein Handy, Raum mit Code und QR-Code, Sync über MQTT wie bei Flunky Ball
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
 - `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4, three.js r159)
-- `app.js`: Menü, Spielerverwaltung, zeichnet das laufende Spiel und die Trink-Meldung. Die Spieler werden im Browser gespeichert.
+- `boot.js`: läuft auf jeder Seite zuerst: Altersabfrage (18+) beim ersten Start und Offline-Modus
+- `sw.js`: Service Worker, speichert die App fürs Spielen ohne Internet (neue Dateien dort in `FILES` eintragen)
+- `info.html`: Verantwortung, Impressum und Datenschutz
+- `app.js`: Menü, Einstellungen (Stufe), Spielregeln, Spielerverwaltung, zeichnet das laufende Spiel und die Trink-Meldung. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
 
@@ -35,6 +38,14 @@ Eine eigene Datei anlegen, die `registerGame(key, { label, emoji, description, c
 - `registerCardGame(key, { ..., cards: [...] })` in `cards.js`: einfaches Kartenspiel, die App zieht zufällige Karten
 - `setup(players)`, `view(s, me)`, `act(s, action, by)`: eigenes Spiel. Der ganze Spielstand ist ein JSON-Objekt, `view` sagt, was zu sehen ist und wer welchen Knopf drücken darf, `act` ändert den Stand. Damit läuft das Spiel automatisch auf einem Handy und mit jedem am eigenen Handy. Muss jemand trinken, `drink(s, [{ who, n }])` aufrufen.
 - `open()`: eigenes Spiel ohne Namenseingabe, z. B. eine eigene Seite
+
+## Stufe und Spielregeln
+
+Über ⚙️ im Menü stellt man ein, wie viel getrunken wird: Alkoholfrei (gleiche Schlucke, aber Limo oder Wasser), Mild (halbe Schlucke), Normal oder Hart (1,5-fach). `drink()` rechnet die Schlucke automatisch um, die Stufe steht beim Spielstart in `s.level`, damit alle Handys dasselbe sehen. Jedes Spiel hat ein `rules`-Feld, das hinter dem „?“ oben rechts steht.
+
+## App Store und Google Play
+
+Siehe [STORE.md](STORE.md): Die Web-App wird mit Capacitor verpackt (`package.json`, `capacitor.config.json`, `resources/` für Icons).
 
 ## Bots
 

@@ -20,6 +20,7 @@
   <main id="app">
     <!-- Menü: Spiel auswählen -->
     <section id="screen-menu" class="screen active">
+      <button id="settings-btn" class="settings-btn" aria-label="Einstellungen"></button>
       <header class="menu-head">
         <img class="menu-logo" src="icons/icon.svg" alt="" width="76" height="76">
         <h1>Saufomat</h1>
@@ -27,6 +28,19 @@
       </header>
       <div id="game-list" class="game-list"></div>
       <p class="disclaimer">Trink verantwortungsvoll. Wasser zählt auch als Getränk.</p>
+    </section>
+
+    <!-- Einstellungen: Stufe, Infos -->
+    <section id="screen-settings" class="screen">
+      <header class="game-bar">
+        <button id="settings-back" class="btn ghost small" aria-label="Zurück">←</button>
+        <span class="game-title">Einstellungen</span>
+        <span class="bar-spacer"></span>
+      </header>
+      <p class="hint">Wie viel wird getrunken?</p>
+      <div id="level-list" class="level-list"></div>
+      <p class="hint small-text">Gilt für jedes neue Spiel. Bei „Jeder sein Handy“ zählt die Einstellung vom Handy, das den Raum erstellt.</p>
+      <a class="btn ghost info-link" href="info.html">Verantwortung, Impressum und Datenschutz</a>
     </section>
 
     <!-- Ein Handy oder jeder sein Handy -->
@@ -121,6 +135,15 @@
   <!-- Kleiner Hinweis für alle, die nicht betroffen sind -->
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <!-- Spielregeln -->
+  <div id="rules" class="rules-sheet" hidden>
+    <div class="rules-box" role="dialog" aria-labelledby="rules-title">
+      <h2 id="rules-title"></h2>
+      <ul id="rules-list"></ul>
+      <button id="rules-ok" class="btn">Alles klar</button>
+    </div>
+  </div>
+
   <!-- Trink-Meldung -->
   <div id="drink-alert" class="drink-alert" hidden>
     <div class="da-box" role="alertdialog" aria-labelledby="da-title">
@@ -128,10 +151,12 @@
       <div id="da-count" class="da-count" hidden></div>
       <h2 id="da-title"></h2>
       <ul id="da-list"></ul>
+      <p id="da-level" class="da-level" hidden></p>
       <button id="da-ok" class="btn">Prost! 🍻</button>
     </div>
   </div>
 
+  <script src="boot.js"></script>
   <script src="vendor/mqtt.min.js"></script>
   <script src="vendor/qrcode.js"></script>
   <script src="games.js"></script>

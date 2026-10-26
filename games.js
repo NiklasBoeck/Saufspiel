@@ -11,6 +11,7 @@
 //   act(s, action, by)    // Aktion auf den Spielstand anwenden, by = wer gedrückt hat
 //   privateAlerts         // true: große Trink-Meldung nur für alle, die trinken, die anderen sehen einen kleinen Hinweis
 //   afterRender(root, s, me) // nach dem Zeichnen, z. B. Animation; gibt ms zurück, die die Meldung wartet
+//   rules                 // Spielregeln zum Nachlesen (Liste von Sätzen), kommen hinter das „?“ oben rechts
 //   fit                   // false: Seite darf scrollen (sonst passt jedes Spiel genau auf den Bildschirm, hoch und quer)
 //   open()                // eigenes Spiel auf eigener Seite (z. B. Flunky Ball)
 //   bot(s, name, actions) // was ein Bot drückt (eine act aus actions); fehlt: zufälliger Knopf
@@ -30,10 +31,66 @@ function registerGame(key, def) {
 // Für Trink-Meldungen: alle trinken.
 const ALL = "*";
 
+// --- Stufe: wie viel getrunken wird ---
+// Wird beim Spielstart in den Spielstand geschrieben (s.level), damit alle Handys dasselbe sehen.
+// Alkoholfrei: gleiche Schlucke, aber Limo, Wasser oder was man will.
+const LEVELS = {
+  alkoholfrei: { label: "Alkoholfrei", emoji: "🥤", desc: "Limo, Wasser, was ihr wollt. Gleiche Regeln, null Promille.", scale: (n) => n },
+  mild: { label: "Mild", emoji: "🙂", desc: "Halb so viele Schlucke.", scale: (n) => Math.ceil(n / 2) },
+  normal: { label: "Normal", emoji: "🍺", desc: "So wie die Regeln es sagen.", scale: (n) => n },
+  hart: { label: "Hart", emoji: "🔥", desc: "Anderthalbmal so viele Schlucke. Nur mit genug Wasser daneben.", scale: (n) => Math.round(n * 1.5) },
+};
+const SETTINGS_KEY = "saufspiel-settings";
+
+const Settings = (() => {
+  let data = {};
+  try {
+    data = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {};
+  } catch {
+    // ohne Speicher gilt einfach Normal
+  }
+  return {
+    get level() {
+      return LEVELS[data.level] ? data.level : "normal";
+    },
+    set level(v) {
+      data.level = v;
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+      } catch {
+        // egal
+      }
+    },
+  };
+})();
+
+// Stufe des laufenden Spiels (app.js setzt sie beim Zeichnen), sonst die eigene Einstellung.
+let playLevel = null;
+function levelOf(s) {
+  const l = s?.level ?? playLevel ?? Settings.level;
+  return LEVELS[l] ? l : "normal";
+}
+
+// Neues Spiel mit der eingestellten Stufe (nur wer den Spielstand hält: ein Handy oder der Host).
+function newGame(key, players, level = Settings.level) {
+  playLevel = level; // setup() kann schon die erste Trink-Meldung auslösen
+  const s = GAMES[key].setup(players);
+  s.level = level;
+  return s;
+}
+
+function drinkEmoji(s) {
+  return levelOf(s) === "alkoholfrei" ? "🥤" : "🍺";
+}
+
 // Trink-Meldung auslösen. items: [{ who, n, give, text }]
 //   who = Spielername oder ALL, n = Schlucke, give = verteilt statt trinkt, text = Zusatz
+// Die Schlucke werden an die Stufe angepasst (Mild halbiert, Hart mal 1,5).
 // Darf ein Bot verteilen, verteilt er gleich selbst, zufällig an die anderen.
 function drink(s, items) {
+  const level = levelOf(s);
+  const scale = LEVELS[level].scale;
+  items = items.map((it) => (it.n ? { ...it, n: scale(it.n) } : it));
   const out = [];
   for (const it of items) {
     out.push(it);
@@ -47,7 +104,7 @@ function drink(s, items) {
       for (const [who, n] of Object.entries(got)) out.push({ who, n, text: `von ${it.who}` });
     }
   }
-  s.alert = { id: Math.random().toString(36).slice(2), items: out };
+  s.alert = { id: Math.random().toString(36).slice(2), items: out, level };
 }
 
 // --- Bots ---
@@ -82,7 +139,7 @@ function sips(n) {
 
 // Hinweis für Trinkregeln, bei denen die App nicht weiß, wen es trifft.
 function drinkNoteHtml(text) {
-  return `<p class="drink-note">🍺 ${text}</p>`;
+  return `<p class="drink-note">${drinkEmoji()} ${text}</p>`;
 }
 
 function shuffle(arr) {
