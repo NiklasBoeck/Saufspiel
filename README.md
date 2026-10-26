@@ -21,6 +21,7 @@ python3 -m http.server 8000
 - `busfahrer.js`: Busfahrer mit Fragerunde, Pyramide und Busfahrt (die Busfahrt gibt es auch als `Busfahrt` für Triade)
 - `triade.js`: Triade, reihum Karten ziehen (7 bis Ass), der Bube startet die Busfahrt
 - `dealer.js`: F*ck den Dealer, die App ist der Stapel: oberste Karte raten (2 bis Ass), beim Fehlversuch sagt sie höher oder niedriger, nach 3 Fehlschlägen in Folge wechselt der Dealer. Gespielte Karten liegen gestapelt auf einem Tisch. Mit einem Handy hält der Dealer beim Raten das Handy, mit mehreren sieht nur der Dealer die oberste Karte
+- `hodenritter.js` + `hodenritter-3d.js`: Hodenritter, Boule im Garten in 3D (three.js, wird erst beim Spielstart geladen). Wer am weitesten weg liegt oder die weiße Kugel berührt, trinkt ein halbes Bier, macht eine Aufgabe und verbeugt sich vor allen, die sitzen. Der Host rechnet die Würfe aus und schickt die Kugelbahnen an alle Handys. Testen ohne Grafikkarte: `?lowgfx`, Kamera frei: `?debug` (`hrDebug.cam`).
 - `room.js`: Jeder sein Handy, Raum mit Code und QR-Code, Sync über MQTT wie bei Flunky Ball
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
 - `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4, three.js r159)
