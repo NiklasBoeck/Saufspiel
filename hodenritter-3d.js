@@ -1335,14 +1335,24 @@ window.Hodenritter3D = (() => {
   // Trinken wie echt: ansetzen, immer steiler, Kopf in den Nacken, zwischendurch absetzen und durchatmen,
   // am Ende die leere Flasche hochhalten. Bots wissen, wie lange sie brauchen, sonst rechnen wir mit gut 20 Sekunden.
   function drinkPose(p, d, now) {
-    const st = drinkState(p, d, now);
-    if (st.mode === "none") return POSES.stand;
-    if (st.mode === "done") {
+    if (!d) return POSES.stand;
+    if (d.done) {
+      if (!p.doneAt) p.doneAt = now;
+      if (now - p.doneAt > 2800) return POSES.stand;
       const w = Math.sin(now / 170 + p.seed) * 0.2;
       return { ...POSES.empty, lShZ: POSES.empty.lShZ + w, rShZ: POSES.empty.rShZ + w };
     }
-    if (st.mode === "breath") return POSES.breath;
-    const J = mixPose(POSES.sip, POSES.chug, st.u);
+    p.doneAt = 0;
+    if (p.drinkKey !== S.drink.id) {
+      p.drinkKey = S.drink.id;
+      p.drinkAt = now;
+    }
+    const t = (now - p.drinkAt) / 1000;
+    const total = d.bot ? d.bot / 1000 : 22;
+    const u = Math.min(1, t / total);
+    const cyc = (t + p.seed) % 6.5;
+    if (t > 2.5 && cyc > 5.2 && u < 0.9) return POSES.breath;
+    const J = mixPose(POSES.sip, POSES.chug, Math.min(1, 0.2 + u * 0.95));
     J.headX += Math.sin(now / 240 + p.seed) * 0.05; // schlucken
     return J;
   }
@@ -1370,303 +1380,6 @@ window.Hodenritter3D = (() => {
     p.legs[1].knee.rotation.x = J.rKnee;
     p.legs[1].ankle.rotation.x = -(J.rHip + J.rKnee) * 0.85;
     p.bottle.rotation.set(J.bot ?? 1.15, 0, J.botZ ?? 0); // Neigung der Flasche in der Hand
-  }
-
-  // --- Fertige Figuren (Kenney Mini Characters, CC0) mit echten Animationen ---
-  // Jede Figur wird einmal geladen (gut 75 KB) und für alle Spieler mit derselben Figur geklont.
-  // Bis sie da ist (oder wenn sie nicht lädt), steht der selbstgebaute Mensch auf dem Platz.
-  // Gehen, Rennen, Sitzen, Jubeln und Hocken kommen aus den Animationen; Trinken, Werfen, Verbeugen,
-  // Klatschen und Hampelmann legen wir als Gelenkwinkel darüber.
-  const FIGS = ["mini_male_a", "mini_female_a", "mini_male_b", "mini_female_b", "mini_male_c", "mini_female_c", "mini_male_d", "mini_female_d", "mini_male_e", "mini_female_e", "mini_male_f", "mini_female_f"];
-  const FIG_S = 1.75; // Figuren sind etwa 0,7 groß: so werden sie gut 1,2 m, mit großem Comic-Kopf
-  const FIG_SEAT = 0.58; // Höhe der Figur auf dem Stuhl
-  const FIG_CLIPS = ["idle", "walk", "sprint", "sit", "emote-yes", "crouch"];
-  const fig = { loader: null, ready: new Map(), loading: new Set(), failed: false, queue: null };
-  const NOFIG = /[?&]nofig/.test(location.search);
-
-  function figLib(cb) {
-    if (THREE.GLTFLoader) return cb();
-    if (fig.queue) return fig.queue.push(cb);
-    fig.queue = [cb];
-    const tag = document.createElement("script");
-    tag.src = "vendor/three-gltf.js";
-    tag.onload = () => fig.queue.splice(0).forEach((f) => f());
-    tag.onerror = () => (fig.failed = true);
-    document.head.appendChild(tag);
-  }
-
-  function loadFig(v) {
-    if (NOFIG || fig.failed || fig.ready.has(v) || fig.loading.has(v)) return;
-    fig.loading.add(v);
-    figLib(() => {
-      if (!fig.loader) {
-        fig.loader = new THREE.GLTFLoader();
-        fig.loader.setMeshoptDecoder(THREE.MeshoptDecoder);
-      }
-      fig.loader.load(
-        `figuren/${FIGS[v]}.glb`,
-        (g) => {
-          g.scene.traverse((o) => {
-            if (!o.isMesh) return;
-            rim(o.material);
-            o.material.roughness = 0.62;
-            o.material.envMapIntensity = 0.3; // sonst wirken die Farben blass
-            o.castShadow = true;
-            o.frustumCulled = false; // Animationen schieben die Figur aus ihrer Hülle
-          });
-          fig.ready.set(v, g);
-          fig.loading.delete(v);
-        },
-        undefined,
-        () => (fig.failed = true)
-      );
-    });
-  }
-
-  // Jeder bekommt eine eigene Figur, solange es genug gibt
-  function figVariant(name) {
-    const used = new Set([...G.people.values()].map((p) => p.variant));
-    let v = hash(name) % FIGS.length;
-    for (let i = 0; i < FIGS.length && used.has(v); i++) v = (v + 1) % FIGS.length;
-    return v;
-  }
-
-  function makeFigure(name, v) {
-    const g = fig.ready.get(v);
-    const model = THREE.SkeletonUtils.clone(g.scene);
-    model.scale.setScalar(FIG_S);
-    const root = new THREE.Group();
-    root.add(model);
-    const bone = (n) => model.getObjectByName(n);
-    const B = { root: bone("root"), torso: bone("torso"), head: bone("head"), armL: bone("arm-left"), armR: bone("arm-right"), legL: bone("leg-left"), legR: bone("leg-right") };
-    const rest = {};
-    for (const k in B) rest[k] = B[k].position.clone();
-    const mixer = new THREE.AnimationMixer(model);
-    const acts = {};
-    for (const c of FIG_CLIPS) {
-      const a = mixer.clipAction(g.animations.find((x) => x.name === c));
-      a.play();
-      a.setEffectiveWeight(c === "idle" ? 1 : 0);
-      acts[c] = a;
-    }
-    const bottle = makeBottle();
-    bottle.scale.setScalar(1.5 / FIG_S);
-    model.add(bottle);
-    const ball = mesh(sphere(H.B_R, 20, 14), mat(0xbfc4ca, 0.3, { metalness: 1 }), 0, 0, 0);
-    ball.scale.setScalar(1 / FIG_S);
-    ball.visible = false;
-    model.add(ball);
-    return { fig: true, variant: v, root, model, B, rest, mixer, acts, w: { idle: 1 }, seatK: 1, bottle, ball, look: { height: 1.2 }, J: { ...POSES.stand }, pos: null, face: 0, mode: "seated", leg: null, walk: 0, moveW: 0, vel: 0, seed: (hash(name) % 1000) / 100, sipAt: 0 };
-  }
-
-  const _q = new THREE.Quaternion();
-  const _e = new THREE.Euler();
-  const _v = new THREE.Vector3();
-  const _w = new THREE.Vector3();
-  const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
-  // Richtung der Gliedmaßen in Ruhe (T-Pose): Arme seitlich raus, Beine nach unten
-  const FIG_AX = { armL: V3(1, 0, 0), armR: V3(-1, 0, 0), legL: V3(0, -1, 0), legR: V3(0, -1, 0) };
-  const MOUTH = V3(0, 0.072, 0.185); // im Kopf-Gelenk
-  const HAND_L = V3(0.29, -0.01, 0.03); // im Arm-Gelenk
-  const HAND_R = V3(-0.29, -0.01, 0.03);
-
-  // Arm oder Bein in eine Richtung zeigen lassen (im Raum des Elterngelenks: x links, y hoch, z nach vorne)
-  function aimLimb(p, k, x, y, z, w = 1) {
-    _q.setFromUnitVectors(FIG_AX[k], _v.set(x, y, z).normalize());
-    p.B[k].quaternion.slerp(_q, w);
-  }
-
-  // Zusätzlich drehen (x: nach vorne kippen, y: zur Seite schauen, z: seitlich neigen)
-  function bend(p, k, x, y = 0, z = 0) {
-    _q.setFromEuler(_e.set(x, y, z));
-    p.B[k].quaternion.multiply(_q);
-  }
-
-  // Punkt aus einem Gelenk in den Raum der Figur
-  function inModel(p, boneKey, local) {
-    return p.model.worldToLocal(p.B[boneKey].localToWorld(_w.copy(local)));
-  }
-
-  // Wie weit jemand beim Trinken ist: ansetzen, immer steiler, zwischendurch durchatmen, am Ende leer
-  function drinkState(p, d, now) {
-    if (!d) return { mode: "none" };
-    if (d.done) {
-      if (!p.doneAt) p.doneAt = now;
-      return { mode: now - p.doneAt > 2800 ? "none" : "done" };
-    }
-    p.doneAt = 0;
-    if (p.drinkKey !== S.drink.id) {
-      p.drinkKey = S.drink.id;
-      p.drinkAt = now;
-    }
-    const t = (now - p.drinkAt) / 1000;
-    const total = d.bot ? d.bot / 1000 : 22;
-    const u = Math.min(1, t / total);
-    const cyc = (t + p.seed) % 6.5;
-    if (t > 2.5 && cyc > 5.2 && u < 0.9) return { mode: "breath", u };
-    return { mode: "drink", u: Math.min(1, 0.2 + u * 0.95) };
-  }
-
-  // Flasche an den Mund: Hals am Mund, Boden schräg nach vorne oben, Hand hält sie, Kopf im Nacken.
-  function figSip(p, u, k) {
-    const B = p.B;
-    bend(p, "torso", -0.06 * u * k);
-    bend(p, "head", -(0.15 + u * 0.5) * k + Math.sin(performance.now() / 240 + p.seed) * 0.04 * k);
-    p.model.updateMatrixWorld(true);
-    const mouth = inModel(p, "head", MOUTH);
-    const phi = 0.05 + u * 0.95; // wie steil der Flaschenboden nach oben zeigt
-    const neck = V3(0, -Math.sin(phi), -Math.cos(phi)); // vom Boden zum Hals
-    const tip = 0.118 * (1.5 / FIG_S);
-    const grip = mouth.clone().addScaledVector(neck, -tip);
-    // Flasche schwebt sonst neben der Hand: erst aus der Ruhehaltung heraus, dann ganz zum Mund
-    const carry = inModel(p, "armL", HAND_L);
-    p.bottle.position.copy(carry.lerp(grip, k));
-    _q.setFromUnitVectors(V3(0, 1, 0), neck);
-    p.bottle.quaternion.slerp(_q, k);
-    // Arm zur Flasche: Richtung im Rumpf-Raum, Schulter darf etwas mitgehen
-    const gw = p.model.localToWorld(p.bottle.position.clone());
-    const gt = B.torso.worldToLocal(gw).sub(B.armL.position);
-    const reach = gt.length();
-    aimLimb(p, "armL", gt.x, gt.y, gt.z, k);
-    if (reach > 0.27) B.armL.position.addScaledVector(gt.normalize(), Math.min(0.09, reach - 0.27) * k);
-  }
-
-  // Flasche oder Kugel einfach in der Hand
-  function figCarry(p, upside = 0) {
-    p.model.updateMatrixWorld(true);
-    p.bottle.position.copy(inModel(p, "armL", HAND_L));
-    p.bottle.quaternion.setFromEuler(_e.set(0.25 + upside * Math.PI, 0, 0));
-  }
-
-  function figWeights(p, want, dt) {
-    const k = Math.min(1, dt * 9);
-    let sum = 0;
-    for (const c of FIG_CLIPS) {
-      p.w[c] = (p.w[c] ?? 0) + ((want[c] ?? 0) - (p.w[c] ?? 0)) * k;
-      sum += p.w[c];
-    }
-    for (const c of FIG_CLIPS) p.acts[c].setEffectiveWeight(sum > 0 ? p.w[c] / sum : c === "idle" ? 1 : 0);
-  }
-
-  // Eine Figur für diesen Moment bewegen
-  function animateFigure(p, o) {
-    const { poseName, plan, now, dt, seatedNow, run } = o;
-    const B = p.B;
-    p.seatK += ((seatedNow ? 1 : 0) - p.seatK) * Math.min(1, dt * 7);
-    const sitW = p.seatK;
-    const mv = p.moveW * (1 - sitW);
-    const want = { sit: sitW };
-    const rest = 1 - sitW - mv;
-    if (run) want.sprint = mv;
-    else want.walk = mv;
-    const c = plan.c ?? 0;
-    if (poseName === "cheer" || (poseName === "drink" && o.drink?.mode === "done")) want["emote-yes"] = rest;
-    else if (poseName === "squat") {
-      want.crouch = rest * c;
-      want.idle = rest * (1 - c);
-    } else want.idle = rest;
-    figWeights(p, want, dt);
-    p.acts.walk.timeScale = Math.max(0.6, p.vel / 1.1);
-    p.acts.sprint.timeScale = Math.max(0.8, p.vel / 3.2);
-
-    // Gelenke auf Ruhe, dann Animation, dann unsere Haltung obendrauf
-    for (const k in B) {
-      B[k].position.copy(p.rest[k]);
-      B[k].quaternion.identity();
-    }
-    p.mixer.update(dt);
-    p.root.position.y += sitW * FIG_SEAT;
-
-    const wave = Math.sin(now / 170 + p.seed);
-    let hold = "carry";
-    switch (poseName) {
-      case "sitDrink":
-      case "drink": {
-        const d = o.drink;
-        if (poseName === "sitDrink") figSip(p, 0.15, 1);
-        else if (d?.mode === "drink") figSip(p, d.u, 1);
-        else if (d?.mode === "breath") {
-          aimLimb(p, "armL", 0.35, -0.55, 0.75);
-          bend(p, "head", 0.12);
-        } else if (d?.mode === "done") {
-          aimLimb(p, "armL", 0.5, 1, 0.1 + wave * 0.15);
-          aimLimb(p, "armR", -0.5, 1, 0.1 - wave * 0.15);
-          hold = "empty";
-        }
-        if (poseName === "drink" || poseName === "sitDrink") {
-          if (d?.mode !== "breath" && d?.mode !== "done") hold = "sip";
-          if (poseName === "drink" && d?.mode !== "done") aimLimb(p, "armR", -0.55, -0.6, -0.35, 0.8); // Hand in die Hüfte
-        }
-        break;
-      }
-      case "cheerSit":
-      case "cheer":
-        aimLimb(p, "armL", 0.45, 1, 0.15 + wave * 0.2);
-        aimLimb(p, "armR", -0.45, 1, 0.15 - wave * 0.2);
-        break;
-      case "clapSit": {
-        const cl = Math.abs(Math.sin(now / 150 + p.seed));
-        aimLimb(p, "armL", 0.05 + cl * 0.35, 0.15, 1);
-        aimLimb(p, "armR", -0.05 - cl * 0.35, 0.15, 1);
-        break;
-      }
-      case "aim": {
-        const pw = o.power ?? 0;
-        bend(p, "torso", 0.15 + pw * 0.25);
-        aimLimb(p, "armR", -0.25, -1, 0.25 - pw * 1.4);
-        aimLimb(p, "legL", 0, -1, 0.35);
-        aimLimb(p, "legR", 0, -1, -0.2);
-        break;
-      }
-      case "release":
-        bend(p, "torso", 0.3);
-        aimLimb(p, "armR", -0.15, 0.55, 1);
-        aimLimb(p, "legL", 0, -1, 0.35);
-        aimLimb(p, "legR", 0, -1, -0.25);
-        break;
-      case "bow": {
-        const b = 0.5 + 0.5 * Math.sin(now / 700 + p.seed);
-        bend(p, "torso", 0.45 + b * 0.55);
-        bend(p, "head", 0.1 + b * 0.2);
-        aimLimb(p, "armR", 0.35, -0.55, 0.75); // Hand vor den Bauch
-        aimLimb(p, "armL", 0.4, -0.8, -0.5);
-        break;
-      }
-      case "jacks": {
-        const j = plan.c ?? 0;
-        aimLimb(p, "armL", 0.3 + j * 0.2, -1 + j * 2.2, 0);
-        aimLimb(p, "armR", -0.3 - j * 0.2, -1 + j * 2.2, 0);
-        aimLimb(p, "legL", j * 0.42, -1, 0);
-        aimLimb(p, "legR", -j * 0.42, -1, 0);
-        p.root.position.y += j * 0.12;
-        break;
-      }
-      case "squat":
-        aimLimb(p, "armL", 0.2, -0.2, 1, c);
-        aimLimb(p, "armR", -0.2, -0.2, 1, c);
-        break;
-    }
-    if (plan.spin) {
-      aimLimb(p, "armL", 1, 0.15, 0);
-      aimLimb(p, "armR", -1, 0.15, 0);
-    }
-    if (plan.hop && p.moveW > 0.1) aimLimb(p, "legR", 0, -0.5, -0.85);
-    if (o.headY) bend(p, "head", 0, o.headY);
-
-    if (hold === "sip") return;
-    figCarry(p, hold === "empty" ? 1 : 0);
-    if (hold === "empty") p.bottle.position.y += 0.04;
-  }
-
-  // Wo der Kopf ist (für Namen und Häkchen darüber)
-  function headTop(p, extra = 0) {
-    if (p.fig) {
-      p.root.updateMatrixWorld(true);
-      return p.B.head.localToWorld(V3(0, 0.36 + extra / FIG_S, 0));
-    }
-    const head = p.root.position.clone();
-    head.y += (p.look.height / 1.78) * (p.J.hipY + 0.9 + extra);
-    return head;
   }
 
   // --- Wer steht wo und macht was ---
@@ -1838,23 +1551,11 @@ window.Hodenritter3D = (() => {
       seen.add(name);
       let p = G.people.get(name);
       if (!p) {
-        const v = figVariant(name);
-        loadFig(v);
-        p = fig.ready.has(v) ? makeFigure(name, v) : makeHuman(name);
-        p.variant = v;
+        p = makeHuman(name);
         G.people.set(name, p);
         G.scene.add(p.root);
         const seat = seatOf(name);
         p.pos = { x: seat.x, y: seat.y };
-      } else if (!p.fig && fig.ready.has(p.variant)) {
-        // Figur ist fertig geladen: den Platzhalter austauschen, Ort und Haltung bleiben
-        const f = makeFigure(name, p.variant);
-        for (const k of ["pos", "face", "mode", "leg", "walk", "moveW", "vel", "sipAt"]) f[k] = p[k];
-        f.seatK = p.mode === "seated" ? 1 : 0;
-        G.scene.remove(p.root);
-        G.scene.add(f.root);
-        G.people.set(name, f);
-        p = f;
       }
       const plan = planFor(name, now);
       const seat = seatOf(name);
@@ -1921,21 +1622,6 @@ window.Hodenritter3D = (() => {
         const c = Math.abs(Math.sin(now / 150 + p.seed));
         target.lShZ = -0.08 - c * 0.3;
         target.rShZ = 0.08 + c * 0.3;
-      }
-      if (p.fig) {
-        let headY = 0;
-        if (playing && (seated || poseName === "stand")) {
-          const b = animBall(playing.a.ball, (now - playing.t0) / 1000);
-          if (b) headY = Math.max(-1, Math.min(1, -Math.atan2(b.x - p.pos.x, b.y - p.pos.y) * 0.6));
-        } else if (seated) headY = Math.sin(now / 2300 + p.seed * 3) * 0.35;
-        const drink = poseName === "drink" ? drinkState(p, plan.drink, now) : null;
-        const power = poseName === "aim" && name === H.thrower(S) && pulling() ? aimPull.power : 0;
-        const seatedNow = seated || (backIn && dist < 0.25);
-        animateFigure(p, { poseName, plan, now, dt, seatedNow, run: !!plan.run, drink, power, headY });
-        p.bottle.visible = true;
-        p.ball.visible = !!plan.ball;
-        if (plan.ball) p.ball.position.copy(inModel(p, "armR", HAND_R));
-        continue;
       }
       if (poseName === "drink") Object.assign(target, drinkPose(p, plan.drink, now));
       if (poseName === "aim") {
@@ -2285,8 +1971,7 @@ window.Hodenritter3D = (() => {
         const n = S.drink.list.length;
         const spread = n + 1.2;
         const back = Math.max(3.1, fitDist(spread) * 0.95);
-        const gap = S.players.length % 2 ? H.SEAT_GAP / 2 : 0; // zwischen zwei Köpfen durch, nicht über einen drüber
-        return { pos: P(gap, H.CHAIR_Y + 2.0 - back, 3.4), look: P(0, H.CHAIR_Y + 2.9, 0.6), k: 1.6 };
+        return { pos: P(0, H.CHAIR_Y + 2.0 - back, 2.15), look: P(0, H.CHAIR_Y + 3.2, 0.85), k: 1.6 };
       }
       case "bow": {
         const target = H.bowTargets(S)[S.bow.ti];
@@ -2852,7 +2537,8 @@ window.Hodenritter3D = (() => {
     const showNames = S.phase !== "result" && S.phase !== "place" && !mini;
     if (showNames) {
       for (const [name, p] of G.people) {
-        const head = headTop(p);
+        const head = p.root.position.clone();
+        head.y += (p.look.height / 1.78) * (p.J.hipY + 0.9);
         const s = project(head);
         if (!s || s.x < -40 || s.x > w + 40) continue;
         const actor = name === H.thrower(S) || (S.phase === "bow" && name === S.bow.queue[0]) || (S.phase === "task" && name === S.task.who);
@@ -3019,7 +2705,9 @@ window.Hodenritter3D = (() => {
       for (const d of S.drink.list) {
         const p = G.people.get(d.n);
         if (!p) continue;
-        const s = project(headTop(p, 0.15));
+        const head = p.root.position.clone();
+        head.y += (p.look.height / 1.78) * (p.J.hipY + 1.05);
+        const s = project(head);
         if (s && d.done) label("✓ leer", s.x, s.y - 22, { size: 12, bg: "rgba(21,128,61,0.92)" });
       }
     } else if (S.phase === "task" && S.task.stage === "run") {
@@ -3137,7 +2825,6 @@ window.Hodenritter3D = (() => {
       mini: () => mini && { ...mini },
       applyPose,
       POSES,
-      fig,
     };
   }
 

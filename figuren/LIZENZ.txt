@@ -1,5 +1,0 @@
-Figuren: "Mini Characters 1.0" von Kenney (https://kenney.nl/assets/mini-characters)
-Lizenz: Creative Commons Zero (CC0 1.0), gemeinfrei, auch für kommerzielle Nutzung und den App Store.
-Optimierte Kopien (meshopt) aus dem npm-Paket @netforge/asset-library-files 0.2.0, ebenfalls CC0.
-Volltext der Lizenz: CC0-1.0.txt
-Danke an Kenney!
