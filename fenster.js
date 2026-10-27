@@ -302,7 +302,7 @@
   const HAND_DEFS = `<linearGradient id="fhs" x1="0" x2="1" y1="0" y2="0"> <stop offset="0" stop-color="#c98d64"/><stop offset="0.35" stop-color="#f0c39c"/><stop offset="0.7" stop-color="#e9b48a"/><stop offset="1" stop-color="#b97a52"/> </linearGradient> <linearGradient id="fhf" x1="0" x2="1"> <stop offset="0" stop-color="#cf946a"/><stop offset="0.45" stop-color="#f3caa4"/><stop offset="1" stop-color="#c4875e"/> </linearGradient> <radialGradient id="fhb" cx="0.5" cy="0.35" r="0.6"> <stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/> </radialGradient> <linearGradient id="fhc" x1="0" x2="1"> <stop offset="0" stop-color="#14213d"/><stop offset="0.5" stop-color="#26385f"/><stop offset="1" stop-color="#101a30"/> </linearGradient> <radialGradient id="fdh" cx="0.45" cy="0.4" r="0.65"><stop offset="0" stop-color="#6b4429"/><stop offset="1" stop-color="#24150b"/></radialGradient> <linearGradient id="fdj" x1="0" x2="1"><stop offset="0" stop-color="#0c1426"/><stop offset="0.5" stop-color="#22345a"/><stop offset="1" stop-color="#0c1426"/></linearGradient>`;
   const HAND_BODY = `<path d="M72 214 C76 260 70 290 64 306 L144 306 C138 290 134 260 146 210 Z" fill="url(#fhs)"/> <path d="M50 300 C80 292 130 292 162 300 L163 312 C130 304 82 304 49 312 Z" fill="#f4f1ea"/> <g class="fh-thumb"> <path d="M66 178 C48 170 30 150 22 128 C17 114 28 104 40 112 C52 122 62 138 76 150 Z" fill="url(#fhf)"/> <path d="M24 122 C24 113 33 110 38 116 C41 121 37 127 31 128 C27 128 24 126 24 122 Z" fill="#f6d9c4" opacity="0.9"/> </g> <g class="fh-fingers"> <g class="fh-f1" transform="rotate(-5 72 126)"><rect x="60" y="34" width="25" height="92" rx="12.5" fill="url(#fhf)"/><rect x="64.5" y="38" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M63 80 q9 4 19 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f2" transform="rotate(-1 100 124)"><rect x="87" y="18" width="26" height="106" rx="13" fill="url(#fhf)"/><rect x="92" y="22" width="16" height="19" rx="7" fill="#f7dccb"/><path d="M90 70 q10 4 20 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f3" transform="rotate(3 127 124)"><rect x="115" y="26" width="24" height="98" rx="12" fill="url(#fhf)"/><rect x="119" y="30" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M118 76 q9 4 18 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f4" transform="rotate(8 151 130)"><rect x="141" y="50" width="21" height="80" rx="10.5" fill="url(#fhf)"/><rect x="144.5" y="53" width="14" height="15" rx="6" fill="#f7dccb"/><path d="M144 92 q8 3 15 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> </g> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhs)"/> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhb)"/> <g fill="#fff" opacity="0.18"><ellipse cx="74" cy="121" rx="6" ry="3.5"/><ellipse cx="100" cy="117" rx="6" ry="3.5"/><ellipse cx="126" cy="120" rx="6" ry="3.5"/><ellipse cx="150" cy="128" rx="5" ry="3"/></g> <g stroke="#a8724d" stroke-width="1.2" fill="none" opacity="0.18"><path d="M74 132 C80 170 88 200 96 226"/><path d="M100 128 C102 170 104 200 106 228"/><path d="M127 131 C124 170 120 200 116 226"/></g>`;
   // Rücken mit Sakko, Kragen, Nacken und Hinterkopf; Nacken bei (0,0), Einheiten wie die Hand
-  const DEALER_BODY = `<path d="M-430 90 C-420 -20 -300 -64 -200 -66 L200 -66 C300 -64 420 -20 430 90 L460 2400 L-460 2400 Z" fill="url(#fdj)"/> <path d="M0 0 L0 2400" stroke="#081020" stroke-width="6" opacity="0.6"/> <path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
+  const DEALER_BODY = `<path d="M-320 80 C-312 -18 -236 -62 -160 -66 L160 -66 C236 -62 312 -18 320 80 L340 2400 L-340 2400 Z" fill="url(#fdj)"/> <path d="M0 0 L0 2400" stroke="#081020" stroke-width="6" opacity="0.6"/> <path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
   const SVG_NS = "http://www.w3.org/2000/svg";
 
   const sweptSeen = new Set();
@@ -325,10 +325,13 @@
 
     // Maße in Hand-Einheiten (Hand von Handgelenk bis Fingerspitze ≈ 290)
     const k = Math.min(W, H) * 0.0095;
-    const L1 = 370 * k; // Oberarm
-    const L2 = 340 * k; // Unterarm
+    const L1 = 430 * k; // Oberarm
+    const L2 = 380 * k; // Unterarm
     const PALM = 136 * k; // Handgelenk bis Handflächenmitte
-    const REACH = L1 + L2 + PALM;
+    // Die Schulter ist über dem Tisch, die Hand liegt auf ihm: von oben wirkt der Arm dadurch verkürzt
+    const Z = (L1 + L2) * 0.42;
+    const REACH = Math.sqrt((L1 + L2) ** 2 * 0.93 - Z * Z) + PALM;
+    const BODY = k * 0.8;
 
     // Zeitplan: reinkommen, von links nach rechts abräumen, von rechts nach links neu legen, wieder raus
     const IN = 300;
@@ -339,24 +342,33 @@
     const back = [...cells].reverse();
     const HOME = DEAL + STEP * (n + 1) + 150;
     const END = HOME + 300;
-    const rest = { x: vw * 0.62, y: vh + REACH * 0.15 };
+    const rest = { x: vw * 0.97, y: vh + REACH * 0.3 }; // Hand hängt rechts neben dem Körper
     const keys = [
       { t: 0, ...rest },
       { t: START, x: cells[0].r.left - W * 0.3, y: mid(cells[0]).y },
       ...cells.map((c, j) => ({ t: START + (SWEEP * (j + 1)) / (n + 1), x: c.r.left + W * 0.25, y: mid(c).y })),
       { t: START + SWEEP, x: vw + W * 0.4, y: mid(cells[n - 1]).y - H * 0.3 },
-      ...back.map((c, j) => ({ t: DEAL + STEP * (j + 1), x: mid(c).x, y: c.r.top + H * 0.35 })),
+      ...back.flatMap((c, j) => {
+        const p = { x: mid(c).x, y: c.r.top + H * 0.35 };
+        return [{ t: DEAL + STEP * (j + 1) - 40, ...p }, { t: DEAL + STEP * (j + 1) + 30, ...p }];
+      }),
       { t: HOME, ...rest },
     ];
-    const ease = (u) => (u + u * u * (3 - 2 * u)) / 2;
+    const ease = (u) => u * u * (3 - 2 * u);
+    // Weiche Kurve durch alle Punkte (Catmull-Rom), damit die Hand fließt statt an jeder Karte zu stoppen
+    const cr = (a, b, c, d, u) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
     const palmAt = (t) => {
       if (t <= keys[0].t) return keys[0];
       for (let j = 1; j < keys.length; j++) {
         if (t <= keys[j].t) {
-          const a = keys[j - 1];
-          const b = keys[j];
-          const u = ease((t - a.t) / (b.t - a.t));
-          return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+          const a = keys[Math.max(0, j - 2)];
+          const b = keys[j - 1];
+          const c = keys[j];
+          const d = keys[Math.min(keys.length - 1, j + 1)];
+          let u = (t - b.t) / (c.t - b.t || 1);
+          if (j === 1 || j === keys.length - 1) u = ease(u);
+          if (b.x === c.x && b.y === c.y) return b;
+          return { x: cr(a.x, b.x, c.x, d.x, u), y: cr(a.y, b.y, c.y, d.y, u) };
         }
       }
       return keys[keys.length - 1];
@@ -369,13 +381,13 @@
     rig.innerHTML = `<defs>${HAND_DEFS}</defs>
       <g class="fd-body">${DEALER_BODY}</g>
       <g fill="none" stroke-linecap="round">
-        <line class="fd-shadow" stroke="rgb(0 0 0 / 0.28)" stroke-width="${130 * k}"/>
-        <line class="fd-upper" stroke="#16233f" stroke-width="${140 * k}"/>
-        <line class="fd-upper2" stroke="#23365c" stroke-width="${60 * k}"/>
-        <circle class="fd-shoulder" r="${84 * k}" fill="#1b2a4a" stroke="none"/>
-        <line class="fd-fore" stroke="#182644" stroke-width="${118 * k}" stroke-linecap="butt"/>
-        <line class="fd-fore2" stroke="#26395f" stroke-width="${50 * k}" stroke-linecap="butt"/>
-        <circle class="fd-elbow" r="${62 * k}" fill="#1a2846" stroke="none"/>
+        <line class="fd-shadow" stroke="rgb(0 0 0 / 0.25)" stroke-width="${100 * k}"/>
+        <line class="fd-upper" stroke="#16233f" stroke-width="${116 * k}"/>
+        <line class="fd-upper2" stroke="#23365c" stroke-width="${46 * k}"/>
+        <circle class="fd-shoulder" r="${70 * k}" fill="#1b2a4a" stroke="none"/>
+        <line class="fd-fore" stroke="#182644" stroke-width="${102 * k}" stroke-linecap="butt"/>
+        <line class="fd-fore2" stroke="#26395f" stroke-width="${40 * k}" stroke-linecap="butt"/>
+        <circle class="fd-elbow" r="${54 * k}" fill="#1a2846" stroke="none"/>
       </g>
       <g class="fd-hand">${HAND_BODY}</g>`;
     document.body.appendChild(rig);
@@ -398,13 +410,22 @@
       S.y += (1 - ease(clamp(inOut, 0, 1))) * REACH * 0.9;
       const dq = Math.hypot(Q.x - S.x, Q.y - S.y) || 1;
       const P = { x: Q.x - ((Q.x - S.x) / dq) * PALM, y: Q.y - ((Q.y - S.y) / dq) * PALM };
-      // Ellbogen: Kosinussatz, Gelenk zeigt nach außen (vom Kopf weg)
-      const d = clamp(Math.hypot(P.x - S.x, P.y - S.y), Math.abs(L1 - L2) + 1, L1 + L2 - 0.5);
-      const base = Math.atan2(P.y - S.y, P.x - S.x);
-      const bend = Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
-      const E = { x: S.x + L1 * Math.cos(base + bend), y: S.y + L1 * Math.sin(base + bend) };
-      const N = { x: S.x - 200 * k, y: S.y + 20 * k };
-      $(".fd-body").setAttribute("transform", `translate(${N.x} ${N.y}) scale(${k * 0.87})`);
+      // Ellbogen in 3D: Schulter in Höhe Z, Hand auf dem Tisch; das Gelenk hängt nach unten und etwas nach außen.
+      // Gezeichnet wird die Draufsicht, so wird der Arm beim Heranziehen kürzer statt seitlich abzuknicken.
+      const ax = P.x - S.x;
+      const ay = P.y - S.y;
+      const d = clamp(Math.hypot(ax, ay, Z), Math.abs(L1 - L2) + 1, L1 + L2 - 0.5);
+      const u = [ax / d, ay / d, -Z / d];
+      const along = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
+      const rad = Math.sqrt(Math.max(0, L1 * L1 - along * along));
+      const flat = Math.hypot(ax, ay) || 1;
+      const pole = [(-ay / flat) * 0.6, (ax / flat) * 0.6, -1];
+      const pu = pole[0] * u[0] + pole[1] * u[1] + pole[2] * u[2];
+      const v = pole.map((x, i) => x - pu * u[i]);
+      const vl = Math.hypot(...v) || 1;
+      const E = { x: S.x + along * u[0] + (rad * v[0]) / vl, y: S.y + along * u[1] + (rad * v[1]) / vl };
+      const N = { x: S.x - 260 * BODY, y: S.y + 30 * BODY };
+      $(".fd-body").setAttribute("transform", `translate(${N.x} ${N.y}) scale(${BODY})`);
       line($(".fd-upper"), S, E);
       line($(".fd-upper2"), S, E);
       line($(".fd-fore"), E, P);
@@ -415,7 +436,11 @@
         $(c).setAttribute("cx", p.x);
         $(c).setAttribute("cy", p.y);
       }
-      const rot = (Math.atan2(P.y - E.y, P.x - E.x) * 180) / Math.PI + 90;
+      // Hand zeigt in Richtung Unterarm; ist der von oben kaum zu sehen, in Richtung Schulter→Hand
+      const fx = P.x - E.x;
+      const fy = P.y - E.y;
+      const w = clamp(Math.hypot(fx, fy) / (L2 * 0.6), 0, 1);
+      const rot = (Math.atan2(fy * w + (ay / flat) * (1 - w) * 50, fx * w + (ax / flat) * (1 - w) * 50) * 180) / Math.PI + 90;
       $(".fd-hand").setAttribute("transform", `translate(${P.x} ${P.y}) rotate(${rot}) scale(${k}) translate(-106 -306)`);
     }
     const t0 = performance.now();
