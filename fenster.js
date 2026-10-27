@@ -300,9 +300,11 @@
   // Der Dealer, von hinten/oben gesehen: Hinterkopf und rechte Schulter schauen unten ins Bild,
   // der Arm hat Ober- und Unterarm mit Ellbogengelenk (zwei Knochen, Winkel per Kosinussatz).
   const HAND_DEFS = `<linearGradient id="fhs" x1="0" x2="1" y1="0" y2="0"> <stop offset="0" stop-color="#c98d64"/><stop offset="0.35" stop-color="#f0c39c"/><stop offset="0.7" stop-color="#e9b48a"/><stop offset="1" stop-color="#b97a52"/> </linearGradient> <linearGradient id="fhf" x1="0" x2="1"> <stop offset="0" stop-color="#cf946a"/><stop offset="0.45" stop-color="#f3caa4"/><stop offset="1" stop-color="#c4875e"/> </linearGradient> <radialGradient id="fhb" cx="0.5" cy="0.35" r="0.6"> <stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/> </radialGradient> <linearGradient id="fhc" x1="0" x2="1"> <stop offset="0" stop-color="#14213d"/><stop offset="0.5" stop-color="#26385f"/><stop offset="1" stop-color="#101a30"/> </linearGradient> <radialGradient id="fdh" cx="0.45" cy="0.4" r="0.65"><stop offset="0" stop-color="#6b4429"/><stop offset="1" stop-color="#24150b"/></radialGradient> <linearGradient id="fdj" x1="0" x2="1"><stop offset="0" stop-color="#0c1426"/><stop offset="0.5" stop-color="#22345a"/><stop offset="1" stop-color="#0c1426"/></linearGradient>`;
-  const HAND_BODY = `<path d="M72 214 C76 260 70 290 64 306 L144 306 C138 290 134 260 146 210 Z" fill="url(#fhs)"/> <path d="M50 300 C80 292 130 292 162 300 L163 312 C130 304 82 304 49 312 Z" fill="#f4f1ea"/> <g class="fh-thumb"> <path d="M66 178 C48 170 30 150 22 128 C17 114 28 104 40 112 C52 122 62 138 76 150 Z" fill="url(#fhf)"/> <path d="M24 122 C24 113 33 110 38 116 C41 121 37 127 31 128 C27 128 24 126 24 122 Z" fill="#f6d9c4" opacity="0.9"/> </g> <g class="fh-fingers"> <g class="fh-f1" transform="rotate(-5 72 126)"><rect x="60" y="34" width="25" height="92" rx="12.5" fill="url(#fhf)"/><rect x="64.5" y="38" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M63 80 q9 4 19 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f2" transform="rotate(-1 100 124)"><rect x="87" y="18" width="26" height="106" rx="13" fill="url(#fhf)"/><rect x="92" y="22" width="16" height="19" rx="7" fill="#f7dccb"/><path d="M90 70 q10 4 20 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f3" transform="rotate(3 127 124)"><rect x="115" y="26" width="24" height="98" rx="12" fill="url(#fhf)"/><rect x="119" y="30" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M118 76 q9 4 18 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f4" transform="rotate(8 151 130)"><rect x="141" y="50" width="21" height="80" rx="10.5" fill="url(#fhf)"/><rect x="144.5" y="53" width="14" height="15" rx="6" fill="#f7dccb"/><path d="M144 92 q8 3 15 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> </g> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhs)"/> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhb)"/> <g fill="#fff" opacity="0.18"><ellipse cx="74" cy="121" rx="6" ry="3.5"/><ellipse cx="100" cy="117" rx="6" ry="3.5"/><ellipse cx="126" cy="120" rx="6" ry="3.5"/><ellipse cx="150" cy="128" rx="5" ry="3"/></g> <g stroke="#a8724d" stroke-width="1.2" fill="none" opacity="0.18"><path d="M74 132 C80 170 88 200 96 226"/><path d="M100 128 C102 170 104 200 106 228"/><path d="M127 131 C124 170 120 200 116 226"/></g>`;
+  const HAND_BODY = `<path d="M72 214 C76 260 70 290 64 306 L144 306 C138 290 134 260 146 210 Z" fill="url(#fhs)"/> <path d="M58 300 C84 293 126 293 152 300 L153 311 C126 304 84 304 57 311 Z" fill="#f4f1ea"/> <g class="fh-thumb"> <path d="M66 178 C48 170 30 150 22 128 C17 114 28 104 40 112 C52 122 62 138 76 150 Z" fill="url(#fhf)"/> <path d="M24 122 C24 113 33 110 38 116 C41 121 37 127 31 128 C27 128 24 126 24 122 Z" fill="#f6d9c4" opacity="0.9"/> </g> <g class="fh-fingers"> <g class="fh-f1" transform="rotate(-5 72 126)"><rect x="60" y="34" width="25" height="92" rx="12.5" fill="url(#fhf)"/><rect x="64.5" y="38" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M63 80 q9 4 19 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f2" transform="rotate(-1 100 124)"><rect x="87" y="18" width="26" height="106" rx="13" fill="url(#fhf)"/><rect x="92" y="22" width="16" height="19" rx="7" fill="#f7dccb"/><path d="M90 70 q10 4 20 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f3" transform="rotate(3 127 124)"><rect x="115" y="26" width="24" height="98" rx="12" fill="url(#fhf)"/><rect x="119" y="30" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M118 76 q9 4 18 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f4" transform="rotate(8 151 130)"><rect x="141" y="50" width="21" height="80" rx="10.5" fill="url(#fhf)"/><rect x="144.5" y="53" width="14" height="15" rx="6" fill="#f7dccb"/><path d="M144 92 q8 3 15 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> </g> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhs)"/> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhb)"/> <g fill="#fff" opacity="0.18"><ellipse cx="74" cy="121" rx="6" ry="3.5"/><ellipse cx="100" cy="117" rx="6" ry="3.5"/><ellipse cx="126" cy="120" rx="6" ry="3.5"/><ellipse cx="150" cy="128" rx="5" ry="3"/></g> <g stroke="#a8724d" stroke-width="1.2" fill="none" opacity="0.18"><path d="M74 132 C80 170 88 200 96 226"/><path d="M100 128 C102 170 104 200 106 228"/><path d="M127 131 C124 170 120 200 116 226"/></g>`;
   // Rücken mit Sakko, Kragen, Nacken und Hinterkopf; Nacken bei (0,0), Einheiten wie die Hand
-  const DEALER_BODY = `<path d="M-320 80 C-312 -18 -236 -62 -160 -66 L160 -66 C236 -62 312 -18 320 80 L340 2400 L-340 2400 Z" fill="url(#fdj)"/> <path d="M0 0 L0 2400" stroke="#081020" stroke-width="6" opacity="0.6"/> <path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
+  const DEALER_BODY = `<path d="M-320 80 C-312 -18 -236 -62 -160 -66 L160 -66 C236 -62 312 -18 320 80 L340 2400 L-340 2400 Z" fill="url(#fdj)"/> <path d="M0 0 L0 2400" stroke="#081020" stroke-width="6" opacity="0.6"/>`;
+  // Kopf, Nacken und Kragen kommen zuletzt: Arm und Hand gehen immer darunter durch
+  const DEALER_HEAD = `<path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
   const SVG_NS = "http://www.w3.org/2000/svg";
 
   const sweptSeen = new Set();
@@ -396,26 +398,52 @@
       <path class="fd-upper" fill="url(#fdu)"/>
       <path class="fd-fore" fill="url(#fdf)"/>
       <path class="fd-folds" fill="none" stroke="#060c18" stroke-width="${5 * k}" stroke-linecap="round" opacity="0.55"/>
-      <g class="fd-hand">${HAND_BODY}</g>`;
+      <g class="fd-hand">${HAND_BODY}</g>
+      <g class="fd-head">${DEALER_HEAD}</g>`;
     document.body.appendChild(rig);
     const $ = (c) => rig.querySelector(c);
     const pt = (p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
-    // Ärmel als gerundete Form: breit an a, Wölbung in der Mitte, schmaler an b; runde Kappen, am Handgelenk gerade
-    function limb(a, b, wa, wm, wb, capB, gradId) {
+    // Ärmel mit Muskelform: halbe Breiten (Hand-Einheiten) entlang des Glieds, getrennt für beide Seiten.
+    // Oberarm: Schulter, schmaler unterm Deltamuskel, Bizeps-/Trizepswölbung, schmaler Ellbogen.
+    // Unterarm: kräftig direkt unterm Ellbogen, dann bis zum Handgelenk schmal zulaufend.
+    const UPPER = { s: [0, 0.22, 0.52, 0.78, 1], a: [68, 60, 69, 58, 47], b: [68, 58, 61, 54, 47] };
+    const FORE = { s: [0, 0.22, 0.5, 0.8, 1], a: [49, 58, 52, 44, 42], b: [49, 54, 47, 42, 42] };
+    const half = (prof, side, x) => {
+      const w = prof[side];
+      let j = 1;
+      while (j < prof.s.length - 1 && x > prof.s[j]) j++;
+      const u = (x - prof.s[j - 1]) / (prof.s[j] - prof.s[j - 1]);
+      return cr(w[Math.max(0, j - 2)], w[j - 1], w[j], w[Math.min(w.length - 1, j + 1)], u);
+    };
+    function limb(a, b, prof, flip, capB, gradId) {
       const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-      const nx = -(b.y - a.y) / len;
-      const ny = (b.x - a.x) / len;
-      const at = (p, side, w) => ({ x: p.x + (nx * w * side) / 2, y: p.y + (ny * w * side) / 2 });
-      const m = lerp(a, b, 0.42);
+      const dx = (b.x - a.x) / len;
+      const dy = (b.y - a.y) / len;
+      const nx = -dy * flip;
+      const ny = dx * flip;
+      const at = (x, side) => {
+        const h = half(prof, side < 0 ? "b" : "a", x) * k * side;
+        return { x: a.x + dx * len * x + nx * h, y: a.y + dy * len * x + ny * h };
+      };
       const g = $(`#${gradId}`);
-      const g1 = at(m, -1, wm);
-      const g2 = at(m, 1, wm);
+      const g1 = at(0.5, -1);
+      const g2 = at(0.5, 1);
       g.setAttribute("x1", g1.x);
       g.setAttribute("y1", g1.y);
       g.setAttribute("x2", g2.x);
       g.setAttribute("y2", g2.y);
-      const endB = capB ? `A ${wb / 2} ${wb / 2} 0 0 0 ${pt(at(b, -1, wb))}` : `L ${pt(at(b, -1, wb))}`;
-      return `M ${pt(at(a, 1, wa))} Q ${pt(at(m, 1, wm * 1.6 - (wa + wb) * 0.3))} ${pt(at(b, 1, wb))} ${endB} Q ${pt(at(m, -1, wm * 1.6 - (wa + wb) * 0.3))} ${pt(at(a, -1, wa))} A ${wa / 2} ${wa / 2} 0 0 0 ${pt(at(a, 1, wa))} Z`;
+      const N = 12;
+      const sideA = [];
+      const sideB = [];
+      for (let i = 0; i <= N; i++) {
+        sideA.push(pt(at(i / N, 1)));
+        sideB.push(pt(at(1 - i / N, -1)));
+      }
+      const ra = prof.a[0] * k;
+      const rb = prof.a[prof.a.length - 1] * k;
+      const sw = flip > 0 ? 0 : 1;
+      const endB = capB ? `A ${rb} ${rb} 0 0 ${sw} ${sideB[0]}` : `L ${sideB[0]}`;
+      return `M ${sideA[0]} L ${sideA.join(" L ")} ${endB} L ${sideB.join(" L ")} A ${ra} ${ra} 0 0 ${sw} ${sideA[0]} Z`;
     }
 
     function draw(t) {
@@ -455,8 +483,11 @@
       const E = { x: S.x + along * u[0] + (rad * v[0]) / vl, y: S.y + along * u[1] + (rad * v[1]) / vl };
       const N = { x: S.x - 260 * BODY, y: S.y + 30 * BODY };
       $(".fd-body").setAttribute("transform", `translate(${N.x} ${N.y}) scale(${BODY})`);
-      const up = limb(S, E, 132 * k, 128 * k, 100 * k, true, "fdu");
-      const fore = limb(E, P, 104 * k, 112 * k, 98 * k, false, "fdf");
+      $(".fd-head").setAttribute("transform", `translate(${N.x} ${N.y}) scale(${BODY})`);
+      // Bizeps und Unterarmmuskel liegen auf der Innenseite des Arms (zur Körpermitte, also links vom Arm)
+      const inner = (S.x - N.x) * (E.y - S.y) - (S.y - N.y) * (E.x - S.x) > 0 ? 1 : -1;
+      const up = limb(S, E, UPPER, inner, true, "fdu");
+      const fore = limb(E, P, FORE, inner, false, "fdf");
       $(".fd-upper").setAttribute("d", up);
       $(".fd-fore").setAttribute("d", fore);
       $(".fd-shadow").setAttribute("d", up + fore);
