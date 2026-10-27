@@ -984,25 +984,28 @@ html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-to
 /* --- Fenster --- */
 .fe-status { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; flex: none; }
 .fe-table {
-  position: relative;
+  /* Unsichtbarer Rahmen, der den ganzen Platz nimmt; das grüne Fenster darin wird so groß wie möglich */
   flex: 1 1 0;
   min-height: 160px;
+  width: 100%;
   container-type: size;
   display: grid;
   place-items: center;
-  border-radius: 26px;
-  border: 7px solid #5b3a1e;
-  background: radial-gradient(ellipse at 50% 40%, #1f8a4c, #146c3a 55%, #0d4f2a);
-  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 6px 22px rgb(0 0 0 / 0.5), 0 12px 30px -10px rgb(0 0 0 / 0.7);
 }
 .fe-grid {
-  /* Kartenbreite passt sich an: 5 Spalten nebeneinander, 5 Reihen mit Karten im Format 5:7 */
+  /* Kartenbreite passt sich an: 5 Spalten, 5 Reihen mit Karten im Format 5:7, plus Holzrand */
   --g: clamp(4px, 1.6cqmin, 10px);
-  --w: min((100cqw - 20px - 4 * var(--g)) / 5, (100cqh - 20px - 4 * var(--g)) / 7, 110px);
+  --p: clamp(8px, 2.4cqmin, 16px);
+  --w: min((100cqw - 2 * var(--p) - 14px - 4 * var(--g)) / 5, (100cqh - 2 * var(--p) - 14px - 4 * var(--g)) / 7, 110px);
   display: grid;
   grid-template-columns: repeat(5, var(--w));
   grid-template-rows: repeat(5, calc(var(--w) * 1.4));
   gap: var(--g);
+  padding: var(--p);
+  border-radius: 26px;
+  border: 7px solid #5b3a1e;
+  background: radial-gradient(ellipse at 50% 40%, #1f8a4c, #146c3a 55%, #0d4f2a);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 6px 22px rgb(0 0 0 / 0.5), 0 12px 30px -10px rgb(0 0 0 / 0.7);
 }
 .fe-card {
   position: relative;
@@ -1049,9 +1052,12 @@ html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-to
 .bf-actions .btn small { display: block; font-size: 0.75rem; font-weight: 600; opacity: 0.8; }
 .fe-tally { flex: none; }
 html.fit .fe-tally li { padding: clamp(3px, 0.8dvh, 10px) 14px; }
-/* Der Tisch bleibt so breit wie das Fenster hoch ist, damit außen kein leeres Grün steht. */
-html.fit .fe-table { width: auto; height: 100%; aspect-ratio: 5 / 7; max-width: 100%; margin: 0 auto; }
 @media (min-aspect-ratio: 6 / 5) {
   html.fit[data-game="fenster"] .bf { grid-template-columns: minmax(0, 1.2fr) minmax(220px, 1fr); }
   html.fit[data-game="fenster"] .bf-actions.fe-actions { grid-template-columns: 1fr 1fr; }
+}
+/* Niedriges Querformat (z. B. iPhone Duo zugeklappt quer): Kästen weg, das Fenster bekommt die ganze Höhe.
+   Wer dran ist, steht ja schon im Titel. */
+@media (min-aspect-ratio: 6 / 5) and (max-height: 520px) {
+  html.fit[data-game="fenster"] .fe-status { display: none; }
 }
