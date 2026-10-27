@@ -2,7 +2,7 @@
 // dazwischen je 3, in der Mitte ein Kreuz, das die mittleren Karten der Seiten verbindet. Die 4 Ecken liegen offen.
 // Wer dran ist, deckt Karten neben offenen Karten auf und sagt vorher höher oder tiefer (zwischen zwei offenen
 // Karten: dazwischen oder außerhalb). Falsch: Man trinkt so viele Schlucke, wie Karten offen mit ihr verbunden sind,
-// und die werden wieder umgedreht. Ab 2 richtigen Karten darf man aufhören und die Anzahl verteilen.
+// die werden wieder umgedreht (die Ecken bleiben offen) und man spielt weiter. Ab 2 richtigen darf man abgeben und verteilen.
 (() => {
   const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "B", "D", "K", "A"];
   const NAMES = { 11: "Bube", 12: "Dame", 13: "König", 14: "Ass" };
@@ -134,12 +134,12 @@
     return `<div class="fe-table"><div class="fe-grid">${cells.join("")}</div></div>`;
   }
 
-  function statusHtml(s, me) {
+  // Kleine Zeile oben: Runde, wer dran ist, wie viele Karten richtig. Der Platz gehört dem Tisch.
+  function infoLine(s, me) {
     const p = s.players[s.cur];
-    return `<div class="fe-status">
-      <div class="fd-role"><span>Am Zug</span><b>${me === p ? "Du" : escapeHtml(p)}</b></div>
-      <div class="fd-role"><span>Diesen Zug</span><b>${s.count} ${s.count === 1 ? "Karte" : "Karten"}${s.mid ? " 🥃" : ""}</b></div>
-    </div>`;
+    const who = me === p ? "Du bist" : `${escapeHtml(p)} ist`;
+    const got = s.count >= MIN_CARDS ? `${s.count} richtig` : `${s.count} von ${MIN_CARDS}`;
+    return `Runde ${s.round} · ${who} dran · ${got}${s.mid ? " · 🥃" : ""}`;
   }
 
   function stopAction(s) {
@@ -154,9 +154,9 @@
     const p = s.players[s.cur];
     const mine = me === p;
     return {
-      phase: s.count ? `${s.count} richtig` : "Neuer Zug",
-      title: mine || !me ? `${name(p)}, tipp auf eine Karte neben einer offenen` : `${name(p)} sucht sich eine Karte aus`,
-      body: statusHtml(s, me) + boardHtml(s, p),
+      phase: infoLine(s, me),
+      title: mine || !me ? "Tipp auf eine leuchtende Karte" : `${name(p)} sucht sich eine Karte aus`,
+      body: boardHtml(s, p),
       actions: [stopAction(s)],
       turn: p,
     };
@@ -167,9 +167,9 @@
     const opts = optionsOf(s, s.sel);
     const two = opts[0].dir === "rein";
     return {
-      phase: s.count ? `${s.count} richtig` : "Neuer Zug",
+      phase: infoLine(s, me),
       title: two ? "Dazwischen oder außerhalb?" : "Höher oder tiefer?",
-      body: statusHtml(s, me) + boardHtml(s, p),
+      body: boardHtml(s, p),
       actions: [
         ...opts.map((o) => ({ label: o.label, sub: o.sub, act: { type: "guess", dir: o.dir }, by: p, disabled: !o.can })),
         ...(s.count >= MIN_CARDS ? [stopAction(s)] : []),
@@ -183,10 +183,10 @@
     const w = s.wrong;
     const p = s.players[s.cur];
     return {
-      phase: "Daneben",
+      phase: infoLine(s, me),
       title: `❌ ${cardName(w.value)}! ${name(p)} trinkt ${sips(w.n)}${w.shot ? " und einen Shot 🥃" : ""}.`,
-      body: statusHtml(s, me) + boardHtml(s),
-      actions: [{ label: "Karten umdrehen", act: { type: "next" }, by: p }],
+      body: boardHtml(s),
+      actions: [{ label: "Umdrehen und weiter", sub: `${me === p ? "Du spielst" : `${p} spielt`} weiter, bis ${MIN_CARDS} richtig sind`, act: { type: "next" }, by: p }],
     };
   }
 
@@ -265,6 +265,7 @@
 
   function nextTurn(s) {
     s.cur = (s.cur + 1) % s.players.length;
+    if (s.cur === s.start) s.round++;
     s.count = 0;
     s.mid = false;
     s.sel = null;
@@ -273,15 +274,20 @@
   }
 
   // Nach dem Fehler: die verbundenen Karten werden umgedreht, kommen zurück in den Stapel, und der wird gemischt.
-  // Liegt danach gar nichts mehr offen, werden die 4 Ecken neu aufgedeckt.
+  // Die 4 Ecken bleiben immer offen liegen. Wer falsch lag, spielt weiter und fängt beim Zählen wieder bei 0 an.
   function flipBack(s) {
     for (const i of s.wrong.group) {
+      if (CORNERS.includes(i)) continue;
       s.deck.push(s.board[i].card);
       s.board[i] = { open: false, card: null };
     }
     shuffle(s.deck);
-    if (!openCount(s)) for (const i of CORNERS) deal(s, i);
     s.last = null;
+    s.count = 0;
+    s.mid = false;
+    s.sel = null;
+    s.wrong = null;
+    s.stage = "pick";
   }
 
   // --- Bots ---
@@ -326,8 +332,8 @@
     rules: [
       "21 Karten (2 bis Ass, Ass zählt 14) liegen verdeckt als Fenster: oben und unten je 5, links und rechts je 3 dazwischen, in der Mitte ein Kreuz. Die 4 Ecken liegen offen.",
       "Wer dran ist, tippt eine verdeckte Karte neben einer offenen an und sagt höher oder tiefer. Liegen auf beiden Seiten offene Karten (gerade oder über die Ecke), heißt es dazwischen oder außerhalb. Gleich zählt als falsch.",
-      "Falsch: Du trinkst so viele Schlucke, wie offene Karten mit der neuen Karte verbunden sind (sie selbst mitgezählt). Diese Karten werden umgedreht und neu gemischt, dann ist der Nächste dran.",
-      "Du musst mindestens 2 Karten aufdecken. Danach darfst du aufhören und so viele Schlucke verteilen, wie du Karten aufgedeckt hast.",
+      "Falsch: Du trinkst so viele Schlucke, wie offene Karten mit der neuen Karte verbunden sind (sie selbst und die Ecken mitgezählt). Diese Karten werden umgedreht und neu gemischt, nur die 4 Ecken bleiben immer offen.",
+      "Nach einem Fehler spielst du weiter und fängst wieder bei 0 an. Abgeben darfst du erst, wenn du selbst 2 Karten richtig aufgedeckt hast. Dann verteilst du so viele Schlucke, wie du Karten richtig hast.",
       "Hast du die Mitte aufgedeckt und hörst auf, verteilst du zusätzlich einen Shot. Hängt die Mitte an deiner falschen Karte, trinkst du den Shot selbst.",
       "Wer die letzte Karte aufdeckt, macht das Fenster zu und verteilt seine Karten.",
     ],
@@ -337,6 +343,8 @@
       for (const p of players) s.tally[p] = { sips: 0, shots: 0 };
       for (const i of CORNERS) deal(s, i);
       s.cur = Math.floor(Math.random() * players.length);
+      s.start = s.cur;
+      s.round = 1;
       return s;
     },
 
@@ -369,7 +377,6 @@
       }
       else if (s.stage === "wrong" && a.type === "next") {
         flipBack(s);
-        nextTurn(s);
       }
     },
   });
