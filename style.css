@@ -980,3 +980,78 @@ html[data-game="hodenritter"] .hr-kinds .btn { padding: 4px 2px; font-size: 1.25
   html.fit[data-game="hodenritter"] .bf > .bf-actions.hr-kinds { grid-template-columns: repeat(8, 1fr); }
 }
 html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-top: 2px; font-size: 0.72rem; font-weight: 600; opacity: 0.85; }
+
+/* --- Fenster --- */
+.fe-status { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; flex: none; }
+.fe-table {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 160px;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  border-radius: 26px;
+  border: 7px solid #5b3a1e;
+  background: radial-gradient(ellipse at 50% 40%, #1f8a4c, #146c3a 55%, #0d4f2a);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 6px 22px rgb(0 0 0 / 0.5), 0 12px 30px -10px rgb(0 0 0 / 0.7);
+}
+.fe-grid {
+  /* Kartenbreite passt sich an: 5 Spalten nebeneinander, 5 Reihen mit Karten im Format 5:7 */
+  --g: clamp(4px, 1.6cqmin, 10px);
+  --w: min((100cqw - 20px - 4 * var(--g)) / 5, (100cqh - 20px - 4 * var(--g)) / 7, 110px);
+  display: grid;
+  grid-template-columns: repeat(5, var(--w));
+  grid-template-rows: repeat(5, calc(var(--w) * 1.4));
+  gap: var(--g);
+}
+.fe-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: calc(var(--w) * 0.06) calc(var(--w) * 0.1);
+  border-radius: calc(var(--w) * 0.13);
+  background: #fff;
+  color: #1b1033;
+  font-weight: 900;
+  font-size: calc(var(--w) * 0.3);
+  line-height: 1;
+  box-shadow: 0 3px 6px rgb(0 0 0 / 0.45);
+}
+.fe-card span:last-child { font-size: 1.15em; }
+.fe-card.red { color: #dc2626; }
+.fe-card.back {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: repeating-linear-gradient(45deg, #7c3aed 0 5px, #5b21b6 5px 10px);
+  border: 3px solid #fff;
+}
+.fe-card.back span { font-size: calc(var(--w) * 0.4); filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
+.fe-card.mid { outline: 3px solid #fbbf24; outline-offset: 2px; }
+.fe-card.can { cursor: pointer; -webkit-tap-highlight-color: transparent; border-color: #fde68a; box-shadow: 0 0 12px 2px rgb(253 230 138 / 0.75); }
+.fe-card.can:active { transform: scale(0.92); }
+.fe-card.sel { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary), 0 0 18px 4px var(--primary); animation: fe-pulse 1s ease-in-out infinite alternate; }
+.fe-card.ref { box-shadow: 0 0 0 3px #38bdf8, 0 3px 6px rgb(0 0 0 / 0.45); }
+.fe-card.right { box-shadow: 0 0 0 3px #22c55e, 0 0 14px #22c55e; }
+.fe-card.bad { box-shadow: 0 0 0 3px #ef4444, 0 0 14px #ef4444; }
+.fe-card.flip { animation: fe-flip 0.7s ease-out both; }
+@keyframes fe-flip {
+  0% { transform: rotateY(90deg) scale(1.15); }
+  60% { transform: rotateY(0deg) scale(1.15); }
+  100% { transform: none; }
+}
+@keyframes fe-pulse { to { transform: scale(1.07); } }
+.bf-actions.fe-actions { grid-template-columns: 1fr 1fr; }
+.fe-actions .btn small { display: block; margin-top: 2px; font-size: 0.75rem; font-weight: 600; opacity: 0.8; }
+.fe-actions .btn.ghost { grid-column: 1 / -1; }
+.fe-actions .btn:disabled { opacity: 0.35; }
+.bf-actions .btn small { display: block; font-size: 0.75rem; font-weight: 600; opacity: 0.8; }
+.fe-tally { flex: none; }
+html.fit .fe-tally li { padding: clamp(3px, 0.8dvh, 10px) 14px; }
+/* Der Tisch bleibt so breit wie das Fenster hoch ist, damit außen kein leeres Grün steht. */
+html.fit .fe-table { width: auto; height: 100%; aspect-ratio: 5 / 7; max-width: 100%; margin: 0 auto; }
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit[data-game="fenster"] .bf { grid-template-columns: minmax(0, 1.2fr) minmax(220px, 1fr); }
+  html.fit[data-game="fenster"] .bf-actions.fe-actions { grid-template-columns: 1fr 1fr; }
+}

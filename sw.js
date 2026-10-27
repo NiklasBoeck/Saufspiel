@@ -14,6 +14,7 @@ const FILES = [
   "busfahrer.js",
   "triade.js",
   "dealer.js",
+  "fenster.js",
   "hodenritter.js",
   "hodenritter-3d.js",
   "flunky.js",
