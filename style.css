@@ -1265,3 +1265,34 @@ html[data-game="duell"] .bf-actions:empty { display: none; }
   .pd-arena .pd-signal { min-height: 0; width: clamp(110px, 22vw, 260px); font-size: clamp(1.3rem, 7dvh, 3rem); }
   .pd-arena.solo .pd-signal { width: auto; min-height: clamp(50px, 22dvh, 140px); }
 }
+
+/* --- Kistenturm: 3D-Biergarten füllt den ganzen Bildschirm, Text oben, Hinweis und Knöpfe unten --- */
+.kt-view { position: relative; flex: 1; min-height: 180px; border-radius: 18px; overflow: hidden; background: #2a2050; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.kt-mount, .kt-stage { position: absolute; inset: 0; }
+.kt-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.kt-hint { margin: 0; }
+html[data-game="kistenturm"] .bf:has(.kt-view) { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; gap: 4px; pointer-events: none;
+  padding: calc(52px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+html[data-game="kistenturm"] .bf:has(.kt-view)::before { content: ""; position: absolute; inset: 0 0 auto; height: calc(130px + env(safe-area-inset-top)); background: linear-gradient(rgb(15 12 30 / 0.6), transparent); pointer-events: none; z-index: 1; }
+html[data-game="kistenturm"] .bf:has(.kt-view) > * { position: relative; z-index: 2; margin: 0; }
+html[data-game="kistenturm"] .bf:has(.kt-view) > .bf-body { position: static; z-index: auto; flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; min-height: 0; overflow: visible; height: auto; }
+html[data-game="kistenturm"] .kt-view { position: fixed; inset: 0; z-index: 0; min-height: 0; border-radius: 0; pointer-events: auto; }
+html[data-game="kistenturm"] .bf:has(.kt-view) .bf-phase, html[data-game="kistenturm"] .bf:has(.kt-view) .bf-title { text-align: center; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); text-transform: none; letter-spacing: 0; }
+html[data-game="kistenturm"] .bf:has(.kt-view) .bf-phase { font-size: 0.75rem; opacity: 0.9; }
+html[data-game="kistenturm"] .bf:has(.kt-view) .bf-title { font-size: clamp(1rem, 2.6vmin, 1.3rem); }
+html[data-game="kistenturm"] .your-turn { display: none; }
+html[data-game="kistenturm"] .kt-hint, html[data-game="kistenturm"] .kt-tally { position: relative; z-index: 2; align-self: center; max-width: 620px; }
+html[data-game="kistenturm"] .kt-hint { padding: 6px 14px; border-radius: 12px; background: rgb(15 12 30 / 0.6); color: #fff; font-size: 0.88rem; text-align: center; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+html[data-game="kistenturm"] .kt-tally li { background: rgb(15 12 30 / 0.7); color: #fff; }
+html[data-game="kistenturm"] .bf:has(.kt-view) > .bf-actions { pointer-events: auto; width: 100%; max-width: 620px; align-self: center; }
+html[data-game="kistenturm"] .bf:has(.kt-view) .bf-actions:empty { display: none; }
+html[data-game="kistenturm"] .bf:has(.kt-view) .wait { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); padding: 6px; }
+html[data-game="kistenturm"] #screen-game:has(.kt-view) .game-bar { position: fixed; z-index: 3; top: calc(6px + env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); pointer-events: none; }
+html[data-game="kistenturm"] #screen-game:has(.kt-view) .game-bar > * { pointer-events: auto; }
+html[data-game="kistenturm"] #screen-game:has(.kt-view) .game-bar .btn { min-width: 38px; height: 38px; padding: 0 10px; border-radius: 999px; background: rgb(15 12 30 / 0.5); color: #fff; }
+html[data-game="kistenturm"] #screen-game:has(.kt-view) .game-title { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
+html[data-game="kistenturm"] #screen-game:has(.kt-view) .conn { position: fixed; z-index: 3; bottom: calc(2px + env(safe-area-inset-bottom)); left: 0; right: 0; margin: 0; font-size: 0.7rem; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / 0.8); }
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit[data-game="kistenturm"] .bf:has(.kt-view) { display: flex; }
+  html.fit[data-game="kistenturm"] .bf:has(.kt-view) > * { grid-column: auto; }
+}
