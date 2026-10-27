@@ -343,16 +343,27 @@
     const STEP = 200;
     const back = [...cells].reverse();
     // Nach der letzten Karte zieht der Dealer die Hand etwas zurück und geht mit ihr nach unten raus
-    const HOME = DEAL + STEP * n + 30;
+    // Austeilen: der Dealer hält den Stapel vor sich und wirft die Karten einzeln mit einem kurzen Schwung
+    const grid = (root.querySelector(".fe-grid") || root).getBoundingClientRect();
+    const D = { x: grid.left + grid.width * 0.7, y: grid.top + grid.height * 0.64 };
+    const THROW = (j) => DEAL + 200 + STEP * j;
+    const flick = (c) => {
+      const m = mid(c);
+      const l = Math.hypot(m.x - D.x, m.y - D.y) || 1;
+      return { x: D.x + ((m.x - D.x) / l) * W * 0.35, y: D.y + ((m.y - D.y) / l) * W * 0.35 };
+    };
+    const HOME = THROW(n - 1) + 160;
     const END = HOME + 450;
     const keys = [
       { t: START, x: cells[0].r.left - W * 0.3, y: mid(cells[0]).y },
       ...cells.map((c, j) => ({ t: START + (SWEEP * (j + 1)) / (n + 1), x: c.r.left + W * 0.25, y: mid(c).y })),
       { t: START + SWEEP, x: vw + W * 0.4, y: mid(cells[n - 1]).y - H * 0.3 },
-      ...back.flatMap((c, j) => {
-        const p = { x: mid(c).x, y: c.r.top + H * 0.35 };
-        return [{ t: DEAL + STEP * (j + 1) - 40, ...p }, { t: DEAL + STEP * (j + 1) + 30, ...p }];
-      }),
+      { t: DEAL + 120, ...D },
+      ...back.flatMap((c, j) => [
+        { t: THROW(j) - 70, ...D },
+        { t: THROW(j), ...flick(c) },
+      ]),
+      { t: HOME, ...D },
     ];
     const ease = (u) => u * u * (3 - 2 * u);
     // Weiche Kurve durch alle Punkte (Catmull-Rom), damit die Hand fließt statt an jeder Karte zu stoppen
@@ -392,12 +403,18 @@
     rig.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
     const grad = (id) =>
       `<linearGradient id="${id}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0a1222"/><stop offset="0.28" stop-color="#2c4371"/><stop offset="0.55" stop-color="#1c2d50"/><stop offset="1" stop-color="#080f1d"/></linearGradient>`;
+    // Der Stapel liegt unter der Handfläche, Karten längs zu den Fingern
+    const cw = Math.min(W, H) / k;
+    const ch = Math.max(W, H) / k;
+    const deck = [8, 4, 0]
+      .map((o) => `<rect x="${106 - cw / 2 + o}" y="${165 - ch / 2 + o}" width="${cw}" height="${ch}" rx="${cw * 0.1}" fill="#0f5a3a" stroke="#f4f1ea" stroke-width="${cw * 0.05}"/>`)
+      .join("");
     rig.innerHTML = `<defs>${HAND_DEFS}${grad("fdu")}${grad("fdf")}</defs>
       <path class="fd-shadow" fill="rgb(0 0 0 / 0.22)"/>
       <path class="fd-upper" fill="url(#fdu)"/>
       <path class="fd-fore" fill="url(#fdf)"/>
       <path class="fd-folds" fill="none" stroke="#060c18" stroke-width="${5 * k}" stroke-linecap="round" opacity="0.55"/>
-      <g class="fd-hand">${HAND_BODY}</g>
+      <g class="fd-hand"><g class="fd-deck">${deck}</g>${HAND_BODY}</g>
       <g class="fd-body">${DEALER_BODY}</g>
       <g class="fd-head">${DEALER_HEAD}</g>`;
     document.body.appendChild(rig);
@@ -506,6 +523,7 @@
       // Hand zeigt in Richtung Unterarm; ist der von oben kaum zu sehen, in Richtung Schulter→Hand
       const w = clamp(fl / (L2 * 0.6), 0, 1);
       const rot = (Math.atan2(fy * w + (ay / flat) * (1 - w), fx * w + (ax / flat) * (1 - w)) * 180) / Math.PI + 90;
+      $(".fd-deck").style.display = t > START + SWEEP + 60 && t < THROW(n - 1) + 30 ? "" : "none";
       $(".fd-hand").setAttribute("transform", `translate(${P.x} ${P.y}) rotate(${rot}) scale(${k}) translate(-106 -306)`);
     }
     const t0 = performance.now();
@@ -548,16 +566,24 @@
       ).onfinish = () => ghost.remove();
     });
 
-    // Jede neue Karte rutscht unter der Hand hervor, sobald die Hand über ihrem Platz ist
+    // Jede neue Karte fliegt aus der Hand an ihren Platz: dreht sich im Flug, gleitet über den Filz aus
     back.forEach((c, j) => {
+      const from = flick(c);
+      const m = mid(c);
+      const dx = from.x - m.x;
+      const dy = from.y - m.y;
+      const spin = (j % 2 ? 1 : -1) * (160 + j * 25);
       c.el.animate(
         [
-          { transform: `translate(${W * 0.15}px, ${-H * 0.25}px) rotate(-6deg) scale(1.04)`, opacity: 0 },
-          { transform: `translate(${W * 0.08}px, ${-H * 0.12}px) rotate(-3deg)`, opacity: 1, offset: 0.3 },
+          { transform: `translate(${dx}px, ${dy}px) rotate(${spin}deg) scale(0.92)`, opacity: 1 },
+          { transform: `translate(${dx * 0.25}px, ${dy * 0.25}px) rotate(${spin * 0.06}deg) scale(1.03)`, offset: 0.45 },
+          { transform: `translate(${dx * 0.05}px, ${dy * 0.05}px) rotate(${spin * 0.01}deg)`, offset: 0.75 },
           { transform: "none", opacity: 1 },
         ],
-        { duration: 260, delay: DEAL + STEP * (j + 1) - 60, easing: "ease-out", fill: "backwards" }
+        { duration: 520, delay: THROW(j), easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "backwards" }
       );
+      // bis zum Wurf ist der Platz leer
+      c.el.animate([{ opacity: 0 }, { opacity: 0 }], { duration: THROW(j), fill: "none" });
     });
     return END;
   }
