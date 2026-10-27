@@ -66,7 +66,9 @@
     const hi = Math.max(...vals);
     return [
       { dir: "rein", label: `Dazwischen ↔`, sub: `${cardName(lo)} bis ${cardName(hi)}`, ok: (x) => x > lo && x < hi, can: hi - lo > 1 },
-      { dir: "raus", label: `Außerhalb ⇹`, sub: `unter ${cardName(lo)} oder über ${cardName(hi)}`, ok: (x) => x < lo || x > hi, can: lo > 2 || hi < 14 },
+      { dir: "raus", label: `Außerhalb ⇹`, sub: `unter ${cardName(lo)}, über ${cardName(hi)}`, ok: (x) => x < lo || x > hi, can: lo > 2 || hi < 14 },
+      // Gleich: richtig, wenn die Karte denselben Wert hat wie eine der beiden (Zahl oder Bild)
+      { dir: "gleich", label: `Gleich =`, sub: lo === hi ? cardName(lo) : `${cardName(lo)} oder ${cardName(hi)}`, ok: (x) => x === lo || x === hi, can: true },
     ];
   }
 
@@ -115,6 +117,7 @@
       cls.push("can");
       attrs = ` data-act='${JSON.stringify({ type: "pick", i })}' data-by="${escapeHtml(tap)}" role="button"`;
     }
+    attrs += ` data-i="${i}"`;
     if (!b.open) {
       cls.push("back");
       return `<div class="${cls.join(" ")}"${attrs}>${i === MID ? "<span>🥃</span>" : ""}</div>`;
@@ -142,12 +145,10 @@
     return `Runde ${s.round} · ${who} dran · ${got}${s.mid ? " · 🥃" : ""}`;
   }
 
+  // Kleiner Knopf. Vor der 2. richtigen Karte leuchtet er beim Drücken nur rot auf (siehe afterRender).
+  const STOP = "Aufhören";
   function stopAction(s) {
-    const p = s.players[s.cur];
-    const shot = s.mid ? " + 🥃" : "";
-    return s.count >= MIN_CARDS
-      ? { label: `Aufhören, ${s.count} verteilen${shot}`, act: { type: "stop" }, by: p, ghost: true }
-      : { label: "Aufhören", sub: `erst ab ${MIN_CARDS} Karten`, act: { type: "stop" }, by: p, ghost: true, disabled: true };
+    return { label: STOP, act: { type: "stop" }, by: s.players[s.cur], ghost: true };
   }
 
   function pickView(s, me) {
@@ -155,9 +156,10 @@
     const mine = me === p;
     return {
       phase: infoLine(s, me),
-      title: mine || !me ? "Tipp auf eine leuchtende Karte" : `${name(p)} sucht sich eine Karte aus`,
+      title: mine || !me ? "" : `${name(p)} sucht sich eine Karte aus`,
       body: boardHtml(s, p),
       actions: [stopAction(s)],
+      actionsClass: "fe-actions",
       turn: p,
     };
   }
@@ -168,13 +170,13 @@
     const two = opts[0].dir === "rein";
     return {
       phase: infoLine(s, me),
-      title: two ? "Dazwischen oder außerhalb?" : "Höher oder tiefer?",
+      title: two ? "Dazwischen, außerhalb oder gleich?" : "Höher oder tiefer?",
       body: boardHtml(s, p),
       actions: [
         ...opts.map((o) => ({ label: o.label, sub: o.sub, act: { type: "guess", dir: o.dir }, by: p, disabled: !o.can })),
-        ...(s.count >= MIN_CARDS ? [stopAction(s)] : []),
+        stopAction(s),
       ],
-      actionsClass: "fe-actions",
+      actionsClass: `fe-actions fe-n${opts.length}`,
       turn: p,
     };
   }
@@ -221,11 +223,11 @@
     const card = s.board[i].card;
     s.sel = null;
     s.last = { i, ok: opt.ok(card.value), id: Math.random().toString(36).slice(2) };
+    s.swept = null;
     if (s.last.ok) {
       s.count++;
       if (i === MID) s.mid = true;
       if (openCount(s) === CELLS.length) return finish(s, p);
-      notice(s, { emoji: "✅", title: "Richtig!", text: `${cardName(card.value)}. Weiter oder aufhören?` });
       s.stage = "pick";
       return;
     }
@@ -276,6 +278,7 @@
   // Nach dem Fehler: die verbundenen Karten werden umgedreht, kommen zurück in den Stapel, und der wird gemischt.
   // Die Ecken werden dabei ausgetauscht und liegen gleich wieder offen. Wer falsch lag, spielt weiter und fängt beim Zählen wieder bei 0 an.
   function flipBack(s) {
+    s.swept = { id: Math.random().toString(36).slice(2), cards: s.wrong.group.map((i) => ({ i, card: s.board[i].card })) };
     for (const i of s.wrong.group) {
       s.deck.push(s.board[i].card);
       s.board[i] = { open: false, card: null };
@@ -289,6 +292,95 @@
     s.sel = null;
     s.wrong = null;
     s.stage = "pick";
+  }
+
+  // --- Animationen nach dem Zeichnen ---
+
+  // Nach einem Fehler schiebt eine Hand die verbundenen Karten vom Tisch, dann werden neue vom Stapel hingelegt.
+  // Läuft auf jedem Handy einmal pro Fehler. Gibt zurück, wie lange es dauert.
+  const sweptSeen = new Set();
+  function sweepAnim(root, s) {
+    const sw = s.swept;
+    if (!sw || sweptSeen.has(sw.id)) return 0;
+    sweptSeen.add(sw.id);
+    const table = root.querySelector(".fe-table");
+    const cells = sw.cards
+      .map((c) => ({ ...c, el: root.querySelector(`.fe-card[data-i="${c.i}"]`) }))
+      .filter((c) => c.el)
+      .map((c) => ({ ...c, r: c.el.getBoundingClientRect() }))
+      .sort((a, b) => a.r.left - b.r.left || a.r.top - b.r.top);
+    if (!cells.length || !table) return 0;
+    const tr = table.getBoundingClientRect();
+    const H = cells[0].r.height;
+    const W = cells[0].r.width;
+    const START = 250;
+    const SWEEP = 500 + cells.length * 160;
+
+    // Hand fährt von links über alle Karten nach rechts aus dem Bild
+    const hand = document.createElement("div");
+    hand.className = "fe-hand";
+    hand.textContent = "🫸";
+    const hs = Math.max(W, H) * 1.1;
+    Object.assign(hand.style, { fontSize: `${hs}px`, left: "0px", top: "0px" });
+    document.body.appendChild(hand);
+    const pts = [{ x: tr.left - hs, y: cells[0].r.top + H / 2 }, ...cells.map((c) => ({ x: c.r.left - hs * 0.55, y: c.r.top + H / 2 })), { x: window.innerWidth + hs, y: cells[cells.length - 1].r.top + H / 2 }];
+    const frames = pts.map((p, k) => ({ transform: `translate(${p.x}px, ${p.y - hs / 2}px)`, offset: k / (pts.length - 1) }));
+    hand.animate(frames, { duration: SWEEP, delay: START, easing: "ease-in-out", fill: "both" }).onfinish = () => hand.remove();
+
+    // Die alten Karten liegen noch kurz da und werden weggeschoben, sobald die Hand sie erreicht
+    cells.forEach((c, k) => {
+      const ghost = document.createElement("div");
+      ghost.className = `fe-ghost ${c.card.suit.red ? "red" : ""}`;
+      ghost.innerHTML = `<span>${c.card.rank}</span><span>${c.card.suit.symbol}</span>`;
+      Object.assign(ghost.style, {
+        left: `${c.r.left}px`,
+        top: `${c.r.top}px`,
+        width: `${W}px`,
+        height: `${H}px`,
+        fontSize: `${Math.min(W, H) * 0.3}px`,
+        borderRadius: `${Math.min(W, H) * 0.12}px`,
+      });
+      document.body.appendChild(ghost);
+      const hit = START + SWEEP * ((k + 1) / (pts.length - 1)) - 60;
+      const off = window.innerWidth - c.r.left + 40;
+      ghost.animate(
+        [
+          { transform: "none", opacity: 1 },
+          { transform: `translate(${W * 0.3}px, -4px) rotate(6deg)`, opacity: 1, offset: 0.25 },
+          { transform: `translate(${off}px, ${-H * 0.4}px) rotate(${20 + k * 4}deg)`, opacity: 0.9 },
+        ],
+        { duration: Math.max(380, SWEEP - (hit - START)), delay: hit, easing: "ease-in", fill: "both" }
+      ).onfinish = () => ghost.remove();
+    });
+
+    // Neue Karten fliegen vom Stapel oben in der Tischmitte auf ihren Platz
+    const DEAL = START + SWEEP + 150;
+    cells.forEach((c, k) => {
+      const dx = tr.left + tr.width / 2 - (c.r.left + W / 2);
+      const dy = tr.top - (c.r.top + H / 2);
+      c.el.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(0.6) rotate(-14deg)`, opacity: 0 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.7) rotate(-10deg)`, opacity: 1, offset: 0.15 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 420, delay: DEAL + k * 110, easing: "cubic-bezier(0.2, 0.8, 0.3, 1.05)", fill: "backwards" }
+      );
+    });
+    return DEAL + cells.length * 110 + 420;
+  }
+
+  // „Aufhören“ vor der 2. richtigen Karte: nichts passiert, der Knopf leuchtet nur kurz rot auf.
+  function guardStop(root, s) {
+    if (s.count >= MIN_CARDS) return;
+    const btn = [...root.querySelectorAll(".bf-actions .btn")].find((b) => b.textContent.trim() === STOP);
+    if (!btn) return;
+    btn.classList.add("fe-stop");
+    btn.onclick = () => {
+      btn.classList.remove("nope");
+      void btn.offsetWidth;
+      btn.classList.add("nope");
+    };
   }
 
   // --- Bots ---
@@ -332,7 +424,7 @@
     fit: true,
     rules: [
       "21 Karten (2 bis Ass, Ass zählt 14) liegen verdeckt als Fenster: oben und unten je 5, links und rechts je 3 dazwischen, in der Mitte ein Kreuz. Die 4 Ecken liegen offen.",
-      "Wer dran ist, tippt eine verdeckte Karte neben einer offenen an und sagt höher oder tiefer. Liegen auf beiden Seiten offene Karten (gerade oder über die Ecke), heißt es dazwischen oder außerhalb. Gleich zählt als falsch.",
+      "Wer dran ist, tippt eine verdeckte Karte neben einer offenen an und sagt höher oder tiefer. Liegen auf beiden Seiten offene Karten (gerade oder über die Ecke), heißt es dazwischen, außerhalb oder gleich. Gleich ist richtig, wenn die Karte denselben Wert hat wie eine der beiden (Zahl oder Bild). Kommt sonst ein gleicher Wert, ist es immer falsch.",
       "Falsch: Du trinkst so viele Schlucke, wie offene Karten mit der neuen Karte verbunden sind (sie selbst und die Ecken mitgezählt). Diese Karten werden umgedreht und neu gemischt. Hängt eine Ecke dran, kommt dort eine neue Karte hin, die gleich wieder offen liegt.",
       "Nach einem Fehler spielst du weiter und fängst wieder bei 0 an. Abgeben darfst du erst, wenn du selbst 2 Karten richtig aufgedeckt hast. Dann verteilst du so viele Schlucke, wie du Karten richtig hast.",
       "Hast du die Mitte aufgedeckt und hörst auf, verteilst du zusätzlich einen Shot. Hängt die Mitte an deiner falschen Karte, trinkst du den Shot selbst.",
@@ -356,6 +448,13 @@
         case "wrong": return wrongView(s, me);
         default: return endView(s);
       }
+    },
+
+    afterRender(root, s) {
+      const stop = [...root.querySelectorAll(".bf-actions .btn")].find((b) => b.textContent.trim() === STOP);
+      if (stop) stop.classList.add("fe-stop");
+      guardStop(root, s);
+      return sweepAnim(root, s);
     },
 
     bot(s, name, acts) {

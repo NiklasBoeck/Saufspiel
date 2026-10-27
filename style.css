@@ -996,18 +996,46 @@ html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-to
 /* --- Fenster --- */
 /* Der Tisch füllt alles zwischen der kleinen Info-Zeile oben und den Knöpfen unten.
    Hochkant liegen die Karten hochkant, im Querformat (Handy gekippt) liegt der ganze Tisch quer. */
+/* Casino-Tisch: gepolsterte Lederbande, goldene Zierlinie, Filz mit Licht von oben */
 .fe-table {
+  position: relative;
   flex: 1 1 0;
   min-height: 160px;
   width: 100%;
   container-type: size;
   display: grid;
   place-items: center;
-  border-radius: 22px;
-  border: 5px solid #5b3a1e;
-  background: radial-gradient(ellipse at 50% 45%, #237a4b, #165e37 55%, #0c4426);
-  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.25), inset 0 6px 22px rgb(0 0 0 / 0.5), 0 12px 30px -10px rgb(0 0 0 / 0.7);
+  border-radius: 30px;
+  border: clamp(8px, 1.6vmin, 14px) solid transparent;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgb(255 255 240 / 0.13), transparent 70%) padding-box,
+    repeating-linear-gradient(45deg, rgb(0 0 0 / 0.035) 0 1px, transparent 1px 4px) padding-box,
+    repeating-linear-gradient(-45deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 4px) padding-box,
+    radial-gradient(ellipse at 50% 45%, #1f8f52, #136a3d 55%, #093b22) padding-box,
+    linear-gradient(170deg, #8a4a22, #5a2a10 35%, #3a1808 70%, #6b3517) border-box;
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.4),
+    inset 0 10px 30px rgb(0 0 0 / 0.55),
+    inset 0 -6px 20px rgb(0 0 0 / 0.35),
+    0 0 0 1px rgb(255 214 140 / 0.25),
+    0 16px 34px -12px rgb(0 0 0 / 0.8);
 }
+/* Goldene Zierlinie im Filz */
+.fe-table::after {
+  content: "";
+  position: absolute;
+  inset: clamp(4px, 1.2cqmin, 10px);
+  border: 1.5px solid rgb(231 200 115 / 0.55);
+  border-radius: 20px;
+  box-shadow: 0 0 0 3px rgb(231 200 115 / 0.08);
+  pointer-events: none;
+}
+/* In den vier freien Feldern im Fenster: goldene Kartenfarben, wie auf einen Casino-Filz gedruckt */
+.fe-gap { display: grid; place-items: center; color: rgb(231 200 115 / 0.32); font-size: calc(min(var(--w), var(--w) * var(--r)) * 0.55); text-shadow: 0 1px 0 rgb(0 0 0 / 0.35); }
+.fe-gap::before { content: "♠"; }
+.fe-gap:nth-child(9)::before { content: "♥"; }
+.fe-gap:nth-child(17)::before { content: "♦"; }
+.fe-gap:nth-child(19)::before { content: "♣"; }
 .fe-grid {
   /* --w = Kartenbreite, --r = Höhe zu Breite (hochkant 1.4, quer 0.72) */
   --r: 1.4;
@@ -1074,9 +1102,40 @@ html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-to
   100% { transform: none; }
 }
 @keyframes fe-pulse { to { transform: scale(1.07); } }
-.bf-actions.fe-actions { grid-template-columns: 1fr 1fr; }
-.fe-actions .btn.ghost { grid-column: 1 / -1; }
+.bf-actions.fe-actions { display: grid; grid-template-columns: 1fr; justify-items: stretch; align-items: center; gap: 8px; }
+.bf-actions.fe-actions.fe-n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bf-actions.fe-actions.fe-n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fe-actions .btn { min-width: 0; font-size: clamp(0.85rem, 2.2dvh, 1.05rem); line-height: 1.15; }
+.fe-actions .btn.fe-stop { grid-column: 1 / -1; justify-self: center; }
 .fe-actions .btn:disabled { opacity: 0.35; }
+/* Kleiner Aufhören-Knopf; vor der 2. richtigen Karte leuchtet er beim Drücken rot auf */
+.fe-actions .btn.fe-stop { flex: none; padding: 7px 16px; font-size: 0.88rem; border-radius: 999px; }
+.fe-actions .btn.fe-stop.nope { animation: fe-nope 0.6s ease-out; }
+@keyframes fe-nope {
+  0%, 100% { transform: none; }
+  15% { transform: translateX(-5px); background: #dc2626; color: #fff; border-color: #ef4444; box-shadow: 0 0 18px #ef4444; }
+  30% { transform: translateX(5px); background: #dc2626; color: #fff; }
+  45% { transform: translateX(-3px); background: #dc2626; color: #fff; }
+  60% { transform: translateX(2px); background: #dc2626; color: #fff; box-shadow: 0 0 12px #ef4444; }
+}
+/* Hand und alte Karten beim Wegräumen nach einem Fehler */
+.fe-hand { position: fixed; z-index: 20; pointer-events: none; line-height: 1; filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.5)); will-change: transform; }
+.fe-ghost {
+  position: fixed;
+  z-index: 19;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.2em 0.33em;
+  background: #fff;
+  color: #1b1033;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0 0 3px #ef4444, 0 6px 14px rgb(0 0 0 / 0.5);
+  will-change: transform;
+}
+.fe-ghost.red { color: #dc2626; }
 .bf-actions .btn small { display: block; margin-top: 2px; font-size: 0.75rem; font-weight: 600; opacity: 0.8; }
 .fe-tally { flex: none; }
 html.fit .fe-tally li { padding: clamp(3px, 0.8dvh, 10px) 14px; }
@@ -1104,6 +1163,7 @@ html.fit[data-game="fenster"] .bf-actions .btn { padding: clamp(7px, 1.5dvh, 14p
   html.fit[data-game="fenster"] .bf > .bf-title { grid-column: 2; text-align: left; font-size: clamp(0.9rem, 3.2dvh, 1.25rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   html.fit[data-game="fenster"] .bf > .bf-body { grid-column: 1 / -1; grid-row: 2; height: 100%; }
   html.fit[data-game="fenster"] .bf > .bf-actions { grid-column: 3; display: flex; gap: 6px; align-self: center; }
+  html.fit[data-game="fenster"] .fe-actions .btn.fe-stop { grid-column: auto; }
   html.fit[data-game="fenster"] .bf-actions .btn { padding: clamp(4px, 1.4dvh, 10px) clamp(10px, 1.6vw, 18px); font-size: clamp(0.8rem, 2.8dvh, 1rem); white-space: nowrap; }
   html.fit[data-game="fenster"] .bf-actions .btn small { font-size: 0.66rem; }
   html.fit[data-game="fenster"] .bf-actions .wait { padding: 4px 8px; }
