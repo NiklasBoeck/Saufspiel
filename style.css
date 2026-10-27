@@ -1119,7 +1119,7 @@ html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-to
   60% { transform: translateX(2px); background: #dc2626; color: #fff; box-shadow: 0 0 12px #ef4444; }
 }
 /* Hand und alte Karten beim Wegräumen nach einem Fehler */
-.fe-hand { position: fixed; z-index: 20; pointer-events: none; transform-origin: 50% 60%; filter: drop-shadow(-6px 10px 10px rgb(0 0 0 / 0.45)); will-change: transform; }
+.fe-hand { position: fixed; z-index: 20; pointer-events: none; transform-origin: 50% 400%; filter: drop-shadow(-6px 10px 10px rgb(0 0 0 / 0.45)); will-change: transform; }
 .fe-hand svg { display: block; width: 100%; height: 100%; overflow: visible; }
 /* Finger und Daumen bewegen sich beim Wischen ein bisschen */
 .fe-hand .fh-fingers, .fe-hand .fh-thumb { transform-box: fill-box; transform-origin: 50% 100%; animation: fh-wiggle 0.32s ease-in-out infinite alternate; }
