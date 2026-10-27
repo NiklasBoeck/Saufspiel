@@ -85,6 +85,23 @@
     };
   }
 
+  // Vor dem ersten Glas: kurz erklärt, mit Beispiel
+  function introView(s) {
+    const [a, b, c] = [s.players[0], s.players[1], s.players[2] ?? s.players[0]].map(escapeHtml);
+    return {
+      phase: "So geht Randvoll",
+      title: "Ihr füllt zusammen ein Glas. Wer es überlaufen lässt, trinkt.",
+      body: `<ol class="za-intro">
+          <li>Wenn du dran bist: Finger aufs Glas und <b>gedrückt halten</b>, dann läuft Bier rein. Loslassen, wann du willst. Dann ist der Nächste dran.</li>
+          <li>Wann das Glas überläuft, sieht keiner. Nur bis zur grünen Linie <b>„sicher“</b> passiert garantiert nichts.</li>
+          <li>Läuft's bei dir über, trinkst du. Je öfter schon gezapft wurde, desto mehr Schlucke.</li>
+          <li>Hörst du ganz knapp vorm Überlaufen auf, ist es <b>randvoll</b> 🎯 und du verteilst die Schlucke.</li>
+        </ol>
+        <p class="za-example">Beispiel: ${a} zapft bis zur grünen Linie, ${b} traut sich noch ein Stück, dann zapft ${c} und es läuft über. 3-mal gezapft, also trinkt ${c} 3 Schlucke.</p>`,
+      actions: [{ label: "Verstanden, los geht's 🍺", act: { type: "go" } }],
+    };
+  }
+
   function doneView(s, me) {
     const r = s.result;
     const you = me === r.who;
@@ -298,13 +315,14 @@
     ],
 
     setup(players) {
-      const s = { players, cur: Math.floor(Math.random() * players.length), stage: "pour", last: null, result: null, tally: {} };
+      const s = { players, cur: Math.floor(Math.random() * players.length), stage: "intro", last: null, result: null, tally: {} };
       for (const p of players) s.tally[p] = { sips: 0, over: 0, full: 0 };
       newGlass(s);
       return s;
     },
 
     view(s, me) {
+      if (s.stage === "intro") return introView(s);
       return s.stage === "done" ? doneView(s, me) : pourView(s, me);
     },
 
@@ -316,7 +334,8 @@
 
     act(s, a) {
       // n und pours: nur das Zapfen zählt, das zu diesem Glas und diesem Zug gehört (nicht doppelt)
-      if (s.stage === "pour" && a.type === "pour" && a.n === s.n && a.pours === s.glass.pours) {
+      if (s.stage === "intro" && a.type === "go") s.stage = "pour";
+      else if (s.stage === "pour" && a.type === "pour" && a.n === s.n && a.pours === s.glass.pours) {
         pour(s, Math.min(100, Math.max(0, Number(a.amt) || 0)));
       } else if (s.stage === "done" && a.type === "next" && a.n === s.n) {
         newGlass(s);

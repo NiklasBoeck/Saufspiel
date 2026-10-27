@@ -1212,3 +1212,6 @@ html.fit[data-game="randvoll"] .bf-body { overflow: hidden; gap: clamp(4px, 1dvh
   html.fit[data-game="randvoll"] .bf-phase, html.fit[data-game="randvoll"] .bf-title { text-align: left; }
   html.fit[data-game="randvoll"] .bf-title { font-size: clamp(0.95rem, 4dvh, 1.4rem); }
 }
+.za-intro { margin: 0; padding: 0 0 0 1.3em; display: flex; flex-direction: column; gap: clamp(6px, 1.4dvh, 14px); line-height: 1.4; font-size: clamp(0.95rem, 2.3dvh, 1.15rem); }
+.za-intro b { color: #fcd34d; }
+.za-example { margin: 0; padding: clamp(8px, 1.6dvh, 14px) 14px; border-radius: 14px; background: var(--surface); color: var(--muted); line-height: 1.4; font-size: clamp(0.85rem, 2dvh, 1rem); }
