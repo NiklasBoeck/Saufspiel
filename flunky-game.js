@@ -31,8 +31,16 @@
   // Bots (mittel): zielen auf die Flasche, gleichen den Wind nur teilweise aus und streuen.
   // Mit diesen Werten trifft ein Bot etwa jeden dritten Wurf.
   const BOT_NAMES = ["Robo-Rudi", "Bot-Bärbel", "Chip-Charlie", "Byte-Brigitte", "Turbo-Tom", "Pixel-Paula", "Kalle Klon", "Data-Dörte"];
-  const BOT_AIM = 0.08; // Streuung der Richtung (rad, Standardabweichung)
-  const BOT_POWER = 0.15; // Streuung der Kraft (Anteil)
+  // Bot-Stufe aus den Einstellungen der App (leicht: mehr Streuung, schwer: weniger)
+  const BOT_ERR = (() => {
+    try {
+      return { leicht: 2.2, schwer: 0.3 }[JSON.parse(localStorage.getItem("saufspiel-settings"))?.bots] ?? 1;
+    } catch {
+      return 1;
+    }
+  })();
+  const BOT_AIM = 0.08 * BOT_ERR; // Streuung der Richtung (rad, Standardabweichung)
+  const BOT_POWER = 0.15 * BOT_ERR; // Streuung der Kraft (Anteil)
   const BOT_WIND = 0.85; // so viel vom Wind gleicht ein Bot aus
   const BOT_SIP = [0.12, 0.28]; // so viel Bier trinkt ein Bot pro Treffer (von 1)
 

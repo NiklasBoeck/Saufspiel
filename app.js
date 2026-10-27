@@ -92,12 +92,17 @@ function renderSettingsBtn() {
 }
 
 function renderLevels() {
-  const list = $("level-list");
+  pickList($("level-list"), LEVELS, "level");
+  pickList($("bot-level-list"), BOT_LEVELS, "bots");
+}
+
+// Kacheln zum Auswählen einer Einstellung (Settings[field])
+function pickList(list, options, field) {
   list.innerHTML = "";
-  for (const [key, l] of Object.entries(LEVELS)) {
+  for (const [key, l] of Object.entries(options)) {
     const tile = document.createElement("button");
-    tile.className = `mode-tile level-tile ${key === Settings.level ? "picked" : ""}`;
-    tile.setAttribute("aria-pressed", key === Settings.level);
+    tile.className = `mode-tile level-tile ${key === Settings[field] ? "picked" : ""}`;
+    tile.setAttribute("aria-pressed", key === Settings[field]);
     tile.innerHTML = `
       <span class="mode-emoji">${l.emoji}</span>
       <span class="game-info">
@@ -105,7 +110,7 @@ function renderLevels() {
         <span class="game-desc">${escapeHtml(l.desc)}</span>
       </span>`;
     tile.onclick = () => {
-      Settings.level = key;
+      Settings[field] = key;
       renderLevels();
       renderSettingsBtn();
     };
@@ -180,6 +185,26 @@ function renderPlayers() {
   });
   $("start-btn").disabled = state.players.length < 2;
   $("bot-btn").disabled = state.players.length >= 16;
+  renderBotSeg($("bot-level"), state.players.some(isBot));
+}
+
+// Schalter Leicht / Mittel / Schwer, sobald Bots mitspielen
+function renderBotSeg(el, show) {
+  el.hidden = !show;
+  if (!show) return;
+  el.replaceChildren(
+    ...Object.entries(BOT_LEVELS).map(([key, l]) => {
+      const b = document.createElement("button");
+      b.className = key === Settings.bots ? "picked" : "";
+      b.setAttribute("aria-pressed", key === Settings.bots);
+      b.textContent = `${l.emoji} ${l.label}`;
+      b.onclick = () => {
+        Settings.bots = key;
+        renderBotSeg(el, true);
+      };
+      return b;
+    })
+  );
 }
 
 $("bot-btn").onclick = () => {

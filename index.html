@@ -39,6 +39,8 @@
       </header>
       <p class="hint">Wie viel wird getrunken?</p>
       <div id="level-list" class="level-list"></div>
+      <p class="hint">Wie gut spielen die Bots?</p>
+      <div id="bot-level-list" class="level-list bot-levels"></div>
       <p class="hint small-text">Gilt für jedes neue Spiel. Bei „Jeder sein Handy“ zählt die Einstellung vom Handy, das den Raum erstellt.</p>
       <a class="btn ghost info-link" href="info.html">Verantwortung, Impressum und Datenschutz</a>
     </section>
@@ -80,6 +82,7 @@
       </form>
       <ul id="player-list" class="chips"></ul>
       <button id="bot-btn" class="btn ghost small bot-add">🤖 Bot dazu</button>
+      <div id="bot-level" class="bot-seg" role="group" aria-label="Wie gut spielen die Bots?" hidden></div>
       <p class="hint small-hint">Bots spielen mit, damit du auch alleine spielen kannst.</p>
 
       <button id="start-btn" class="btn" disabled>Los geht’s</button>
@@ -116,6 +119,7 @@
       <button id="lobby-share" class="btn ghost small share-btn">Link teilen</button>
       <ul id="lobby-players" class="chips"></ul>
       <button id="lobby-bot" class="btn ghost small bot-add" hidden>🤖 Bot dazu</button>
+      <div id="lobby-bot-level" class="bot-seg" role="group" aria-label="Wie gut spielen die Bots?" hidden></div>
       <p id="lobby-hint" class="hint"></p>
       <button id="lobby-start" class="btn" hidden>Los geht’s</button>
       <p class="conn"></p>

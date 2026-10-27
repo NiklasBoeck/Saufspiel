@@ -375,7 +375,7 @@
     s.task = { who, i, stage: "ready", id: rid(), goal: taskGoal(s, i), v: 0 };
     if (isBot(who)) {
       // Bots schaffen es in 65 % der Fälle, sonst kommen sie nur ein Stück weit
-      s.task.botOk = Math.random() < 0.65;
+      s.task.botOk = Math.random() < Math.max(0.2, Math.min(0.95, 1 - 0.35 * botErr()));
       s.task.botMs = s.task.botOk ? Math.round(TASKS[i].s * 1000 * (0.45 + Math.random() * 0.4)) : TASKS[i].s * 1000;
       s.task.botFrac = s.task.botOk ? 1 : 0.45 + Math.random() * 0.45;
     }
@@ -563,12 +563,13 @@
     if (s.phase === "white") {
       return { type: "throw", k: s.k, a: gauss() * 0.22, p: 0.42 + Math.random() * 0.38 };
     }
+    const e = botErr(); // Streuung je nach Bot-Stufe
     const dx = s.white.x - x0;
     const dy = s.white.y - THROW_Y;
     const D = Math.hypot(dx, dy);
     // Kurz vor die rote Kugel werfen, den Rest rollt sie
     const p = (D - 0.15) / (RANGE * (1 + ROLL.boule));
-    return { type: "throw", k: s.k, a: Math.atan2(dx, dy) + gauss() * 0.03, p: p * (1 + gauss() * 0.055) };
+    return { type: "throw", k: s.k, a: Math.atan2(dx, dy) + gauss() * 0.03 * e, p: p * (1 + gauss() * 0.055 * e) };
   }
 
   function botBow(s) {

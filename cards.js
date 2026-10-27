@@ -38,7 +38,7 @@ function registerCardGame(key, def) {
       else s.card.bot = `${p} hat’s geschafft!`;
     }
     if (def.botChance) {
-      const hit = s.players.filter((x) => isBot(x) && Math.random() < def.botChance);
+      const hit = s.players.filter((x) => isBot(x) && Math.random() < Math.min(0.9, def.botChance * Math.sqrt(botErr())));
       items.push(...hit.map((who) => ({ who, n: def.botSips, text: def.botText })));
       if (s.players.some(isBot) && !hit.length) s.card.bot = def.botNone;
     }

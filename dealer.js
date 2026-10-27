@@ -308,7 +308,10 @@
     }
     if (!pool.length) return null;
     // Eher aus der Mitte der möglichen Karten, aber jedes Mal anders (Mittel aus zwei Zufallszahlen).
-    const v = pool[Math.floor(((Math.random() + Math.random()) / 2) * pool.length)];
+    // Leicht: irgendeine; schwer: fast genau die Mitte.
+    const e = botErr();
+    const r = e > 1.5 ? Math.random() : e < 0.5 ? 0.5 + (Math.random() - 0.5) * 0.2 : (Math.random() + Math.random()) / 2;
+    const v = pool[Math.floor(r * pool.length)];
     return { type: "guess", value: v };
   }
 

@@ -358,7 +358,7 @@ window.Hodenritter3D = (() => {
       pmrem.dispose();
 
       // Helles, freundliches Licht: blauer Himmel von oben, warmes Gras von unten, tief stehende Sonne
-      scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x7aa84a, 1.35));
+      scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x9c9a62, 1.35));
       const sun = new THREE.DirectionalLight(0xfff1d6, 2.7);
       sun.position.copy(P(0, 6.5).add(SUN_DIR.clone().multiplyScalar(30)));
       sun.target.position.copy(P(0, 6.5));
@@ -1081,13 +1081,13 @@ window.Hodenritter3D = (() => {
     const L = lookOf(name);
     const sw = L.female ? 0.88 : 1.0 * L.build; // Schulterbreite
     const hw = L.female ? 1.08 : 0.98; // Hüftbreite
-    const skin = mat(L.skin, 0.55);
+    const skin = mat(L.skin, 0.55, { emissive: new THREE.Color(L.skin).multiplyScalar(0.12) }); // etwas Eigenleuchten: das grüne Licht vom Rasen färbt sonst Kinn und Hals
     const shirtM = L.stripes ? rim(new THREE.MeshStandardMaterial({ map: stripeTex(L.shirt, L.shirt2), roughness: 0.8 })) : mat(L.shirt, 0.82);
     const pantsM = L.bottom === "jeans" ? rim(new THREE.MeshStandardMaterial({ map: jeansTex(L.pants), roughness: 0.85 })) : mat(L.pants, 0.85);
     const hairM = mat(L.hair, 0.75);
     const shoeM = mat(L.shoes, 0.55);
     const soleM = mat("#f1f1f1", 0.6);
-    const lipM = mat(new THREE.Color(L.skin).lerp(new THREE.Color("#7a2230"), 0.6).getStyle(), 0.5);
+    const lipM = mat(new THREE.Color(L.skin).lerp(new THREE.Color("#7a2230"), 0.38).getStyle(), 0.5);
     const eyeM = mat("#f8f8f5", 0.25);
     const irisM = mat(L.iris, 0.3);
     const pupilM = mat("#0b0b0b", 0.15);
@@ -1123,29 +1123,32 @@ window.Hodenritter3D = (() => {
     neck.add(head);
     addTo(head, mesh(sphere(0.1, 32, 24), skin, 0, 0.1, 0)).scale.set(0.9, 1.08, 1.0);
     addTo(head, mesh(sphere(0.08, 24, 16), skin, 0, 0.045, 0.02)).scale.set(0.92, 0.8, 1.0);
-    // Freundliches Comic-Gesicht: große Augen mit Glanzpunkt, kräftige Brauen, Lächeln, rote Wangen
-    addTo(head, mesh(sphere(0.016, 14, 10), skin, 0, 0.085, 0.097)).scale.set(0.9, 0.85, 0.9);
-    const shine = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const blush = new THREE.MeshBasicMaterial({ color: new THREE.Color(L.skin).lerp(new THREE.Color("#ff6b7a"), 0.45), transparent: true, opacity: 0.45, depthWrite: false });
+    // Natürliches Gesicht: Augen mit Lidern auf halber Kopfhöhe, schmale Brauen, Nase mit Rücken, ruhiger Mund
+    addTo(head, mesh(sphere(0.0105, 14, 10), skin, 0, 0.084, 0.1)).scale.set(1, 0.85, 1.0); // Nasenspitze
+    const bridge = mesh(capsule(0.0075, 0.03, 8), skin, 0, 0.098, 0.096);
+    bridge.rotation.x = -0.3;
+    head.add(bridge);
+    const lidM = skin;
     for (const s of [-1, 1]) {
-      addTo(head, mesh(sphere(0.026, 12, 10), skin, s * 0.09, 0.095, -0.005)).scale.set(0.45, 1, 0.75);
-      addTo(head, mesh(sphere(0.019, 16, 12), eyeM, s * 0.036, 0.113, 0.083, false)).scale.set(0.95, 1.2, 0.62);
-      addTo(head, mesh(sphere(0.0118, 14, 10), irisM, s * 0.035, 0.111, 0.0915, false)).scale.set(1, 1.12, 0.5);
-      addTo(head, mesh(sphere(0.0064, 10, 8), pupilM, s * 0.035, 0.111, 0.0955, false)).scale.set(1, 1.1, 0.5);
-      head.add(mesh(sphere(0.0032, 8, 6), shine, s * 0.035 + 0.004, 0.117, 0.0985, false));
-      const brow = mesh(capsule(0.0045, 0.026, 8), hairM, s * 0.036, 0.139, 0.093, false);
-      brow.rotation.z = Math.PI / 2 - s * 0.18;
+      addTo(head, mesh(sphere(0.026, 12, 10), skin, s * 0.09, 0.095, -0.005)).scale.set(0.45, 1, 0.75); // Ohren
+      addTo(head, mesh(sphere(0.013, 16, 12), eyeM, s * 0.034, 0.108, 0.086, false)).scale.set(1.15, 0.72, 0.6);
+      addTo(head, mesh(sphere(0.0078, 14, 10), irisM, s * 0.034, 0.1075, 0.0925, false)).scale.set(1, 1, 0.45);
+      addTo(head, mesh(sphere(0.0038, 10, 8), pupilM, s * 0.034, 0.1075, 0.0952, false)).scale.set(1, 1, 0.4);
+      // Oberlid: halbe Kugel in Hautfarbe über dem Auge, nimmt den starren Blick
+      const lid = mesh(new THREE.SphereGeometry(0.0142, 14, 8, 0, TAU, 0, Math.PI * 0.3), lidM, s * 0.034, 0.1075, 0.0855, false);
+      lid.scale.set(1.18, 0.8, 0.72);
+      head.add(lid);
+      const brow = mesh(capsule(0.0026, 0.024, 8), hairM, s * 0.035, 0.127, 0.095, false);
+      brow.rotation.z = Math.PI / 2 - s * 0.1;
+      brow.rotation.y = s * 0.25;
       head.add(brow);
-      const cheek = mesh(new THREE.CircleGeometry(0.014, 16), blush, s * 0.056, 0.07, 0.087, false);
-      cheek.rotation.y = s * 0.55;
-      head.add(cheek);
     }
-    // Lächeln als Bogen
-    const smile = mesh(new THREE.TorusGeometry(0.019, 0.0042, 8, 20, Math.PI * 0.8), lipM, 0, 0.062, 0.096, false);
-    smile.rotation.z = Math.PI + Math.PI * 0.1;
-    smile.rotation.x = -0.25;
-    head.add(smile);
-    addHair(head, L, hairM);
+    // Mund: Oberlippe als flacher Bogen, Unterlippe etwas voller
+    const upper = mesh(new THREE.TorusGeometry(0.017, 0.0034, 8, 18, Math.PI * 0.62), lipM, 0, 0.07, 0.098, false);
+    upper.rotation.z = Math.PI + Math.PI * 0.19;
+    upper.rotation.x = -0.2;
+    head.add(upper);
+        addHair(head, L, hairM);
     if (L.beard) {
       const beard = mesh(new THREE.SphereGeometry(0.084, 24, 12, 0, TAU, Math.PI * 0.45, Math.PI * 0.55), hairM, 0, 0.065, 0.012);
       beard.scale.set(0.95, 0.95, 1.06);

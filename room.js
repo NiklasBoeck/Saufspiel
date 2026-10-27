@@ -295,6 +295,7 @@ const Room = (() => {
     $("lobby-start").hidden = !session.host;
     $("lobby-bot").hidden = !session.host;
     $("lobby-bot").disabled = S.players.length >= MAX_PLAYERS;
+    renderBotSeg($("lobby-bot-level"), session.host && S.players.some(isBot));
     $("lobby-start").disabled = !enough;
     let hint;
     if (!me()) hint = "Du wirst gleich hinzugefügt…";
@@ -358,6 +359,7 @@ const Room = (() => {
       $("lobby-hint").textContent = "Suche Raum…";
       $("lobby-start").hidden = true;
       $("lobby-bot").hidden = true;
+      $("lobby-bot-level").hidden = true;
       showScreen("lobby");
     }
     connect();

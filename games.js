@@ -40,6 +40,14 @@ const LEVELS = {
   normal: { label: "Normal", emoji: "🍺", desc: "So wie die Regeln es sagen.", scale: (n) => n },
   hart: { label: "Hart", emoji: "🔥", desc: "Anderthalbmal so viele Schlucke. Nur mit genug Wasser daneben.", scale: (n) => Math.round(n * 1.5) },
 };
+// --- Bots: wie gut sie spielen ---
+// err = wie viele Fehler im Vergleich zu Mittel (Streuung beim Werfen, falsche Wahl, verpatzte Aufgaben).
+// Gilt auf dem Handy, das die Bots spielen lässt (ein Handy oder der Host).
+const BOT_LEVELS = {
+  leicht: { label: "Leicht", emoji: "🐣", desc: "Die Bots patzen oft. Gut zum Reinkommen.", err: 2.2 },
+  mittel: { label: "Mittel", emoji: "🤖", desc: "Meistens klug, manchmal daneben.", err: 1 },
+  schwer: { label: "Schwer", emoji: "😈", desc: "Die Bots treffen fast immer. Viel Glück.", err: 0.3 },
+};
 const SETTINGS_KEY = "saufspiel-settings";
 
 const Settings = (() => {
@@ -49,17 +57,27 @@ const Settings = (() => {
   } catch {
     // ohne Speicher gilt einfach Normal
   }
+  const save = () => {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
+    } catch {
+      // egal
+    }
+  };
   return {
     get level() {
       return LEVELS[data.level] ? data.level : "normal";
     },
     set level(v) {
       data.level = v;
-      try {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
-      } catch {
-        // egal
-      }
+      save();
+    },
+    get bots() {
+      return BOT_LEVELS[data.bots] ? data.bots : "mittel";
+    },
+    set bots(v) {
+      data.bots = v;
+      save();
     },
   };
 })();
@@ -123,9 +141,14 @@ function newBotName(names) {
   for (let i = 2; ; i++) if (!names.includes(`${BOT}Bot ${i}`)) return `${BOT}Bot ${i}`;
 }
 
-// Mittlere Schwierigkeit: meistens die kluge Wahl, manchmal einfach irgendwas.
+// Wie viele Fehler die Bots machen (1 = mittel, mehr = leichter, weniger = schwerer)
+function botErr() {
+  return BOT_LEVELS[Settings.bots].err;
+}
+
+// Meistens die kluge Wahl, manchmal einfach irgendwas (wie oft: je nach Bot-Stufe).
 function botPick(smart, options, slip = 0.2) {
-  return Math.random() < slip ? options[Math.floor(Math.random() * options.length)] : smart;
+  return Math.random() < Math.min(0.9, slip * botErr()) ? options[Math.floor(Math.random() * options.length)] : smart;
 }
 
 // Kleine Meldung ohne Trinken (ohne Knopf, verschwindet von selbst), z. B. { emoji: "⬆️", title: "Höher!", text }
