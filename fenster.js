@@ -296,6 +296,9 @@
 
   // --- Animationen nach dem Zeichnen ---
 
+  // Rechte Hand von oben gesehen, mit Ärmel. Die kleine-Finger-Seite schiebt die Karten nach rechts.
+  const HAND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 380"> <defs> <linearGradient id="fhs" x1="0" x2="1" y1="0" y2="0"> <stop offset="0" stop-color="#c98d64"/><stop offset="0.35" stop-color="#f0c39c"/><stop offset="0.7" stop-color="#e9b48a"/><stop offset="1" stop-color="#b97a52"/> </linearGradient> <linearGradient id="fhf" x1="0" x2="1"> <stop offset="0" stop-color="#cf946a"/><stop offset="0.45" stop-color="#f3caa4"/><stop offset="1" stop-color="#c4875e"/> </linearGradient> <radialGradient id="fhb" cx="0.5" cy="0.35" r="0.6"> <stop offset="0" stop-color="#fff" stop-opacity="0.28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/> </radialGradient> <linearGradient id="fhc" x1="0" x2="1"> <stop offset="0" stop-color="#14213d"/><stop offset="0.5" stop-color="#26385f"/><stop offset="1" stop-color="#101a30"/> </linearGradient> </defs> <path d="M72 214 C76 260 70 300 62 380 L146 380 C138 300 134 260 146 210 Z" fill="url(#fhs)"/> <path d="M50 300 C80 292 130 292 162 300 L170 380 L42 380 Z" fill="url(#fhc)"/> <path d="M50 300 C80 292 130 292 162 300 L163 312 C130 304 82 304 49 312 Z" fill="#f4f1ea"/> <g class="fh-thumb"> <path d="M66 178 C48 170 30 150 22 128 C17 114 28 104 40 112 C52 122 62 138 76 150 Z" fill="url(#fhf)"/> <path d="M24 122 C24 113 33 110 38 116 C41 121 37 127 31 128 C27 128 24 126 24 122 Z" fill="#f6d9c4" opacity="0.9"/> </g> <g class="fh-fingers"> <g class="fh-f1" transform="rotate(-5 72 126)"><rect x="60" y="34" width="25" height="92" rx="12.5" fill="url(#fhf)"/><rect x="64.5" y="38" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M63 80 q9 4 19 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f2" transform="rotate(-1 100 124)"><rect x="87" y="18" width="26" height="106" rx="13" fill="url(#fhf)"/><rect x="92" y="22" width="16" height="19" rx="7" fill="#f7dccb"/><path d="M90 70 q10 4 20 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f3" transform="rotate(3 127 124)"><rect x="115" y="26" width="24" height="98" rx="12" fill="url(#fhf)"/><rect x="119" y="30" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M118 76 q9 4 18 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f4" transform="rotate(8 151 130)"><rect x="141" y="50" width="21" height="80" rx="10.5" fill="url(#fhf)"/><rect x="144.5" y="53" width="14" height="15" rx="6" fill="#f7dccb"/><path d="M144 92 q8 3 15 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> </g> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhs)"/> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhb)"/> <g fill="#fff" opacity="0.18"><ellipse cx="74" cy="121" rx="6" ry="3.5"/><ellipse cx="100" cy="117" rx="6" ry="3.5"/><ellipse cx="126" cy="120" rx="6" ry="3.5"/><ellipse cx="150" cy="128" rx="5" ry="3"/></g> <g stroke="#a8724d" stroke-width="1.2" fill="none" opacity="0.18"><path d="M74 132 C80 170 88 200 96 226"/><path d="M100 128 C102 170 104 200 106 228"/><path d="M127 131 C124 170 120 200 116 226"/></g> </svg>`;
+
   // Nach einem Fehler schiebt eine Hand die verbundenen Karten vom Tisch, dann werden neue vom Stapel hingelegt.
   // Läuft auf jedem Handy einmal pro Fehler. Gibt zurück, wie lange es dauert.
   const sweptSeen = new Set();
@@ -316,15 +319,24 @@
     const START = 250;
     const SWEEP = 500 + cells.length * 160;
 
-    // Hand fährt von links über alle Karten nach rechts aus dem Bild
+    // Hand fährt von links über alle Karten nach rechts aus dem Bild und wackelt dabei leicht
     const hand = document.createElement("div");
     hand.className = "fe-hand";
-    hand.textContent = "🫸";
-    const hs = Math.max(W, H) * 1.1;
-    Object.assign(hand.style, { fontSize: `${hs}px`, left: "0px", top: "0px" });
+    hand.innerHTML = HAND_SVG;
+    const hw = Math.min(W, H) * 1.7;
+    const hh = hw * 1.9;
+    Object.assign(hand.style, { width: `${hw}px`, height: `${hh}px`, left: "0px", top: "0px" });
     document.body.appendChild(hand);
-    const pts = [{ x: tr.left - hs, y: cells[0].r.top + H / 2 }, ...cells.map((c) => ({ x: c.r.left - hs * 0.55, y: c.r.top + H / 2 })), { x: window.innerWidth + hs, y: cells[cells.length - 1].r.top + H / 2 }];
-    const frames = pts.map((p, k) => ({ transform: `translate(${p.x}px, ${p.y - hs / 2}px)`, offset: k / (pts.length - 1) }));
+    const at = (x, cy) => ({ x: x - hw * 0.8, y: cy - hh * 0.42 });
+    const pts = [
+      at(tr.left - hw * 0.3, cells[0].r.top + H / 2),
+      ...cells.map((c) => at(c.r.left + W * 0.12, c.r.top + H / 2)),
+      at(window.innerWidth + hw * 1.2, cells[cells.length - 1].r.top + H / 2 - H * 0.3),
+    ];
+    const frames = pts.map((p, k) => ({
+      transform: `translate(${p.x}px, ${p.y}px) rotate(${k === 0 ? -14 : k === pts.length - 1 ? 10 : k % 2 ? 4 : -4}deg)`,
+      offset: k / (pts.length - 1),
+    }));
     hand.animate(frames, { duration: SWEEP, delay: START, easing: "ease-in-out", fill: "both" }).onfinish = () => hand.remove();
 
     // Die alten Karten liegen noch kurz da und werden weggeschoben, sobald die Hand sie erreicht
