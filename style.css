@@ -1215,3 +1215,53 @@ html.fit[data-game="randvoll"] .bf-body { overflow: hidden; gap: clamp(4px, 1dvh
 .za-intro { margin: 0; padding: 0 0 0 1.3em; display: flex; flex-direction: column; gap: clamp(6px, 1.4dvh, 14px); line-height: 1.4; font-size: clamp(0.95rem, 2.3dvh, 1.15rem); }
 .za-intro b { color: #fcd34d; }
 .za-example { margin: 0; padding: clamp(8px, 1.6dvh, 14px) 14px; border-radius: 14px; background: var(--surface); color: var(--muted); line-height: 1.4; font-size: clamp(0.85rem, 2dvh, 1rem); }
+
+/* --- Prost-Duell --- */
+/* Auf einem Handy: obere Hälfte steht auf dem Kopf (für den gegenüber), PROST in der Mitte. Quer: links gegen rechts. */
+.pd-arena { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: clamp(6px, 1.4dvh, 14px); }
+.pd-zone {
+  flex: 1 1 0; min-height: 70px; width: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  border: 3px solid rgb(255 255 255 / 0.12); border-radius: 22px;
+  background: var(--surface); color: var(--text); font: inherit;
+  touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.pd-zone:disabled { opacity: 1; }
+.pd-zone.mine { border-color: #dc2626; background: linear-gradient(160deg, #3b1f6e, #2a1b4d); cursor: pointer; }
+.pd-arena.go .pd-zone.mine { border-color: #22c55e; background: #14532d; }
+.pd-zone.done { border-color: #22c55e; }
+.pd-zone.bad { border-color: #ef4444; background: #450a0a; }
+.pd-name { font-size: clamp(1.1rem, 3.4dvh, 1.8rem); font-weight: 800; }
+.pd-status { color: var(--muted); font-size: clamp(0.85rem, 2.2dvh, 1.1rem); font-weight: 600; }
+.pd-zone.done .pd-status { color: #86efac; font-size: clamp(1rem, 3dvh, 1.5rem); }
+.pd-zone.bad .pd-status { color: #fca5a5; }
+.pd-arena.two .pd-a { transform: rotate(180deg); }
+.pd-signal {
+  flex: none; display: grid; place-items: center; min-height: clamp(54px, 13dvh, 130px);
+  border-radius: 18px; font-weight: 900; letter-spacing: 0.04em;
+  font-size: clamp(1.6rem, 7dvh, 3.6rem); color: var(--muted); background: rgb(0 0 0 / 0.25);
+}
+.pd-signal.wait { font-size: clamp(1rem, 3.4dvh, 1.6rem); font-weight: 700; }
+.pd-signal.fake { color: #fbbf24; background: rgb(251 191 36 / 0.12); }
+.pd-signal.go { color: #fff; background: #16a34a; }
+.pd-arena.solo .pd-zone { flex: 3 1 0; }
+.pd-arena.over { flex: 0 1 auto; }
+.pd-arena.over .pd-zone { flex: none; min-height: 0; padding: clamp(8px, 2dvh, 20px); }
+.pd-arena.over .pd-signal { display: none; }
+.pd-streak { font-size: 0.8em; }
+
+html.fit[data-game="duell"] #screen-game { gap: 2px; }
+html.fit[data-game="duell"] .bf { gap: clamp(4px, 1dvh, 12px); }
+html.fit[data-game="duell"] .bf-phase { text-align: center; text-transform: none; letter-spacing: 0; }
+html.fit[data-game="duell"] .your-turn { display: none; }
+html.fit[data-game="duell"] .bf-title { text-align: center; font-size: clamp(1rem, 2.6dvh, 1.35rem); }
+html.fit[data-game="duell"] .bf-body { overflow: hidden; gap: clamp(4px, 1dvh, 12px); }
+html[data-game="duell"] .bf-actions:empty { display: none; }
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit[data-game="duell"] .bf { grid-template-columns: minmax(0, 1fr) clamp(170px, 28vw, 300px); }
+  html.fit[data-game="duell"] .bf-phase, html.fit[data-game="duell"] .bf-title { text-align: left; }
+  .pd-arena.two, .pd-arena.watch, .pd-arena.over { flex-direction: row; }
+  .pd-arena.two .pd-a { transform: none; }
+  .pd-arena .pd-signal { min-height: 0; width: clamp(110px, 22vw, 260px); font-size: clamp(1.3rem, 7dvh, 3rem); }
+  .pd-arena.solo .pd-signal { width: auto; min-height: clamp(50px, 22dvh, 140px); }
+}
