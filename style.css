@@ -1012,7 +1012,7 @@ html[data-game="hodenritter"] .bf-actions .btn small { display: block; margin-to
   /* --w = Kartenbreite, --r = Höhe zu Breite (hochkant 1.4, quer 0.72) */
   --r: 1.4;
   --g: clamp(4px, 1.8cqmin, 12px);
-  --w: min((100cqw - 16px - 4 * var(--g)) / 5, (100cqh - 16px - 4 * var(--g)) / (5 * var(--r)), 150px);
+  --w: min((100cqw - 16px - 4 * var(--g)) / 5, (100cqh - 16px - 4 * var(--g)) / (5 * var(--r)), 240px);
   display: grid;
   grid-template-columns: repeat(5, var(--w));
   grid-template-rows: repeat(5, calc(var(--w) * var(--r)));
@@ -1089,16 +1089,31 @@ html.fit[data-game="fenster"] .your-turn { display: none; }
 html.fit[data-game="fenster"] .bf-title { text-align: center; font-size: clamp(0.95rem, 2.3dvh, 1.2rem); }
 html.fit[data-game="fenster"] .bf-actions .btn { padding: clamp(7px, 1.5dvh, 14px); }
 
-/* Handy gekippt: Tisch liegt quer und nimmt fast die ganze Breite, Info und Knöpfe in einer schmalen Spalte rechts */
+/* Handy gekippt oder aufgeklappt quer: oben eine schmale Zeile mit Info, Ansage und Knöpfen, darunter der Tisch über die ganze Breite */
 @media (min-aspect-ratio: 6 / 5) {
-  html.fit[data-game="fenster"] .bf { grid-template-columns: minmax(0, 1fr) clamp(150px, 24vw, 260px); column-gap: clamp(8px, 1.5vw, 18px); }
-  html.fit[data-game="fenster"] .bf > :not(.bf-body) { margin-bottom: 6px; }
-  html.fit[data-game="fenster"] .bf-phase, html.fit[data-game="fenster"] .bf-title { text-align: left; }
-  html.fit[data-game="fenster"] .bf-title { font-size: clamp(0.9rem, 3.6dvh, 1.3rem); }
-  html.fit[data-game="fenster"] .bf-actions.fe-actions, html.fit[data-game="fenster"] .bf > .bf-actions { grid-template-columns: 1fr; gap: 6px; }
-  html.fit[data-game="fenster"] .fe-actions .btn.ghost { grid-column: auto; }
-  html.fit[data-game="fenster"] .bf-actions .btn { padding: clamp(5px, 2dvh, 12px); font-size: clamp(0.85rem, 3.4dvh, 1.05rem); }
-  html.fit[data-game="fenster"] .bf-actions .btn small { font-size: 0.68rem; }
+  html.fit[data-game="fenster"] .bf {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: clamp(8px, 1.5vw, 18px);
+    row-gap: clamp(4px, 1dvh, 10px);
+    align-items: center;
+  }
+  html.fit[data-game="fenster"] .bf > * { margin: 0; grid-row: 1; }
+  html.fit[data-game="fenster"] .bf > .bf-phase { grid-column: 1; white-space: nowrap; }
+  html.fit[data-game="fenster"] .bf > .bf-title { grid-column: 2; text-align: left; font-size: clamp(0.9rem, 3.2dvh, 1.25rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html.fit[data-game="fenster"] .bf > .bf-body { grid-column: 1 / -1; grid-row: 2; height: 100%; }
+  html.fit[data-game="fenster"] .bf > .bf-actions { grid-column: 3; display: flex; gap: 6px; align-self: center; }
+  html.fit[data-game="fenster"] .bf-actions .btn { padding: clamp(4px, 1.4dvh, 10px) clamp(10px, 1.6vw, 18px); font-size: clamp(0.8rem, 2.8dvh, 1rem); white-space: nowrap; }
+  html.fit[data-game="fenster"] .bf-actions .btn small { font-size: 0.66rem; }
+  html.fit[data-game="fenster"] .bf-actions .wait { padding: 4px 8px; }
+  /* Zurück und Regeln schweben in den oberen Ecken, die Info-Zeile sitzt dazwischen, so bleibt mehr Höhe für den Tisch */
+  html.fit[data-game="fenster"] #screen-game { position: relative; }
+  html.fit[data-game="fenster"] .game-bar { position: absolute; z-index: 2; top: 0; left: 0; right: 0; pointer-events: none; }
+  html.fit[data-game="fenster"] .game-bar > * { pointer-events: auto; }
+  html.fit[data-game="fenster"] .game-bar .game-title { visibility: hidden; }
+  html.fit[data-game="fenster"] .bf { padding: 0 clamp(52px, 7vw, 70px); }
+  html.fit[data-game="fenster"] .bf > .bf-body { margin: 0 calc(-1 * clamp(52px, 7vw, 70px)); }
 }
 /* Ist der Tisch deutlich breiter als hoch (Handy gekippt), liegen die Karten quer, dann werden sie größer */
 @container (min-aspect-ratio: 6 / 5) {
