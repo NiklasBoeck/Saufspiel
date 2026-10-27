@@ -303,7 +303,7 @@
   const HAND_BODY = `<path d="M72 214 C76 260 70 290 64 306 L144 306 C138 290 134 260 146 210 Z" fill="url(#fhs)"/> <path d="M58 300 C84 293 126 293 152 300 L153 311 C126 304 84 304 57 311 Z" fill="#f4f1ea"/> <g class="fh-thumb"> <path d="M66 178 C48 170 30 150 22 128 C17 114 28 104 40 112 C52 122 62 138 76 150 Z" fill="url(#fhf)"/> <path d="M24 122 C24 113 33 110 38 116 C41 121 37 127 31 128 C27 128 24 126 24 122 Z" fill="#f6d9c4" opacity="0.9"/> </g> <g class="fh-fingers"> <g class="fh-f1" transform="rotate(-5 72 126)"><rect x="60" y="34" width="25" height="92" rx="12.5" fill="url(#fhf)"/><rect x="64.5" y="38" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M63 80 q9 4 19 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f2" transform="rotate(-1 100 124)"><rect x="87" y="18" width="26" height="106" rx="13" fill="url(#fhf)"/><rect x="92" y="22" width="16" height="19" rx="7" fill="#f7dccb"/><path d="M90 70 q10 4 20 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f3" transform="rotate(3 127 124)"><rect x="115" y="26" width="24" height="98" rx="12" fill="url(#fhf)"/><rect x="119" y="30" width="16" height="18" rx="7" fill="#f7dccb"/><path d="M118 76 q9 4 18 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> <g class="fh-f4" transform="rotate(8 151 130)"><rect x="141" y="50" width="21" height="80" rx="10.5" fill="url(#fhf)"/><rect x="144.5" y="53" width="14" height="15" rx="6" fill="#f7dccb"/><path d="M144 92 q8 3 15 0" stroke="#a8724d" stroke-width="1.6" fill="none" opacity="0.55"/></g> </g> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhs)"/> <path d="M60 120 C60 106 74 102 100 102 C130 102 156 106 161 124 C164 150 160 178 150 205 C144 222 132 234 106 236 C84 236 72 226 66 208 C60 188 58 150 60 120 Z" fill="url(#fhb)"/> <g fill="#fff" opacity="0.18"><ellipse cx="74" cy="121" rx="6" ry="3.5"/><ellipse cx="100" cy="117" rx="6" ry="3.5"/><ellipse cx="126" cy="120" rx="6" ry="3.5"/><ellipse cx="150" cy="128" rx="5" ry="3"/></g> <g stroke="#a8724d" stroke-width="1.2" fill="none" opacity="0.18"><path d="M74 132 C80 170 88 200 96 226"/><path d="M100 128 C102 170 104 200 106 228"/><path d="M127 131 C124 170 120 200 116 226"/></g>`;
   // Rücken mit Sakko, Kragen, Nacken und Hinterkopf; Nacken bei (0,0), Einheiten wie die Hand
   const DEALER_BODY = `<path d="M-320 80 C-312 -18 -236 -62 -160 -66 L160 -66 C236 -62 312 -18 320 80 L340 2400 L-340 2400 Z" fill="url(#fdj)"/> <path d="M0 0 L0 2400" stroke="#081020" stroke-width="6" opacity="0.6"/>`;
-  // Kopf, Nacken und Kragen kommen zuletzt: Arm und Hand gehen immer darunter durch
+  // Rücken, Kopf, Nacken und Kragen kommen zuletzt: der Arm liegt vor der Brust und geht immer darunter durch
   const DEALER_HEAD = `<path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
   const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -393,12 +393,12 @@
     const grad = (id) =>
       `<linearGradient id="${id}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0a1222"/><stop offset="0.28" stop-color="#2c4371"/><stop offset="0.55" stop-color="#1c2d50"/><stop offset="1" stop-color="#080f1d"/></linearGradient>`;
     rig.innerHTML = `<defs>${HAND_DEFS}${grad("fdu")}${grad("fdf")}</defs>
-      <g class="fd-body">${DEALER_BODY}</g>
       <path class="fd-shadow" fill="rgb(0 0 0 / 0.22)"/>
       <path class="fd-upper" fill="url(#fdu)"/>
       <path class="fd-fore" fill="url(#fdf)"/>
       <path class="fd-folds" fill="none" stroke="#060c18" stroke-width="${5 * k}" stroke-linecap="round" opacity="0.55"/>
       <g class="fd-hand">${HAND_BODY}</g>
+      <g class="fd-body">${DEALER_BODY}</g>
       <g class="fd-head">${DEALER_HEAD}</g>`;
     document.body.appendChild(rig);
     const $ = (c) => rig.querySelector(c);
