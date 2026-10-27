@@ -340,11 +340,10 @@
     const DEAL = START + SWEEP + 100;
     const STEP = 200;
     const back = [...cells].reverse();
-    const HOME = DEAL + STEP * (n + 1) + 150;
-    const END = HOME + 300;
-    const rest = { x: vw * 0.97, y: vh + REACH * 0.3 }; // Hand hängt rechts neben dem Körper
+    // Nach der letzten Karte zieht der Dealer die Hand etwas zurück und geht mit ihr nach unten raus
+    const HOME = DEAL + STEP * n + 30;
+    const END = HOME + 450;
     const keys = [
-      { t: 0, ...rest },
       { t: START, x: cells[0].r.left - W * 0.3, y: mid(cells[0]).y },
       ...cells.map((c, j) => ({ t: START + (SWEEP * (j + 1)) / (n + 1), x: c.r.left + W * 0.25, y: mid(c).y })),
       { t: START + SWEEP, x: vw + W * 0.4, y: mid(cells[n - 1]).y - H * 0.3 },
@@ -352,7 +351,6 @@
         const p = { x: mid(c).x, y: c.r.top + H * 0.35 };
         return [{ t: DEAL + STEP * (j + 1) - 40, ...p }, { t: DEAL + STEP * (j + 1) + 30, ...p }];
       }),
-      { t: HOME, ...rest },
     ];
     const ease = (u) => u * u * (3 - 2 * u);
     // Weiche Kurve durch alle Punkte (Catmull-Rom), damit die Hand fließt statt an jeder Karte zu stoppen
@@ -365,53 +363,84 @@
           const b = keys[j - 1];
           const c = keys[j];
           const d = keys[Math.min(keys.length - 1, j + 1)];
-          let u = (t - b.t) / (c.t - b.t || 1);
-          if (j === 1 || j === keys.length - 1) u = ease(u);
           if (b.x === c.x && b.y === c.y) return b;
+          const u = (t - b.t) / (c.t - b.t || 1);
           return { x: cr(a.x, b.x, c.x, d.x, u), y: cr(a.y, b.y, c.y, d.y, u) };
         }
       }
       return keys[keys.length - 1];
     };
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
+    // Schulter folgt der Hand am unteren Rand; reicht der Arm nicht, kommt der Dealer etwas näher
+    const shoulderFor = (Q) => {
+      const S = { x: clamp(Q.x + REACH * 0.4, vw * 0.3, vw * 0.97), y: vh - REACH * 0.04 };
+      const far = Math.hypot(Q.x - S.x, Q.y - S.y);
+      const max = REACH * 0.92;
+      if (far <= max) return S;
+      return { x: Q.x + ((S.x - Q.x) * max) / far, y: Math.max(vh * 0.66, Q.y + ((S.y - Q.y) * max) / far) };
+    };
+    const S_IN = shoulderFor(keys[0]);
+    const S_OUT = shoulderFor(keys[keys.length - 1]);
+    // Rein und raus geht die Hand nur am Arm entlang Richtung Schulter, nie quer über den Kopf
+    const pull = (Q, S) => lerp(Q, S, 0.3);
 
     const rig = document.createElementNS(SVG_NS, "svg");
     rig.setAttribute("class", "fe-rig");
     rig.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
-    rig.innerHTML = `<defs>${HAND_DEFS}</defs>
+    const grad = (id) =>
+      `<linearGradient id="${id}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0a1222"/><stop offset="0.28" stop-color="#2c4371"/><stop offset="0.55" stop-color="#1c2d50"/><stop offset="1" stop-color="#080f1d"/></linearGradient>`;
+    rig.innerHTML = `<defs>${HAND_DEFS}${grad("fdu")}${grad("fdf")}</defs>
       <g class="fd-body">${DEALER_BODY}</g>
-      <g fill="none" stroke-linecap="round">
-        <line class="fd-shadow" stroke="rgb(0 0 0 / 0.25)" stroke-width="${100 * k}"/>
-        <line class="fd-upper" stroke="#16233f" stroke-width="${116 * k}"/>
-        <line class="fd-upper2" stroke="#23365c" stroke-width="${46 * k}"/>
-        <circle class="fd-shoulder" r="${70 * k}" fill="#1b2a4a" stroke="none"/>
-        <line class="fd-fore" stroke="#182644" stroke-width="${102 * k}" stroke-linecap="butt"/>
-        <line class="fd-fore2" stroke="#26395f" stroke-width="${40 * k}" stroke-linecap="butt"/>
-        <circle class="fd-elbow" r="${54 * k}" fill="#1a2846" stroke="none"/>
-      </g>
+      <path class="fd-shadow" fill="rgb(0 0 0 / 0.22)"/>
+      <path class="fd-upper" fill="url(#fdu)"/>
+      <path class="fd-fore" fill="url(#fdf)"/>
+      <path class="fd-folds" fill="none" stroke="#060c18" stroke-width="${5 * k}" stroke-linecap="round" opacity="0.55"/>
       <g class="fd-hand">${HAND_BODY}</g>`;
     document.body.appendChild(rig);
     const $ = (c) => rig.querySelector(c);
-    const line = (el, a, b) => {
-      el.setAttribute("x1", a.x);
-      el.setAttribute("y1", a.y);
-      el.setAttribute("x2", b.x);
-      el.setAttribute("y2", b.y);
-    };
+    const pt = (p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+    // Ärmel als gerundete Form: breit an a, Wölbung in der Mitte, schmaler an b; runde Kappen, am Handgelenk gerade
+    function limb(a, b, wa, wm, wb, capB, gradId) {
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const nx = -(b.y - a.y) / len;
+      const ny = (b.x - a.x) / len;
+      const at = (p, side, w) => ({ x: p.x + (nx * w * side) / 2, y: p.y + (ny * w * side) / 2 });
+      const m = lerp(a, b, 0.42);
+      const g = $(`#${gradId}`);
+      const g1 = at(m, -1, wm);
+      const g2 = at(m, 1, wm);
+      g.setAttribute("x1", g1.x);
+      g.setAttribute("y1", g1.y);
+      g.setAttribute("x2", g2.x);
+      g.setAttribute("y2", g2.y);
+      const endB = capB ? `A ${wb / 2} ${wb / 2} 0 0 0 ${pt(at(b, -1, wb))}` : `L ${pt(at(b, -1, wb))}`;
+      return `M ${pt(at(a, 1, wa))} Q ${pt(at(m, 1, wm * 1.6 - (wa + wb) * 0.3))} ${pt(at(b, 1, wb))} ${endB} Q ${pt(at(m, -1, wm * 1.6 - (wa + wb) * 0.3))} ${pt(at(a, -1, wa))} A ${wa / 2} ${wa / 2} 0 0 0 ${pt(at(a, 1, wa))} Z`;
+    }
 
     function draw(t) {
-      const Q = palmAt(t);
-      // Schulter folgt der Hand am unteren Rand; reicht der Arm nicht, kommt der Dealer etwas näher
-      let S = { x: clamp(Q.x + REACH * 0.4, vw * 0.3, vw * 0.97), y: vh - REACH * 0.04 };
-      const far = Math.hypot(Q.x - S.x, Q.y - S.y);
-      const max = REACH * 0.92;
-      if (far > max) S = { x: Q.x + ((S.x - Q.x) * max) / far, y: Math.max(vh * 0.66, Q.y + ((S.y - Q.y) * max) / far) };
-      const inOut = t < IN ? t / IN : t > HOME ? Math.max(0, 1 - (t - HOME) / (END - HOME)) : 1;
-      S.y += (1 - ease(clamp(inOut, 0, 1))) * REACH * 0.9;
+      let Q;
+      let S;
+      let drop = 0;
+      if (t < START) {
+        S = { ...S_IN };
+        Q = lerp(pull(keys[0], S_IN), keys[0], ease(clamp(t / START, 0, 1)));
+        drop = (1 - ease(clamp(t / IN, 0, 1))) * REACH * 0.9;
+      } else if (t > HOME) {
+        const u = clamp((t - HOME) / (END - HOME), 0, 1);
+        S = { ...S_OUT };
+        Q = lerp(keys[keys.length - 1], pull(keys[keys.length - 1], S_OUT), ease(Math.min(1, u * 1.7)));
+        drop = ease(u) * REACH * 0.9;
+      } else {
+        Q = palmAt(t);
+        S = shoulderFor(Q);
+      }
+      S.y += drop;
+      Q = { x: Q.x, y: Q.y + drop };
       const dq = Math.hypot(Q.x - S.x, Q.y - S.y) || 1;
       const P = { x: Q.x - ((Q.x - S.x) / dq) * PALM, y: Q.y - ((Q.y - S.y) / dq) * PALM };
-      // Ellbogen in 3D: Schulter in Höhe Z, Hand auf dem Tisch; das Gelenk hängt nach unten und etwas nach außen.
-      // Gezeichnet wird die Draufsicht, so wird der Arm beim Heranziehen kürzer statt seitlich abzuknicken.
+      // Ellbogen in 3D: Schulter in Höhe Z, Hand auf dem Tisch; das Gelenk hängt nach unten, etwas nach außen
+      // und beim Heranziehen nach hinten. Gezeichnet wird die Draufsicht, so wird der Arm verkürzt statt abzuknicken.
       const ax = P.x - S.x;
       const ay = P.y - S.y;
       const d = clamp(Math.hypot(ax, ay, Z), Math.abs(L1 - L2) + 1, L1 + L2 - 0.5);
@@ -419,28 +448,33 @@
       const along = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
       const rad = Math.sqrt(Math.max(0, L1 * L1 - along * along));
       const flat = Math.hypot(ax, ay) || 1;
-      const pole = [(-ay / flat) * 0.6, (ax / flat) * 0.6, -1];
+      const pole = [(-ay / flat) * 0.6, (ax / flat) * 0.6 + 0.5, -1];
       const pu = pole[0] * u[0] + pole[1] * u[1] + pole[2] * u[2];
       const v = pole.map((x, i) => x - pu * u[i]);
       const vl = Math.hypot(...v) || 1;
       const E = { x: S.x + along * u[0] + (rad * v[0]) / vl, y: S.y + along * u[1] + (rad * v[1]) / vl };
       const N = { x: S.x - 260 * BODY, y: S.y + 30 * BODY };
       $(".fd-body").setAttribute("transform", `translate(${N.x} ${N.y}) scale(${BODY})`);
-      line($(".fd-upper"), S, E);
-      line($(".fd-upper2"), S, E);
-      line($(".fd-fore"), E, P);
-      line($(".fd-fore2"), E, P);
-      line($(".fd-shadow"), { x: E.x - 10 * k, y: E.y + 26 * k }, { x: P.x - 10 * k, y: P.y + 26 * k });
-      for (const c of [".fd-shoulder", ".fd-elbow"]) {
-        const p = c === ".fd-shoulder" ? S : E;
-        $(c).setAttribute("cx", p.x);
-        $(c).setAttribute("cy", p.y);
+      const up = limb(S, E, 132 * k, 128 * k, 100 * k, true, "fdu");
+      const fore = limb(E, P, 104 * k, 112 * k, 98 * k, false, "fdf");
+      $(".fd-upper").setAttribute("d", up);
+      $(".fd-fore").setAttribute("d", fore);
+      $(".fd-shadow").setAttribute("d", up + fore);
+      $(".fd-shadow").setAttribute("transform", `translate(${-8 * k} ${24 * k})`);
+      // Stofffalten in der Armbeuge
+      const fl = Math.hypot(P.x - E.x, P.y - E.y) || 1;
+      const fx = (P.x - E.x) / fl;
+      const fy = (P.y - E.y) / fl;
+      let folds = "";
+      for (const [s0, w0] of [[0.1, 0.42], [0.2, 0.36], [0.62, 0.3]]) {
+        const c = { x: E.x + fx * fl * s0, y: E.y + fy * fl * s0 };
+        const o = 52 * k * w0 * 2;
+        folds += `M ${pt({ x: c.x - fy * o, y: c.y + fx * o })} Q ${pt({ x: c.x + fx * 14 * k, y: c.y + fy * 14 * k })} ${pt({ x: c.x + fy * o * 0.4, y: c.y - fx * o * 0.4 })} `;
       }
+      $(".fd-folds").setAttribute("d", folds);
       // Hand zeigt in Richtung Unterarm; ist der von oben kaum zu sehen, in Richtung Schulter→Hand
-      const fx = P.x - E.x;
-      const fy = P.y - E.y;
-      const w = clamp(Math.hypot(fx, fy) / (L2 * 0.6), 0, 1);
-      const rot = (Math.atan2(fy * w + (ay / flat) * (1 - w) * 50, fx * w + (ax / flat) * (1 - w) * 50) * 180) / Math.PI + 90;
+      const w = clamp(fl / (L2 * 0.6), 0, 1);
+      const rot = (Math.atan2(fy * w + (ay / flat) * (1 - w), fx * w + (ax / flat) * (1 - w)) * 180) / Math.PI + 90;
       $(".fd-hand").setAttribute("transform", `translate(${P.x} ${P.y}) rotate(${rot}) scale(${k}) translate(-106 -306)`);
     }
     const t0 = performance.now();
@@ -453,6 +487,7 @@
     };
     rig._draw = draw; // für Screenshot-Tests: Zeitpunkt direkt zeichnen
     rig._keys = keys;
+    rig._end = END;
     draw(0);
     requestAnimationFrame(loop);
 
@@ -470,7 +505,7 @@
         borderRadius: `${Math.min(W, H) * 0.12}px`,
       });
       document.body.appendChild(ghost);
-      const hit = keys[k2 + 2].t - 60;
+      const hit = keys[k2 + 1].t - 60;
       const off = vw - c.r.left + 40;
       ghost.animate(
         [
