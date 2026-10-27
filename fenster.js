@@ -2,7 +2,7 @@
 // dazwischen je 3, in der Mitte ein Kreuz, das die mittleren Karten der Seiten verbindet. Die 4 Ecken liegen offen.
 // Wer dran ist, deckt Karten neben offenen Karten auf und sagt vorher höher oder tiefer (zwischen zwei offenen
 // Karten: dazwischen oder außerhalb). Falsch: Man trinkt so viele Schlucke, wie Karten offen mit ihr verbunden sind,
-// die werden wieder umgedreht (die Ecken bleiben offen) und man spielt weiter. Ab 2 richtigen darf man abgeben und verteilen.
+// die werden wieder umgedreht (Ecken bekommen eine neue offene Karte) und man spielt weiter. Ab 2 richtigen darf man abgeben und verteilen.
 (() => {
   const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "B", "D", "K", "A"];
   const NAMES = { 11: "Bube", 12: "Dame", 13: "König", 14: "Ass" };
@@ -274,14 +274,15 @@
   }
 
   // Nach dem Fehler: die verbundenen Karten werden umgedreht, kommen zurück in den Stapel, und der wird gemischt.
-  // Die 4 Ecken bleiben immer offen liegen. Wer falsch lag, spielt weiter und fängt beim Zählen wieder bei 0 an.
+  // Die Ecken werden dabei ausgetauscht und liegen gleich wieder offen. Wer falsch lag, spielt weiter und fängt beim Zählen wieder bei 0 an.
   function flipBack(s) {
     for (const i of s.wrong.group) {
-      if (CORNERS.includes(i)) continue;
       s.deck.push(s.board[i].card);
       s.board[i] = { open: false, card: null };
     }
     shuffle(s.deck);
+    // Ecken, die dranhingen, bekommen eine neue Karte, die gleich wieder offen liegt.
+    for (const i of s.wrong.group) if (CORNERS.includes(i)) deal(s, i);
     s.last = null;
     s.count = 0;
     s.mid = false;
@@ -332,7 +333,7 @@
     rules: [
       "21 Karten (2 bis Ass, Ass zählt 14) liegen verdeckt als Fenster: oben und unten je 5, links und rechts je 3 dazwischen, in der Mitte ein Kreuz. Die 4 Ecken liegen offen.",
       "Wer dran ist, tippt eine verdeckte Karte neben einer offenen an und sagt höher oder tiefer. Liegen auf beiden Seiten offene Karten (gerade oder über die Ecke), heißt es dazwischen oder außerhalb. Gleich zählt als falsch.",
-      "Falsch: Du trinkst so viele Schlucke, wie offene Karten mit der neuen Karte verbunden sind (sie selbst und die Ecken mitgezählt). Diese Karten werden umgedreht und neu gemischt, nur die 4 Ecken bleiben immer offen.",
+      "Falsch: Du trinkst so viele Schlucke, wie offene Karten mit der neuen Karte verbunden sind (sie selbst und die Ecken mitgezählt). Diese Karten werden umgedreht und neu gemischt. Hängt eine Ecke dran, kommt dort eine neue Karte hin, die gleich wieder offen liegt.",
       "Nach einem Fehler spielst du weiter und fängst wieder bei 0 an. Abgeben darfst du erst, wenn du selbst 2 Karten richtig aufgedeckt hast. Dann verteilst du so viele Schlucke, wie du Karten richtig hast.",
       "Hast du die Mitte aufgedeckt und hörst auf, verteilst du zusätzlich einen Shot. Hängt die Mitte an deiner falschen Karte, trinkst du den Shot selbst.",
       "Wer die letzte Karte aufdeckt, macht das Fenster zu und verteilt seine Karten.",
