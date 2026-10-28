@@ -338,7 +338,18 @@
     // Zeitplan: reinkommen, von links nach rechts abräumen, Stapel in die linke Hand, Karten einzeln werfen, raus
     const IN = 300;
     const START = 450;
-    const SWEEP = 500 + n * 220;
+    // Abräumen: Zeit pro Karte richtet sich nach dem Weg, damit der Dealer mitlaufen kann statt den Arm zu strecken
+    const sweepPts = [
+      { x: cells[0].r.left - W * 0.3, y: cells[0].r.top + H / 2 },
+      ...cells.map((c) => ({ x: c.r.left + W * 0.25, y: c.r.top + H / 2 })),
+      { x: Math.min(cells[n - 1].r.right + W * 0.6, vw - W * 0.3), y: cells[n - 1].r.top + H * 0.2 },
+    ];
+    const sweepT = [START];
+    for (let i = 1; i < sweepPts.length; i++) {
+      const d = Math.hypot(sweepPts[i].x - sweepPts[i - 1].x, sweepPts[i].y - sweepPts[i - 1].y);
+      sweepT.push(sweepT[i - 1] + 170 + d / 0.7);
+    }
+    const SWEEP = sweepT[sweepT.length - 1] - START;
     const DEAL = START + SWEEP + 150;
     const STEP = 330;
     const THROW = (j) => DEAL + 420 + STEP * j;
@@ -405,7 +416,8 @@
     const shoulderOf = (b) => local(b, 215, -5);
     const lShoulderOf = (b) => local(b, -215, -5);
     // Bester Standplatz: Ziel bequem vor der rechten Schulter, nicht unnötig weit vom letzten Platz weg
-    const COMFY = REACH * 0.4;
+    const COMFY = REACH * 0.32;
+    const MAXR = REACH * 0.58;
     const stationFor = (T, prev) => {
       let best = prev;
       let cost = Infinity;
@@ -424,7 +436,7 @@
           (ahead < dist * 0.2 ? 1e4 : 0) +
           (dist < COMFY * 0.7 ? 5e3 : 0) +
           (head < 170 * BODY ? 5e3 : 0) +
-          (prev == null ? 0 : ringDist(i, prev) * W * 0.05);
+          (prev == null ? 0 : ringDist(i, prev) * W * 0.02);
         if (c < cost) {
           cost = c;
           best = i;
@@ -450,9 +462,7 @@
       return { x: take.x + ((m.x - take.x) / l) * W * f, y: take.y + ((m.y - take.y) / l) * W * f };
     };
     const keys = [
-      { t: START, x: cells[0].r.left - W * 0.3, y: mid(cells[0]).y },
-      ...cells.map((c, j) => ({ t: START + (SWEEP * (j + 1)) / (n + 1), x: c.r.left + W * 0.25, y: mid(c).y })),
-      { t: START + SWEEP, x: Math.min(last.r.right + W * 0.6, vw - W * 0.3), y: mid(last).y - H * 0.3 },
+      ...sweepPts.map((q, i) => ({ t: sweepT[i], ...q })),
       ...back.flatMap((c, j) => [
         { t: THROW(j) - 190, ...take, deal: true },
         { t: THROW(j) - 110, ...take, deal: true },
@@ -470,7 +480,7 @@
     });
     // Der Körper läuft etwas voraus, damit er schon steht, wenn die Hand ankommt
     const bodyAt = (t) => {
-      const list = keys.map((q, i) => ({ t: q.t - 160, i: stations[i] }));
+      const list = keys.map((q, i) => ({ t: q.t - 250, i: stations[i] }));
       const f = curve(list, t, (q) => q.i);
       const i0 = Math.floor(f);
       const u = f - i0;
@@ -496,8 +506,8 @@
     const pinched = (t) => back.some((c, j) => t >= THROW(j) - 150 && t < THROW(j));
     // Wie viele Karten noch im Stapel der linken Hand liegen
     const inDeck = (t) => n - back.filter((c, j) => t >= THROW(j) - 150).length;
-    // Linke Hand: vor dem Austeilen unsichtbar unterm Sakko, dann mit dem Stapel vor der Brust
-    const deckOut = (t) => ease(clamp((t - (DEAL - 100)) / 300, 0, 1)) * (t > HOME ? 1 - ease(clamp((t - HOME) / 250, 0, 1)) : 1);
+    // Linke Hand: vor dem Austeilen unsichtbar unterm Sakko, dann mit dem Stapel vor der Brust; leer wieder weg
+    const deckOut = (t) => ease(clamp((t - (DEAL - 100)) / 300, 0, 1)) * (t > THROW(n - 1) - 140 ? 1 - ease(clamp((t - THROW(n - 1) + 140) / 260, 0, 1)) : 1);
 
     const rig = document.createElementNS(SVG_NS, "svg");
     rig.setAttribute("class", "fe-rig");
@@ -612,6 +622,17 @@
       }
       const backDir = rot2({ x: 0, y: 1 }, body.th);
       const b = { x: body.x + backDir.x * drop, y: body.y + backDir.y * drop, th: body.th };
+      // Nie zu weit strecken: reicht der Arm nicht bequem, beugt sich der Dealer über den Tisch.
+      // Von oben rückt dabei der Oberkörper nach vorn und kommt der Kamera etwas näher (wird größer).
+      const S0 = shoulderOf(b);
+      const far = Math.hypot(Q.x - S0.x, Q.y - S0.y);
+      b.lean = 0;
+      if (far > MAXR) {
+        const f = 1 - MAXR / far;
+        b.x += (Q.x - S0.x) * f;
+        b.y += (Q.y - S0.y) * f;
+        b.lean = Math.min(1, (far - MAXR) / (REACH * 0.4));
+      }
       const S = shoulderOf(b);
       Q = { x: Q.x + backDir.x * drop, y: Q.y + backDir.y * drop };
       const dq = Math.hypot(Q.x - S.x, Q.y - S.y) || 1;
@@ -637,7 +658,7 @@
 
     function draw(t) {
       const { b, S, E, P, fl, fx, fy, rot, SL, EL, WL, LH, out } = pose(t);
-      const bodyT = `translate(${b.x} ${b.y}) rotate(${(b.th * 180) / Math.PI}) scale(${BODY})`;
+      const bodyT = `translate(${b.x} ${b.y}) rotate(${(b.th * 180) / Math.PI}) scale(${BODY * (1 + 0.1 * b.lean)})`;
       $(".fd-body").setAttribute("transform", bodyT);
       $(".fd-head").setAttribute("transform", bodyT);
       // Bizeps und Unterarmmuskel liegen auf der Innenseite des Arms (zur Körpermitte)
