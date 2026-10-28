@@ -462,7 +462,7 @@
       return { x: take.x + ((m.x - take.x) / l) * W * f, y: take.y + ((m.y - take.y) / l) * W * f };
     };
     const keys = [
-      ...sweepPts.map((q, i) => ({ t: sweepT[i], ...q })),
+      ...sweepPts.map((q, i) => ({ t: sweepT[i], ...q, hold: i === sweepPts.length - 1 })),
       ...back.flatMap((c, j) => [
         { t: THROW(j) - 190, ...take, deal: true },
         { t: THROW(j) - 110, ...take, deal: true },
@@ -473,7 +473,10 @@
     ];
     const palmAt = (t) => ({ x: curve(keys, t, (q) => q.x), y: curve(keys, t, (q) => q.y) });
     let prevSt = null;
-    const stations = keys.map((q) => (prevSt = q.deal ? dealSt : stationFor(q, prevSt)));
+    const stations = keys.map((q) => (prevSt = q.deal ? dealSt : q.hold ? prevSt : stationFor(q, prevSt)));
+    // Zum Schluss zieht er die zusammengeschobenen Karten zu sich vom Tisch (unter seinen Oberkörper)
+    const pileEnd = keys[n + 1];
+    Object.assign(pileEnd, lerp(keys[n], shoulderOf(ring[stations[n + 1]]), 0.75));
     // Um die Ecke ist kein Sprung: Standplätze werden fortlaufend gezählt (Ring abgewickelt)
     stations.forEach((v, i) => {
       if (i) stations[i] = v + RL * Math.round((stations[i - 1] - v) / RL);
@@ -697,22 +700,54 @@
       $(".fd-folds").setAttribute("d", folds);
       $(".fd-hand").setAttribute("transform", `translate(${P.x} ${P.y}) rotate(${rot}) scale(${k}) translate(-106 -306)`);
     }
+    const ghosts = [];
+    // Mitte der gezeichneten Handfläche (so liegen die Karten wirklich unter der Hand)
+    const palmOf = (p) => {
+      const v = rot2({ x: 0, y: -140 * k }, (p.rot * Math.PI) / 180);
+      return { x: p.P.x + v.x, y: p.P.y + v.y };
+    };
+    const GONE = START + SWEEP + 60;
+    function drawGhosts(t) {
+      const Q = t < GONE ? palmOf(pose(t)) : null;
+      for (const g of ghosts) {
+        if (t >= GONE) {
+          g.el.style.display = "none";
+          continue;
+        }
+        if (t < g.hit) {
+          g.el.style.transform = "";
+          continue;
+        }
+        const u = ease(clamp((t - g.hit) / 220, 0, 1));
+        const x = Q.x + g.off.x + (g.stack.x - g.off.x) * u - g.m.x;
+        const y = Q.y + g.off.y + (g.stack.y - g.off.y) * u - g.m.y;
+        g.el.style.transform = `translate(${x}px, ${y}px) rotate(${g.turn * u}deg)`;
+      }
+    }
     const t0 = performance.now();
     const loop = (now) => {
       if (rig._frozen || !rig.isConnected) return;
       const t = now - t0;
       draw(t);
+      drawGhosts(t);
       if (t < END) requestAnimationFrame(loop);
-      else rig.remove();
+      else {
+        rig.remove();
+        ghosts.forEach((g) => g.el.remove());
+      }
     };
-    rig._draw = draw; // für Screenshot-Tests: Zeitpunkt direkt zeichnen
+    rig._draw = (t) => {
+      draw(t);
+      drawGhosts(t);
+    }; // für Screenshot-Tests: Zeitpunkt direkt zeichnen
     rig._keys = keys;
     rig._end = END;
     draw(0);
     requestAnimationFrame(loop);
 
-    // Die alten Karten liegen noch kurz da und werden weggeschoben, sobald die Hand sie erreicht
-    cells.forEach((c, k2) => {
+    // Die alten Karten liegen da, bis die Hand sie erreicht; dann liegen sie unter der Hand,
+    // werden zu einem Stapel zusammengeschoben und mit der Hand vom Tisch gezogen
+    cells.forEach((c, j) => {
       const ghost = document.createElement("div");
       ghost.className = `fe-ghost ${c.card.suit.red ? "red" : ""}`;
       ghost.innerHTML = `<span>${c.card.rank}</span><span>${c.card.suit.symbol}</span>`;
@@ -725,17 +760,12 @@
         borderRadius: `${Math.min(W, H) * 0.12}px`,
       });
       document.body.appendChild(ghost);
-      const hit = keys[k2 + 1].t - 60;
-      const off = vw - c.r.left + 40;
-      ghost.animate(
-        [
-          { transform: "none", opacity: 1 },
-          { transform: `translate(${W * 0.3}px, -4px) rotate(6deg)`, opacity: 1, offset: 0.25 },
-          { transform: `translate(${off}px, ${-H * 0.4}px) rotate(${20 + k2 * 4}deg)`, opacity: 0.9 },
-        ],
-        { duration: Math.max(380, START + SWEEP - hit), delay: hit, easing: "ease-in", fill: "both" }
-      ).onfinish = () => ghost.remove();
+      const hit = keys[j + 1].t;
+      const at = palmOf(pose(hit));
+      const m = mid(c);
+      ghosts.push({ el: ghost, hit, m, off: { x: m.x - at.x, y: m.y - at.y }, stack: { x: j * 2, y: -j * 2 }, turn: j * 5 - 6 });
     });
+    drawGhosts(0);
 
     // Jede neue Karte verlässt die Finger genau beim Schnippen, dreht sich einmal und gleitet über den Filz aus
     back.forEach((c, j) => {
