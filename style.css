@@ -1379,3 +1379,18 @@ html[data-game="kistenturm"] #screen-game:has(.kt-view) .conn { position: fixed;
   html.fit[data-game="kistenturm"] .bf:has(.kt-view) { display: flex; }
   html.fit[data-game="kistenturm"] .bf:has(.kt-view) > * { grid-column: auto; }
 }
+
+/* Fenster: kleiner Schalter für die Dealer-Animation in der Infozeile */
+.fe-dealer-tg {
+  margin-left: 6px;
+  padding: 2px 9px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78em;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.fe-dealer-tg.off { opacity: 0.6; }

@@ -308,6 +308,68 @@
   const DEALER_HEAD = `<path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
   const SVG_NS = "http://www.w3.org/2000/svg";
 
+  // Dealer-Animation an/aus: Einstellung pro Handy (nur die Optik, am Spiel ändert sich nichts)
+  const DEALER_KEY = "fenster-dealer";
+  function dealerOn() {
+    try {
+      return localStorage.getItem(DEALER_KEY) !== "aus";
+    } catch {
+      return true;
+    }
+  }
+  function dealerToggle(root) {
+    const phase = root.querySelector(".bf-phase");
+    if (!phase || phase.querySelector(".fe-dealer-tg")) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fe-dealer-tg";
+    const label = () => {
+      btn.textContent = dealerOn() ? "🤵 Dealer an" : "🤵 Dealer aus";
+      btn.classList.toggle("off", !dealerOn());
+    };
+    label();
+    btn.onclick = () => {
+      try {
+        localStorage.setItem(DEALER_KEY, dealerOn() ? "aus" : "an");
+      } catch {}
+      label();
+    };
+    phase.append(" ", btn);
+  }
+
+  // Ohne Dealer: alte Karten verblassen kurz, die neuen drehen sich nacheinander auf ihren Platz
+  function quickAnim(cells, W, H) {
+    cells.forEach((c, j) => {
+      const ghost = document.createElement("div");
+      ghost.className = `fe-ghost ${c.card.suit.red ? "red" : ""}`;
+      ghost.innerHTML = `<span>${c.card.rank}</span><span>${c.card.suit.symbol}</span>`;
+      Object.assign(ghost.style, {
+        left: `${c.r.left}px`,
+        top: `${c.r.top}px`,
+        width: `${W}px`,
+        height: `${H}px`,
+        fontSize: `${Math.min(W, H) * 0.3}px`,
+        borderRadius: `${Math.min(W, H) * 0.12}px`,
+      });
+      document.body.appendChild(ghost);
+      ghost.animate(
+        [
+          { transform: "none", opacity: 1 },
+          { transform: "scale(0.85) rotate(-4deg)", opacity: 0 },
+        ],
+        { duration: 300, delay: j * 50, easing: "ease-in", fill: "both" }
+      ).onfinish = () => ghost.remove();
+      c.el.animate(
+        [
+          { transform: "rotateY(90deg) scale(0.9)", opacity: 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 280, delay: 320 + j * 90, easing: "ease-out", fill: "backwards" }
+      );
+    });
+    return 320 + cells.length * 90 + 300;
+  }
+
   const sweptSeen = new Set();
   function sweepAnim(root, s) {
     const sw = s.swept;
@@ -319,6 +381,7 @@
       .map((c) => ({ ...c, r: c.el.getBoundingClientRect() }))
       .sort((a, b) => a.r.left - b.r.left || a.r.top - b.r.top);
     if (!cells.length) return 0;
+    if (!dealerOn()) return quickAnim(cells, cells[0].r.width, cells[0].r.height);
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const H = cells[0].r.height;
@@ -880,6 +943,7 @@
       const stop = [...root.querySelectorAll(".bf-actions .btn")].find((b) => b.textContent.trim() === STOP);
       if (stop) stop.classList.add("fe-stop");
       guardStop(root, s);
+      dealerToggle(root);
       return sweepAnim(root, s);
     },
 
