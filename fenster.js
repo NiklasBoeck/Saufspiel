@@ -335,38 +335,29 @@
     const REACH = Math.sqrt((L1 + L2) ** 2 * 0.93 - Z * Z) + PALM;
     const BODY = k * 0.8;
 
-    // Zeitplan: reinkommen, von links nach rechts abräumen, Stapel holen, Karten einzeln werfen, wieder raus
+    // Zeitplan: reinkommen, von links nach rechts abräumen, Stapel in die linke Hand, Karten einzeln werfen, raus
     const IN = 300;
     const START = 450;
     const SWEEP = 500 + n * 220;
     const DEAL = START + SWEEP + 150;
-    const STEP = 230;
+    const STEP = 330;
+    const THROW = (j) => DEAL + 420 + STEP * j;
+    const HOME = THROW(n - 1) + 200;
+    const END = HOME + 450;
     const back = [...cells].reverse();
+    const last = cells[n - 1];
     const grid = (root.querySelector(".fe-grid") || root).getBoundingClientRect();
     const D = { x: grid.left + grid.width * 0.6, y: grid.top + grid.height * 0.62 };
-    const THROW = (j) => DEAL + 260 + STEP * j;
-    // Wurf: Hand holt zum Körper hin aus und schnippt dann Richtung Ziel
-    const toward = (c, f) => {
-      const m = mid(c);
-      const l = Math.hypot(m.x - D.x, m.y - D.y) || 1;
-      return { x: D.x + ((m.x - D.x) / l) * W * f, y: D.y + ((m.y - D.y) / l) * W * f };
-    };
-    const HOME = THROW(n - 1) + 180;
-    const END = HOME + 450;
-    const last = cells[n - 1];
-    const keys = [
-      { t: START, x: cells[0].r.left - W * 0.3, y: mid(cells[0]).y },
-      ...cells.map((c, j) => ({ t: START + (SWEEP * (j + 1)) / (n + 1), x: c.r.left + W * 0.25, y: mid(c).y })),
-      { t: START + SWEEP, x: Math.min(last.r.right + W * 0.6, vw - W * 0.3), y: mid(last).y - H * 0.3, deal: false },
-      { t: DEAL + 150, ...D, deal: true },
-      ...back.flatMap((c, j) => [
-        { t: THROW(j) - 90, ...toward(c, -0.3), deal: true },
-        { t: THROW(j), ...toward(c, 0.5), deal: true },
-      ]),
-      { t: HOME, ...D, deal: true },
-    ];
+
     const ease = (u) => u * u * (3 - 2 * u);
-    // Weiche Kurve durch alle Punkte (Catmull-Rom), damit die Hand fließt statt an jeder Karte zu stoppen
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
+    const rot2 = (v, th) => ({ x: v.x * Math.cos(th) - v.y * Math.sin(th), y: v.x * Math.sin(th) + v.y * Math.cos(th) });
+    const local = (b, x, y) => {
+      const o = rot2({ x: x * BODY, y: y * BODY }, b.th);
+      return { x: b.x + o.x, y: b.y + o.y };
+    };
+    // Weiche Kurve durch alle Punkte (Catmull-Rom), damit Hand und Körper fließen statt zu stoppen
     const cr = (a, b, c, d, u) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
     const curve = (list, t, f) => {
       if (t <= list[0].t) return f(list[0]);
@@ -379,10 +370,6 @@
       }
       return f(list[list.length - 1]);
     };
-    const palmAt = (t) => ({ x: curve(keys, t, (q) => q.x), y: curve(keys, t, (q) => q.y) });
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    const lerp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
-    const rot2 = (v, th) => ({ x: v.x * Math.cos(th) - v.y * Math.sin(th), y: v.x * Math.sin(th) + v.y * Math.cos(th) });
 
     // Der Dealer läuft rund um den Tisch (abgerundetes Rechteck knapp außerhalb des Bildschirms).
     // Jeder Punkt hat die Lage des Nackens und die Drehung, mit der er zum Tisch schaut.
@@ -414,10 +401,9 @@
     corner(L0 + Rc, T0 + Rc, -Math.PI / 2, -Math.PI);
     const RL = ring.length;
     const ringDist = (i, j) => Math.min(Math.abs(i - j), RL - Math.abs(i - j));
-    const shoulderOf = (b) => {
-      const o = rot2({ x: 260 * BODY, y: -30 * BODY }, b.th);
-      return { x: b.x + o.x, y: b.y + o.y };
-    };
+    // Schultergelenke sitzen innen im Sakko, damit der Ärmel flach aus der Schulter kommt (keine Kugel)
+    const shoulderOf = (b) => local(b, 215, -5);
+    const lShoulderOf = (b) => local(b, -215, -5);
     // Bester Standplatz: Ziel bequem vor der rechten Schulter, nicht unnötig weit vom letzten Platz weg
     const COMFY = REACH * 0.4;
     const stationFor = (T, prev) => {
@@ -431,13 +417,14 @@
         const dist = Math.hypot(dx, dy);
         const ahead = dx * f.x + dy * f.y;
         // nicht zu dicht ran und nie mit dem Kopf über dem Ziel
-        const hd = rot2({ x: 0, y: -158 * BODY }, b.th);
-        const head = Math.hypot(T.x - b.x - hd.x, T.y - b.y - hd.y);
+        const hd = local(b, 0, -158);
+        const head = Math.hypot(T.x - hd.x, T.y - hd.y);
         const c =
           Math.abs(dist - COMFY) +
           (ahead < dist * 0.2 ? 1e4 : 0) +
           (dist < COMFY * 0.7 ? 5e3 : 0) +
-          (head < 170 * BODY ? 5e3 : 0) + (prev == null ? 0 : ringDist(i, prev) * W * 0.05);
+          (head < 170 * BODY ? 5e3 : 0) +
+          (prev == null ? 0 : ringDist(i, prev) * W * 0.05);
         if (c < cost) {
           cost = c;
           best = i;
@@ -445,8 +432,37 @@
       });
       return best;
     };
-    let prevSt = null;
+
+    // Austeilen: der Stapel liegt in der linken Hand vor der Brust, die rechte nimmt die oberste Karte
+    // zwischen die Finger, holt aus und schnippt sie zum Platz
     const dealSt = stationFor(D, null);
+    const dealBody = ring[dealSt];
+    const DECK = local(dealBody, -40, -360);
+    const deckSide = (() => {
+      const S = shoulderOf(dealBody);
+      const l = Math.hypot(S.x - DECK.x, S.y - DECK.y) || 1;
+      return { x: (S.x - DECK.x) / l, y: (S.y - DECK.y) / l };
+    })();
+    const take = { x: DECK.x + deckSide.x * 120 * k, y: DECK.y + deckSide.y * 120 * k };
+    const throwTo = (c, f) => {
+      const m = mid(c);
+      const l = Math.hypot(m.x - take.x, m.y - take.y) || 1;
+      return { x: take.x + ((m.x - take.x) / l) * W * f, y: take.y + ((m.y - take.y) / l) * W * f };
+    };
+    const keys = [
+      { t: START, x: cells[0].r.left - W * 0.3, y: mid(cells[0]).y },
+      ...cells.map((c, j) => ({ t: START + (SWEEP * (j + 1)) / (n + 1), x: c.r.left + W * 0.25, y: mid(c).y })),
+      { t: START + SWEEP, x: Math.min(last.r.right + W * 0.6, vw - W * 0.3), y: mid(last).y - H * 0.3 },
+      ...back.flatMap((c, j) => [
+        { t: THROW(j) - 190, ...take, deal: true },
+        { t: THROW(j) - 110, ...take, deal: true },
+        { t: THROW(j) - 60, ...throwTo(c, -0.25), deal: true },
+        { t: THROW(j), ...throwTo(c, 0.55), deal: true },
+      ]),
+      { t: HOME, ...take, deal: true },
+    ];
+    const palmAt = (t) => ({ x: curve(keys, t, (q) => q.x), y: curve(keys, t, (q) => q.y) });
+    let prevSt = null;
     const stations = keys.map((q) => (prevSt = q.deal ? dealSt : stationFor(q, prevSt)));
     // Um die Ecke ist kein Sprung: Standplätze werden fortlaufend gezählt (Ring abgewickelt)
     stations.forEach((v, i) => {
@@ -470,55 +486,72 @@
     const wrist = (t) => {
       for (let j = 0; j < n; j++) {
         const d = t - THROW(j);
-        if (d > -160 && d <= -70) return -22 * ((d + 160) / 90);
-        if (d > -70 && d <= 0) return -22 + 42 * ((d + 70) / 70);
+        if (d > -110 && d <= -60) return -24 * ((d + 110) / 50);
+        if (d > -60 && d <= 0) return -24 + 44 * ((d + 60) / 60);
         if (d > 0 && d < 140) return 20 * (1 - d / 140);
       }
       return 0;
     };
+    // Welche Karte die rechte Hand gerade zwischen den Fingern hat (vom Stapel genommen, noch nicht geworfen)
+    const pinched = (t) => back.some((c, j) => t >= THROW(j) - 150 && t < THROW(j));
+    // Wie viele Karten noch im Stapel der linken Hand liegen
+    const inDeck = (t) => n - back.filter((c, j) => t >= THROW(j) - 150).length;
+    // Linke Hand: vor dem Austeilen unsichtbar unterm Sakko, dann mit dem Stapel vor der Brust
+    const deckOut = (t) => ease(clamp((t - (DEAL - 100)) / 300, 0, 1)) * (t > HOME ? 1 - ease(clamp((t - HOME) / 250, 0, 1)) : 1);
 
     const rig = document.createElementNS(SVG_NS, "svg");
     rig.setAttribute("class", "fe-rig");
     rig.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
     const grad = (id) =>
       `<linearGradient id="${id}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0a1222"/><stop offset="0.28" stop-color="#2c4371"/><stop offset="0.55" stop-color="#1c2d50"/><stop offset="1" stop-color="#080f1d"/></linearGradient>`;
-    // Der Stapel liegt unter der Handfläche, Karten längs zu den Fingern
+    // Karten in Hand-Einheiten, lange Seite zeigt nach vorn
     const cw = Math.min(W, H) / k;
     const ch = Math.max(W, H) / k;
-    const deck = [8, 4, 0]
-      .map((o) => `<rect x="${106 - cw / 2 + o}" y="${165 - ch / 2 + o}" width="${cw}" height="${ch}" rx="${cw * 0.1}" fill="#0f5a3a" stroke="#f4f1ea" stroke-width="${cw * 0.05}"/>`)
+    const cardRect = (x, y, cls = "") =>
+      `<rect class="${cls}" x="${x - cw / 2}" y="${y - ch / 2}" width="${cw}" height="${ch}" rx="${cw * 0.1}" fill="#0f5a3a" stroke="#f4f1ea" stroke-width="${cw * 0.05}"/>`;
+    // Linke Hand von oben, Handfläche nach oben: Stapel liegt darin, Daumen oben drauf, Finger um die rechte Kante
+    const deckLayers = [0, 1, 2, 3].map((i) => cardRect(-i * 3, -i * 3, "fd-dk")).join("");
+    const fingers = [-0.32, -0.1, 0.12, 0.32]
+      .map((f, i) => `<rect x="${cw / 2 - 16}" y="${ch * f - 13}" width="${34 - i * 2}" height="26" rx="13" fill="url(#fhf)"/>`)
       .join("");
-    rig.innerHTML = `<defs>${HAND_DEFS}${grad("fdu")}${grad("fdf")}</defs>
+    const LEFT_HAND = `<ellipse cx="${-cw * 0.05}" cy="${ch * 0.18}" rx="${cw * 0.62}" ry="${ch * 0.5}" fill="url(#fhs)"/>
+      <path d="M${-cw * 0.45} ${ch * 0.62} L${cw * 0.4} ${ch * 0.62} L${cw * 0.4} ${ch * 0.62 + 14} L${-cw * 0.45} ${ch * 0.62 + 14} Z" fill="#f4f1ea"/>
+      ${deckLayers}${fingers}
+      <rect x="${-cw * 0.62}" y="${-ch * 0.05}" width="${cw * 0.62}" height="28" rx="14" transform="rotate(-38 ${-cw * 0.3} ${ch * 0.05})" fill="url(#fhf)"/>`;
+    rig.innerHTML = `<defs>${HAND_DEFS}${grad("fdu")}${grad("fdf")}${grad("fdu2")}${grad("fdf2")}</defs>
       <path class="fd-shadow" fill="rgb(0 0 0 / 0.22)"/>
+      <path class="fd-lupper" fill="url(#fdu2)"/>
+      <path class="fd-lfore" fill="url(#fdf2)"/>
+      <g class="fd-lhand">${LEFT_HAND}</g>
       <path class="fd-upper" fill="url(#fdu)"/>
       <path class="fd-fore" fill="url(#fdf)"/>
       <path class="fd-folds" fill="none" stroke="#060c18" stroke-width="${5 * k}" stroke-linecap="round" opacity="0.55"/>
-      <g class="fd-hand"><g class="fd-deck">${deck}</g>${HAND_BODY}</g>
+      <g class="fd-hand">${cardRect(106, 10, "fd-pinch")}${HAND_BODY}</g>
       <g class="fd-body">${DEALER_BODY}</g>
       <g class="fd-head">${DEALER_HEAD}</g>`;
     document.body.appendChild(rig);
     const $ = (c) => rig.querySelector(c);
     const pt = (p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
     // Ärmel mit Muskelform: halbe Breiten (Hand-Einheiten) entlang des Glieds, getrennt für beide Seiten.
-    // Oberarm: Schulter, schmaler unterm Deltamuskel, Bizeps-/Trizepswölbung, schmaler Ellbogen.
+    // Oberarm: kommt flach aus der Schulter, Bizeps-/Trizepswölbung, schmaler Ellbogen.
     // Unterarm: kräftig direkt unterm Ellbogen, dann bis zum Handgelenk schmal zulaufend.
-    const UPPER = { s: [0, 0.22, 0.52, 0.78, 1], a: [68, 60, 69, 58, 47], b: [68, 58, 61, 54, 47] };
+    const UPPER = { s: [0, 0.22, 0.52, 0.78, 1], a: [62, 60, 69, 58, 47], b: [62, 58, 61, 54, 47] };
     const FORE = { s: [0, 0.22, 0.5, 0.8, 1], a: [49, 58, 52, 44, 42], b: [49, 54, 47, 42, 42] };
-    const half = (prof, side, x) => {
-      const w = prof[side];
+    const half = (prof, sideKey, x) => {
+      const w = prof[sideKey];
       let j = 1;
       while (j < prof.s.length - 1 && x > prof.s[j]) j++;
       const u = (x - prof.s[j - 1]) / (prof.s[j] - prof.s[j - 1]);
       return cr(w[Math.max(0, j - 2)], w[j - 1], w[j], w[Math.min(w.length - 1, j + 1)], u);
     };
-    function limb(a, b, prof, flip, capB, gradId) {
+    function limb(a, b, prof, flip, capA, capB, gradId) {
       const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       const dx = (b.x - a.x) / len;
       const dy = (b.y - a.y) / len;
       const nx = -dy * flip;
       const ny = dx * flip;
-      const at = (x, side) => {
-        const h = half(prof, side < 0 ? "b" : "a", x) * k * side;
+      const at = (x, s2) => {
+        const h = half(prof, s2 < 0 ? "b" : "a", x) * k * s2;
         return { x: a.x + dx * len * x + nx * h, y: a.y + dy * len * x + ny * h };
       };
       const g = $(`#${gradId}`);
@@ -539,7 +572,24 @@
       const rb = prof.a[prof.a.length - 1] * k;
       const sw = flip > 0 ? 0 : 1;
       const endB = capB ? `A ${rb} ${rb} 0 0 ${sw} ${sideB[0]}` : `L ${sideB[0]}`;
-      return `M ${sideA[0]} L ${sideA.join(" L ")} ${endB} L ${sideB.join(" L ")} A ${ra} ${ra} 0 0 ${sw} ${sideA[0]} Z`;
+      const endA = capA ? `A ${ra} ${ra} 0 0 ${sw} ${sideA[0]}` : `L ${sideA[0]}`;
+      return `M ${sideA[0]} L ${sideA.join(" L ")} ${endB} L ${sideB.join(" L ")} ${endA} Z`;
+    }
+    // Ellbogen in 3D: Schulter in Höhe Z, Hand auf dem Tisch; das Gelenk hängt nach unten, etwas nach außen
+    // und beim Heranziehen nach hinten. Gezeichnet wird die Draufsicht, so wird der Arm verkürzt statt abzuknicken.
+    function elbow(S, P, out, backDir, z = Z, sideW = 0.6, backW = 0.5) {
+      const ax = P.x - S.x;
+      const ay = P.y - S.y;
+      const d = clamp(Math.hypot(ax, ay, z), Math.abs(L1 - L2) + 1, L1 + L2 - 0.5);
+      const u = [ax / d, ay / d, -z / d];
+      const along = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
+      const rad = Math.sqrt(Math.max(0, L1 * L1 - along * along));
+      const flat = Math.hypot(ax, ay) || 1;
+      const pole = [(-ay / flat) * sideW * out + backDir.x * backW, (ax / flat) * sideW * out + backDir.y * backW, -1];
+      const pu = pole[0] * u[0] + pole[1] * u[1] + pole[2] * u[2];
+      const v = pole.map((x, i) => x - pu * u[i]);
+      const vl = Math.hypot(...v) || 1;
+      return { x: S.x + along * u[0] + (rad * v[0]) / vl, y: S.y + along * u[1] + (rad * v[1]) / vl };
     }
 
     function pose(t) {
@@ -561,46 +611,60 @@
         Q = palmAt(t);
       }
       const backDir = rot2({ x: 0, y: 1 }, body.th);
-      const N = { x: body.x + backDir.x * drop, y: body.y + backDir.y * drop };
-      const S = shoulderOf({ ...body, ...N });
+      const b = { x: body.x + backDir.x * drop, y: body.y + backDir.y * drop, th: body.th };
+      const S = shoulderOf(b);
       Q = { x: Q.x + backDir.x * drop, y: Q.y + backDir.y * drop };
       const dq = Math.hypot(Q.x - S.x, Q.y - S.y) || 1;
       const P = { x: Q.x - ((Q.x - S.x) / dq) * PALM, y: Q.y - ((Q.y - S.y) / dq) * PALM };
-      // Ellbogen in 3D: Schulter in Höhe Z, Hand auf dem Tisch; das Gelenk hängt nach unten, etwas nach außen
-      // und beim Heranziehen nach hinten. Gezeichnet wird die Draufsicht, so wird der Arm verkürzt statt abzuknicken.
+      const E = elbow(S, P, 1, backDir);
+      // Hand zeigt in Richtung Unterarm; ist der von oben kaum zu sehen, in Richtung Schulter→Hand
       const ax = P.x - S.x;
       const ay = P.y - S.y;
-      const d = clamp(Math.hypot(ax, ay, Z), Math.abs(L1 - L2) + 1, L1 + L2 - 0.5);
-      const u = [ax / d, ay / d, -Z / d];
-      const along = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
-      const rad = Math.sqrt(Math.max(0, L1 * L1 - along * along));
       const flat = Math.hypot(ax, ay) || 1;
-      const pole = [(-ay / flat) * 0.6 + backDir.x * 0.5, (ax / flat) * 0.6 + backDir.y * 0.5, -1];
-      const pu = pole[0] * u[0] + pole[1] * u[1] + pole[2] * u[2];
-      const v = pole.map((x, i) => x - pu * u[i]);
-      const vl = Math.hypot(...v) || 1;
-      const E = { x: S.x + along * u[0] + (rad * v[0]) / vl, y: S.y + along * u[1] + (rad * v[1]) / vl };
-      // Hand zeigt in Richtung Unterarm; ist der von oben kaum zu sehen, in Richtung Schulter→Hand
       const fl = Math.hypot(P.x - E.x, P.y - E.y) || 1;
       const fx = (P.x - E.x) / fl;
       const fy = (P.y - E.y) / fl;
       const w = clamp(fl / (L2 * 0.6), 0, 1);
       const rot = (Math.atan2(fy * w + (ay / flat) * (1 - w), fx * w + (ax / flat) * (1 - w)) * 180) / Math.PI + 90 + wrist(t);
-      return { N, th: body.th, S, E, P, Q, fl, fx, fy, rot };
+      // Linker Arm: Hand mit Stapel vor der Brust; vorher und nachher eingezogen unterm Sakko
+      const out = deckOut(t);
+      const LH = lerp(local(b, -130, -40), local(b, -40, -360), out);
+      const SL = lShoulderOf(b);
+      const WL = { x: LH.x + rot2({ x: -10 * k, y: (ch * 0.62 + 7) * k }, b.th).x, y: LH.y + rot2({ x: -10 * k, y: (ch * 0.62 + 7) * k }, b.th).y };
+      const EL = elbow(SL, WL, -1, backDir, Z * 0.35, 0.15, 0.2);
+      return { b, S, E, P, Q, fl, fx, fy, rot, SL, EL, WL, LH, out };
     }
 
     function draw(t) {
-      const { N, th, S, E, P, fl, fx, fy, rot } = pose(t);
-      const bodyT = `translate(${N.x} ${N.y}) rotate(${(th * 180) / Math.PI}) scale(${BODY})`;
+      const { b, S, E, P, fl, fx, fy, rot, SL, EL, WL, LH, out } = pose(t);
+      const bodyT = `translate(${b.x} ${b.y}) rotate(${(b.th * 180) / Math.PI}) scale(${BODY})`;
       $(".fd-body").setAttribute("transform", bodyT);
       $(".fd-head").setAttribute("transform", bodyT);
       // Bizeps und Unterarmmuskel liegen auf der Innenseite des Arms (zur Körpermitte)
-      const inner = (S.x - N.x) * (E.y - S.y) - (S.y - N.y) * (E.x - S.x) > 0 ? 1 : -1;
-      const up = limb(S, E, UPPER, inner, true, "fdu");
-      const fore = limb(E, P, FORE, inner, false, "fdf");
+      const innerOf = (A, B) => ((A.x - b.x) * (B.y - A.y) - (A.y - b.y) * (B.x - A.x) > 0 ? 1 : -1);
+      const up = limb(S, E, UPPER, innerOf(S, E), false, true, "fdu");
+      const fore = limb(E, P, FORE, innerOf(S, E), true, false, "fdf");
       $(".fd-upper").setAttribute("d", up);
       $(".fd-fore").setAttribute("d", fore);
-      $(".fd-shadow").setAttribute("d", up + fore);
+      let shadow = up + fore;
+      if (out > 0.02) {
+        const lup = limb(SL, EL, UPPER, innerOf(SL, EL), false, true, "fdu2");
+        const lfore = limb(EL, WL, FORE, innerOf(SL, EL), true, false, "fdf2");
+        $(".fd-lupper").setAttribute("d", lup);
+        $(".fd-lfore").setAttribute("d", lfore);
+        shadow += lup + lfore;
+      } else {
+        $(".fd-lupper").setAttribute("d", "");
+        $(".fd-lfore").setAttribute("d", "");
+      }
+      $(".fd-lhand").setAttribute("transform", `translate(${LH.x} ${LH.y}) rotate(${(b.th * 180) / Math.PI}) scale(${k})`);
+      $(".fd-lhand").style.display = out > 0.02 ? "" : "none";
+      const left = inDeck(t);
+      rig.querySelectorAll(".fd-dk").forEach((r, i) => {
+        r.style.display = i < Math.min(4, left) ? "" : "none";
+      });
+      $(".fd-pinch").style.display = pinched(t) ? "" : "none";
+      $(".fd-shadow").setAttribute("d", shadow);
       $(".fd-shadow").setAttribute("transform", `translate(${-8 * k} ${24 * k})`);
       // Stofffalten in der Armbeuge
       let folds = "";
@@ -610,12 +674,6 @@
         folds += `M ${pt({ x: c.x - fy * o, y: c.y + fx * o })} Q ${pt({ x: c.x + fx * 14 * k, y: c.y + fy * 14 * k })} ${pt({ x: c.x + fy * o * 0.4, y: c.y - fx * o * 0.4 })} `;
       }
       $(".fd-folds").setAttribute("d", folds);
-      // Stapel in der Hand: wird mit jeder geworfenen Karte kleiner
-      const thrown = back.filter((c, j) => t >= THROW(j)).length;
-      const left = t > START + SWEEP + 80 ? n - thrown : 0;
-      rig.querySelectorAll(".fd-deck rect").forEach((r, i, all) => {
-        r.style.display = all.length - i <= left ? "" : "none";
-      });
       $(".fd-hand").setAttribute("transform", `translate(${P.x} ${P.y}) rotate(${rot}) scale(${k}) translate(-106 -306)`);
     }
     const t0 = performance.now();
@@ -658,12 +716,15 @@
       ).onfinish = () => ghost.remove();
     });
 
-    // Jede neue Karte verlässt die Hand genau beim Schnippen, dreht sich einmal und gleitet über den Filz aus
+    // Jede neue Karte verlässt die Finger genau beim Schnippen, dreht sich einmal und gleitet über den Filz aus
     back.forEach((c, j) => {
       const at = pose(THROW(j));
+      const th = (at.rot * Math.PI) / 180;
+      const tip = rot2({ x: 0, y: -296 * k }, th);
+      const from = { x: at.P.x + tip.x, y: at.P.y + tip.y };
       const m = mid(c);
-      const dx = at.Q.x - m.x;
-      const dy = at.Q.y - m.y;
+      const dx = from.x - m.x;
+      const dy = from.y - m.y;
       let a0 = (at.rot + (W > H ? 90 : 0)) % 180;
       if (a0 > 90) a0 -= 180;
       if (a0 < -90) a0 += 180;
