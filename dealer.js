@@ -64,17 +64,17 @@
 
   // Sind alle 4 Karten eines Werts gelegt, liegen sie umgedreht da. In der Runde, in der das passiert,
   // drehen sie sich nach der Landung der Karte nacheinander um.
-  const FLIP_AT = 2.1;
+  const flipAt = () => landMs() / 1000 + 0.1; // kurz nachdem die 4. Karte liegt
   function stackHtml(s, round, v, cards, fresh) {
     const backs = cards.map((c, j) => `<div class="fd-card back" style="--j:${j}"></div>`).join("");
     if (cards.length < 4) return cards.map((c, j) => tableCardHtml(c, j, fresh)).join("");
     const completing = s.stage === "result" && s.result?.completed === v;
     if (!completing) return backs;
     const t = since(`${round}-${v}-flip`);
-    if (t > FLIP_AT + 1.5) return backs;
+    if (t > flipAt() + 1.5) return backs;
     return cards
       .map((c, j) => {
-        const at = FLIP_AT + j * 0.15 - t;
+        const at = flipAt() + j * 0.15 - t;
         return tableCardHtml(c, j, fresh).replace('class="fd-card', 'class="flip-out fd-card').replace(`style="--j:${j}"`, `style="--j:${j};--fd:${at}s"`) +
           `<div class="fd-card back flip-in" style="--j:${j};--fd:${at + 0.3}s"></div>`;
       })
@@ -315,6 +315,327 @@
     return { type: "guess", value: v };
   }
 
+  // --- Dealer-Animation (wie bei Fenster): Einstellung pro Handy, am Spiel ändert sich nichts ---
+  // Mit Dealer kommt er unten an den Tisch, nimmt die oberste Karte vom Stapel in seiner linken Hand,
+  // dreht sie über dem Tisch um, zeigt sie kurz und legt sie auf ihren Platz. Ohne fliegt die Karte allein.
+  const DEALER_KEY = "fd-dealer";
+  function dealerOn() {
+    try {
+      return localStorage.getItem(DEALER_KEY) !== "aus" && !!window.DEALER_ART;
+    } catch {
+      return !!window.DEALER_ART;
+    }
+  }
+  function dealerToggle(root) {
+    const phase = root.querySelector(".bf-phase");
+    if (!phase || phase.querySelector(".fe-dealer-tg")) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "fe-dealer-tg";
+    const label = () => {
+      btn.textContent = dealerOn() ? "🤵 Dealer an" : "🤵 Dealer aus";
+      btn.classList.toggle("off", !dealerOn());
+    };
+    label();
+    btn.onclick = () => {
+      try {
+        localStorage.setItem(DEALER_KEY, dealerOn() ? "aus" : "an");
+      } catch {}
+      label();
+    };
+    phase.append(" ", btn);
+  }
+
+  // Zeitplan der Dealer-Hand (ms): reinkommen, Karte nehmen, umdrehen, zeigen, hinlegen, raus
+  const R_IN = 350;
+  const R_TAKE = 700;
+  const R_FLIP = [950, 1350];
+  const R_SHOW = 1350;
+  const R_HOLD = 2000;
+  const R_LAND = 2600;
+  const R_HOME = 2900;
+  const R_END = 3350;
+  const landMs = () => (dealerOn() ? R_LAND : FLY_MS);
+
+  function dealerReveal(target, table, s, right) {
+    const A = window.DEALER_ART;
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const tr = target.getBoundingClientRect();
+    const br = table.getBoundingClientRect();
+    const W = tr.width;
+    const H = tr.height;
+    const card = s.result.card;
+
+    const k = Math.max(0.34, Math.min(0.75, W * 0.0105));
+    const L1 = 430 * k;
+    const L2 = 380 * k;
+    const PALM = 136 * k;
+    const Z = (L1 + L2) * 0.42;
+    const REACH = Math.sqrt((L1 + L2) ** 2 * 0.93 - Z * Z) + PALM;
+    const MAXR = REACH * 0.58;
+    const BODY = k * 0.8;
+
+    const ease = (u) => u * u * (3 - 2 * u);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
+    const rot2 = (v, th) => ({ x: v.x * Math.cos(th) - v.y * Math.sin(th), y: v.x * Math.sin(th) + v.y * Math.cos(th) });
+    const local = (b, x, y) => {
+      const o = rot2({ x: x * BODY, y: y * BODY }, b.th);
+      return { x: b.x + o.x, y: b.y + o.y };
+    };
+    const cr = (a, b, c, d, u) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
+    const curve = (list, t, f) => {
+      if (t <= list[0].t) return f(list[0]);
+      for (let j = 1; j < list.length; j++) {
+        if (t <= list[j].t) {
+          const u = (t - list[j - 1].t) / (list[j].t - list[j - 1].t || 1);
+          const at = (i) => f(list[clamp(i, 0, list.length - 1)]);
+          return cr(at(j - 2), at(j - 1), at(j), at(j + 1), u);
+        }
+      }
+      return f(list[list.length - 1]);
+    };
+
+    // Der Dealer sitzt unten mittig vor dem Tisch (Rücken zu uns) und schaut zum Tisch
+    const base = { x: br.left + br.width / 2, y: vh + 20 * BODY, th: 0 };
+    const shoulderOf = (b) => local(b, 215, -5);
+    const lShoulderOf = (b) => local(b, -215, -5);
+    const DECK = local(base, -40, -360);
+    const S0 = shoulderOf(base);
+    const sideL = Math.hypot(S0.x - DECK.x, S0.y - DECK.y) || 1;
+    const take = { x: DECK.x + ((S0.x - DECK.x) / sideL) * 120 * k, y: DECK.y + ((S0.y - DECK.y) / sideL) * 120 * k };
+    // Zum Zeigen hält er die Karte groß über die Tischmitte, dann legt er sie genau auf ihren Platz
+    const SHOW = { x: br.left + br.width / 2, y: br.top + br.height * 0.45 };
+    const LAND = { x: tr.left + W / 2, y: tr.top + H / 2 };
+    const LIFT = clamp(Math.min(br.height * 0.62, 190) / H, 1, 3.2);
+    const keys = [
+      { t: 0, ...take },
+      { t: R_TAKE, ...take },
+      { t: R_TAKE + 260, ...lerp(take, SHOW, 0.5) },
+      { t: R_SHOW, ...SHOW },
+      { t: R_HOLD, x: SHOW.x, y: SHOW.y - 4 },
+      { t: R_LAND, ...LAND },
+      { t: R_LAND + 120, ...LAND },
+      { t: R_HOME, ...lerp(LAND, take, 0.45) },
+    ];
+    const cardAt = (t) => ({ x: curve(keys, t, (q) => q.x), y: curve(keys, t, (q) => q.y) });
+    const held = (t) => t >= R_TAKE - 60 && t < R_LAND;
+    const deckOut = (t) => ease(clamp(t / R_IN, 0, 1)) * (1 - ease(clamp((t - R_LAND) / (R_HOME - R_LAND), 0, 1)));
+
+    function elbow(S, P, out, backDir, z = Z, sideW = 0.6, backW = 0.5) {
+      const ax = P.x - S.x;
+      const ay = P.y - S.y;
+      const d = clamp(Math.hypot(ax, ay, z), Math.abs(L1 - L2) + 1, L1 + L2 - 0.5);
+      const u = [ax / d, ay / d, -z / d];
+      const along = (L1 * L1 - L2 * L2 + d * d) / (2 * d);
+      const rad = Math.sqrt(Math.max(0, L1 * L1 - along * along));
+      const flat = Math.hypot(ax, ay) || 1;
+      const pole = [(-ay / flat) * sideW * out + backDir.x * backW, (ax / flat) * sideW * out + backDir.y * backW, -1];
+      const pu = pole[0] * u[0] + pole[1] * u[1] + pole[2] * u[2];
+      const v = pole.map((x, i) => x - pu * u[i]);
+      const vl = Math.hypot(...v) || 1;
+      return { x: S.x + along * u[0] + (rad * v[0]) / vl, y: S.y + along * u[1] + (rad * v[1]) / vl };
+    }
+
+    function pose(t) {
+      // Rein- und rausrutschen: alles kommt von unten über den Bildschirmrand
+      const drop = ((1 - ease(clamp(t / R_IN, 0, 1))) + ease(clamp((t - R_HOME) / (R_END - R_HOME), 0, 1))) * REACH * 0.9;
+      const backDir = rot2({ x: 0, y: 1 }, base.th);
+      const b = { x: base.x, y: base.y + drop, th: base.th, lean: 0 };
+      // Die Karte sitzt zwischen den Fingerspitzen: die Handfläche liegt ein Stück davor Richtung Schulter
+      const C = cardAt(t);
+      const Sb = shoulderOf(b);
+      const dl = Math.hypot(C.x - Sb.x, C.y - Sb.y) || 1;
+      let Q = { x: C.x - ((C.x - Sb.x) / dl) * 160 * k, y: C.y - ((C.y - Sb.y) / dl) * 160 * k + drop };
+      // Reicht der Arm nicht bequem, beugt er sich über den Tisch (von oben: Oberkörper rückt vor und wird größer)
+      const far = Math.hypot(Q.x - Sb.x, Q.y - Sb.y);
+      if (far > MAXR) {
+        const f = 1 - MAXR / far;
+        b.x += (Q.x - Sb.x) * f;
+        b.y += (Q.y - Sb.y) * f;
+        b.lean = Math.min(1, (far - MAXR) / (REACH * 0.4));
+      }
+      const S = shoulderOf(b);
+      const dq = Math.hypot(Q.x - S.x, Q.y - S.y) || 1;
+      const P = { x: Q.x - ((Q.x - S.x) / dq) * PALM, y: Q.y - ((Q.y - S.y) / dq) * PALM };
+      const E = elbow(S, P, 1, backDir);
+      const ax = P.x - S.x;
+      const ay = P.y - S.y;
+      const flat = Math.hypot(ax, ay) || 1;
+      const fl = Math.hypot(P.x - E.x, P.y - E.y) || 1;
+      const fx = (P.x - E.x) / fl;
+      const fy = (P.y - E.y) / fl;
+      const w = clamp(fl / (L2 * 0.6), 0, 1);
+      const rot = (Math.atan2(fy * w + (ay / flat) * (1 - w), fx * w + (ax / flat) * (1 - w)) * 180) / Math.PI + 90;
+      const out = deckOut(t);
+      const LH = lerp(local(b, -130, -40), local(b, -40, -360), out);
+      const SL = lShoulderOf(b);
+      const off = rot2({ x: -10 * k, y: (ch * 0.62 + 7) * k }, b.th);
+      const WL = { x: LH.x + off.x, y: LH.y + off.y };
+      const EL = elbow(SL, WL, -1, backDir, Z * 0.35, 0.15, 0.2);
+      return { b, S, E, P, C: { x: C.x, y: C.y + drop }, fl, fx, fy, rot, SL, EL, WL, LH, out };
+    }
+
+    // Ärmel mit Muskelform (wie bei Fenster)
+    const UPPER = { s: [0, 0.22, 0.52, 0.78, 1], a: [62, 60, 69, 58, 47], b: [62, 58, 61, 54, 47] };
+    const FORE = { s: [0, 0.22, 0.5, 0.8, 1], a: [49, 58, 52, 44, 42], b: [49, 54, 47, 42, 42] };
+    const half = (prof, key, x) => {
+      const w = prof[key];
+      let j = 1;
+      while (j < prof.s.length - 1 && x > prof.s[j]) j++;
+      const u = (x - prof.s[j - 1]) / (prof.s[j] - prof.s[j - 1]);
+      return cr(w[Math.max(0, j - 2)], w[j - 1], w[j], w[Math.min(w.length - 1, j + 1)], u);
+    };
+    const pt = (p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+    function limb(a, b, prof, flip, capA, capB, gradId) {
+      const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const dx = (b.x - a.x) / len;
+      const dy = (b.y - a.y) / len;
+      const nx = -dy * flip;
+      const ny = dx * flip;
+      const at = (x, s2) => {
+        const h = half(prof, s2 < 0 ? "b" : "a", x) * k * s2;
+        return { x: a.x + dx * len * x + nx * h, y: a.y + dy * len * x + ny * h };
+      };
+      const g = rig.querySelector(`#${gradId}`);
+      const g1 = at(0.5, -1);
+      const g2 = at(0.5, 1);
+      g.setAttribute("x1", g1.x);
+      g.setAttribute("y1", g1.y);
+      g.setAttribute("x2", g2.x);
+      g.setAttribute("y2", g2.y);
+      const N = 12;
+      const sideA = [];
+      const sideB = [];
+      for (let i = 0; i <= N; i++) {
+        sideA.push(pt(at(i / N, 1)));
+        sideB.push(pt(at(1 - i / N, -1)));
+      }
+      const ra = prof.a[0] * k;
+      const rb = prof.a[prof.a.length - 1] * k;
+      const sw = flip > 0 ? 0 : 1;
+      const endB = capB ? `A ${rb} ${rb} 0 0 ${sw} ${sideB[0]}` : `L ${sideB[0]}`;
+      const endA = capA ? `A ${ra} ${ra} 0 0 ${sw} ${sideA[0]}` : `L ${sideA[0]}`;
+      return `M ${sideA[0]} L ${sideA.join(" L ")} ${endB} L ${sideB.join(" L ")} ${endA} Z`;
+    }
+
+    // Karten in Hand-Einheiten für den Stapel in der linken Hand
+    const cw = W / k;
+    const ch = H / k;
+    const back = `fill="url(#fdr-back)" stroke="#fff"`;
+    const deck = [0, 1, 2, 3]
+      .map((i) => `<rect x="${-cw / 2 - i * 3}" y="${-ch / 2 - i * 3}" width="${cw}" height="${ch}" rx="${cw * 0.1}" ${back} stroke-width="${cw * 0.05}"/>`)
+      .join("");
+    const fingers = [-0.32, -0.1, 0.12, 0.32]
+      .map((f, i) => `<rect x="${cw / 2 - 16}" y="${ch * f - 13}" width="${34 - i * 2}" height="26" rx="13" fill="url(#fhf)"/>`)
+      .join("");
+    const LEFT_HAND = `<ellipse cx="${-cw * 0.05}" cy="${ch * 0.18}" rx="${cw * 0.62}" ry="${ch * 0.5}" fill="url(#fhs)"/>
+      <path d="M${-cw * 0.45} ${ch * 0.62} L${cw * 0.4} ${ch * 0.62} L${cw * 0.4} ${ch * 0.62 + 14} L${-cw * 0.45} ${ch * 0.62 + 14} Z" fill="#f4f1ea"/>
+      ${deck}${fingers}
+      <rect x="${-cw * 0.62}" y="${-ch * 0.05}" width="${cw * 0.62}" height="28" rx="14" transform="rotate(-38 ${-cw * 0.3} ${ch * 0.05})" fill="url(#fhf)"/>`;
+    // Die Karte in der rechten Hand (in Bildschirm-Pixeln): Rückseite, nach dem Umdrehen die Vorderseite
+    const red = card.suit.red ? "#dc2626" : "#1b1033";
+    const FRONT = `<rect x="${-W / 2}" y="${-H / 2}" width="${W}" height="${H}" rx="${W * 0.1}" fill="${right ? "#dcfce7" : "#fff"}" stroke="${right ? "#22c55e" : "rgb(0 0 0 / 0.15)"}" stroke-width="${right ? W * 0.06 : 1}"/>
+      <text x="${-W * 0.36}" y="${-H * 0.16}" font-size="${H * 0.26}" font-weight="900" fill="${red}" font-family="inherit">${escapeHtml(card.rank)}</text>
+      <text x="${-W * 0.36}" y="${H * 0.14}" font-size="${H * 0.24}" fill="${red}">${card.suit.symbol}</text>`;
+    const BACK = `<rect x="${-W / 2}" y="${-H / 2}" width="${W}" height="${H}" rx="${W * 0.1}" ${back} stroke-width="2"/>`;
+
+    const grad = (id) =>
+      `<linearGradient id="${id}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#0a1222"/><stop offset="0.28" stop-color="#2c4371"/><stop offset="0.55" stop-color="#1c2d50"/><stop offset="1" stop-color="#080f1d"/></linearGradient>`;
+    const rig = document.createElementNS(SVG_NS, "svg");
+    rig.setAttribute("class", "fe-rig fd-rig");
+    rig.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
+    rig.innerHTML = `<defs>${A.HAND_DEFS}${grad("fdu")}${grad("fdf")}${grad("fdu2")}${grad("fdf2")}
+        <pattern id="fdr-back" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="#5b21b6"/><rect width="4" height="8" fill="#7c3aed"/></pattern></defs>
+      <path class="fd-shadow" fill="rgb(0 0 0 / 0.22)"/>
+      <path class="fd-lupper" fill="url(#fdu2)"/>
+      <path class="fd-lfore" fill="url(#fdf2)"/>
+      <g class="fd-lhand">${LEFT_HAND}</g>
+      <path class="fd-upper" fill="url(#fdu)"/>
+      <path class="fd-fore" fill="url(#fdf)"/>
+      <path class="fd-folds" fill="none" stroke="#060c18" stroke-width="${5 * k}" stroke-linecap="round" opacity="0.55"/>
+      <g class="fdr-card"><g class="fdr-back">${BACK}</g><g class="fdr-front">${FRONT}</g></g>
+      <g class="fd-hand">${A.HAND_BODY}</g>
+      <g class="fd-body">${A.DEALER_BODY}</g>
+      <g class="fd-head">${A.DEALER_HEAD}</g>`;
+    document.body.appendChild(rig);
+    const $ = (c) => rig.querySelector(c);
+
+    function draw(t) {
+      const { b, S, E, P, C, fl, fx, fy, rot, SL, EL, WL, LH, out } = pose(t);
+      const bodyT = `translate(${b.x} ${b.y}) rotate(${(b.th * 180) / Math.PI}) scale(${BODY * (1 + 0.1 * b.lean)})`;
+      $(".fd-body").setAttribute("transform", bodyT);
+      $(".fd-head").setAttribute("transform", bodyT);
+      const innerOf = (A2, B2) => ((A2.x - b.x) * (B2.y - A2.y) - (A2.y - b.y) * (B2.x - A2.x) > 0 ? 1 : -1);
+      const up = limb(S, E, UPPER, innerOf(S, E), false, true, "fdu");
+      const fore = limb(E, P, FORE, innerOf(S, E), true, false, "fdf");
+      $(".fd-upper").setAttribute("d", up);
+      $(".fd-fore").setAttribute("d", fore);
+      let shadow = up + fore;
+      if (out > 0.02) {
+        const lup = limb(SL, EL, UPPER, innerOf(SL, EL), false, true, "fdu2");
+        const lfore = limb(EL, WL, FORE, innerOf(SL, EL), true, false, "fdf2");
+        $(".fd-lupper").setAttribute("d", lup);
+        $(".fd-lfore").setAttribute("d", lfore);
+        shadow += lup + lfore;
+      } else {
+        $(".fd-lupper").setAttribute("d", "");
+        $(".fd-lfore").setAttribute("d", "");
+      }
+      $(".fd-lhand").setAttribute("transform", `translate(${LH.x} ${LH.y}) rotate(${(b.th * 180) / Math.PI}) scale(${k})`);
+      $(".fd-lhand").style.display = out > 0.02 ? "" : "none";
+      $(".fd-shadow").setAttribute("d", shadow);
+      $(".fd-shadow").setAttribute("transform", `translate(${-8 * k} ${24 * k})`);
+      let folds = "";
+      for (const [s0, w0] of [[0.1, 0.42], [0.2, 0.36], [0.62, 0.3]]) {
+        const c = { x: E.x + fx * fl * s0, y: E.y + fy * fl * s0 };
+        const o = 52 * k * w0 * 2;
+        folds += `M ${pt({ x: c.x - fy * o, y: c.y + fx * o })} Q ${pt({ x: c.x + fx * 14 * k, y: c.y + fy * 14 * k })} ${pt({ x: c.x + fy * o * 0.4, y: c.y - fx * o * 0.4 })} `;
+      }
+      $(".fd-folds").setAttribute("d", folds);
+      $(".fd-hand").setAttribute("transform", `translate(${P.x} ${P.y}) rotate(${rot}) scale(${k}) translate(-106 -306)`);
+      // Karte: wird beim Hochheben größer (näher an uns), dreht sich um und liegt zum Schluss gerade
+      const cardEl = $(".fdr-card");
+      cardEl.style.display = held(t) ? "" : "none";
+      if (held(t)) {
+        const up2 = ease(clamp((t - R_TAKE) / (R_SHOW - R_TAKE), 0, 1)) * (1 - ease(clamp((t - R_HOLD) / (R_LAND - R_HOLD), 0, 1)));
+        const sc = 1 + (LIFT - 1) * up2;
+        const f = clamp((t - R_FLIP[0]) / (R_FLIP[1] - R_FLIP[0]), 0, 1);
+        const sx = Math.max(0.02, Math.abs(Math.cos(ease(f) * Math.PI)));
+        const tilt = (rot - 360 * Math.round(rot / 360)) * 0.3 * (1 - ease(clamp((t - R_HOLD) / (R_LAND - R_HOLD), 0, 1)));
+        cardEl.setAttribute("transform", `translate(${C.x} ${C.y}) rotate(${tilt}) scale(${sc * sx} ${sc})`);
+        $(".fdr-front").style.display = f >= 0.5 ? "" : "none";
+        $(".fdr-back").style.display = f >= 0.5 ? "none" : "";
+      }
+    }
+
+    let landed = false;
+    const land = () => {
+      if (landed) return;
+      landed = true;
+      const el = document.querySelector("#game-root .fd-card.new");
+      if (el) {
+        el.style.visibility = "";
+        el.classList.add("landed");
+        if (right) el.classList.add("right");
+      }
+    };
+    const t0 = performance.now();
+    const loop = (now) => {
+      if (!rig.isConnected) return;
+      const t = now - t0;
+      draw(t);
+      if (t >= R_LAND) land();
+      if (t < R_END) requestAnimationFrame(loop);
+      else rig.remove();
+    };
+    rig._draw = draw; // für Screenshot-Tests: Zeitpunkt direkt zeichnen
+    draw(0);
+    requestAnimationFrame(loop);
+  }
+
   // Die aufgedeckte Karte erscheint groß in der Tischmitte und wandert langsam auf ihren Stapel.
   // Gibt zurück, wie lange die Trink-Meldung warten soll.
   const FLY_MS = 2000;
@@ -334,15 +655,19 @@
       }
       return 0;
     }
-    const total = FLY_MS + (s.result.completed ? 1300 : 0); // erst umdrehen, dann Meldung
+    const total = landMs() + (s.result.completed ? 1300 : 0); // erst umdrehen, dann Meldung
     flying = { id: s.result.id, end: now + total };
     target.style.visibility = "hidden";
+    const right = s.result.kind !== "miss"; // erratene Karte wird grün umrandet hingelegt
+    if (dealerOn()) {
+      dealerReveal(target, table, s, right);
+      return total;
+    }
     const tr = target.getBoundingClientRect();
     const br = table.getBoundingClientRect();
     const h = Math.min(br.height * 0.7, 190);
     const w = h * (110 / 158);
     const el = document.createElement("div");
-    const right = s.result.kind !== "miss"; // erratene Karte wird grün umrandet hingelegt
     el.className = `pc fd-fly ${s.result.card.suit.red ? "pc-red" : ""} ${right ? "right" : ""}`;
     el.innerHTML = `<span>${s.result.card.rank}</span><span>${s.result.card.suit.symbol}</span>`;
     Object.assign(el.style, {
@@ -414,6 +739,7 @@
     },
 
     afterRender(root, s) {
+      dealerToggle(root);
       return flyCard(root, s);
     },
 

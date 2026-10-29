@@ -307,6 +307,8 @@
   // Rücken, Kopf, Nacken und Kragen kommen zuletzt: der Arm liegt vor der Brust und geht immer darunter durch
   const DEALER_HEAD = `<path d="M-74 -46 C-40 -14 40 -14 74 -46 L64 -78 C30 -54 -30 -54 -64 -78 Z" fill="#f4f1ea"/> <ellipse cx="0" cy="-84" rx="56" ry="34" fill="#d9a179"/> <ellipse cx="-90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="90" cy="-150" rx="17" ry="27" fill="#e2a982"/> <ellipse cx="0" cy="-158" rx="92" ry="106" fill="url(#fdh)"/> <ellipse cx="-24" cy="-190" rx="40" ry="30" fill="#fff" opacity="0.08"/>`;
   const SVG_NS = "http://www.w3.org/2000/svg";
+  // F*ck den Dealer zeichnet seinen Dealer mit denselben Teilen
+  window.DEALER_ART = { HAND_DEFS, HAND_BODY, DEALER_BODY, DEALER_HEAD };
 
   // Dealer-Animation an/aus: Einstellung pro Handy (nur die Optik, am Spiel ändert sich nichts)
   const DEALER_KEY = "fenster-dealer";
