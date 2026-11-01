@@ -147,7 +147,7 @@ const Room = (() => {
   function sendJoin() {
     if (Date.now() - lastJoin < 1500) return;
     lastJoin = Date.now();
-    send({ type: "join", name: session.name });
+    send({ type: "join", name: session.name, fig: Figur.wire() });
   }
 
   function updateConn() {
@@ -171,7 +171,7 @@ const Room = (() => {
       game: session.game,
       hostId: session.id,
       phase: "lobby",
-      players: [{ id: session.id, name: session.name, online: true }],
+      players: [{ id: session.id, name: session.name, online: true, fig: Figur.wire() }],
       seq: 0,
       gseq: 0,
       g: null,
@@ -198,8 +198,9 @@ const Room = (() => {
         if (p) {
           p.online = true;
           if (S.phase === "lobby") p.name = uniqueName(cleanName(a.name), p.id);
+          if (a.fig) p.fig = a.fig;
         } else if (S.players.length < MAX_PLAYERS) {
-          S.players.push({ id: a.from, name: uniqueName(cleanName(a.name), a.from), online: true });
+          S.players.push({ id: a.from, name: uniqueName(cleanName(a.name), a.from), online: true, fig: a.fig || undefined });
         } else return;
         break;
       case "leave":
@@ -248,6 +249,7 @@ const Room = (() => {
 
   function onState() {
     if (!S || !session) return;
+    Figur.setRoom(S.players); // Charaktere der anderen, damit man sie überall sieht
     if (S.phase === "lobby") {
       freshJoin = false;
       renderLobby();
@@ -276,7 +278,7 @@ const Room = (() => {
     $("lobby-players").replaceChildren(
       ...S.players.map((p) => {
         const li = document.createElement("li");
-        li.textContent = `${p.id === S.hostId ? "👑 " : ""}${p.name}`;
+        li.innerHTML = `${Figur.avatar(p.name)}<span>${p.id === S.hostId ? "👑 " : ""}${escapeHtml(p.name)}</span>`;
         li.classList.toggle("me", p.id === session.id);
         li.classList.toggle("off", !p.online);
         li.classList.toggle("bot", !!p.bot);
@@ -394,12 +396,27 @@ const Room = (() => {
     const err = $("room-error");
     err.hidden = !error;
     err.textContent = error || "";
-    if (!$("room-name").value) $("room-name").value = read(NAME_KEY) || "";
+    if (!$("room-name").value) $("room-name").value = Figur.mine?.name || read(NAME_KEY) || "";
+    renderRoomFigur();
     const saved = parseSaved();
     const resume = saved && saved.game === gameKey;
     $("room-resume").hidden = !resume;
     if (resume) $("room-resume").textContent = t("Zurück in Raum {code}", { code: saved.code });
     showScreen("room");
+  }
+
+  // Eigene Figur über dem Namen; Antippen öffnet den Editor und kommt danach hierher zurück
+  function renderRoomFigur() {
+    const btn = $("room-figur");
+    const mine = Figur.mine;
+    btn.innerHTML = mine ? `${Figur.avatar(mine.name, "big")}<span>${escapeHtml(t("Charakter ändern"))}</span>` : `<span class="fav big empty">＋</span><span>${escapeHtml(t("Charakter erstellen"))}</span>`;
+    btn.onclick = () =>
+      Figur.edit({
+        done: () => {
+          if (Figur.mine) $("room-name").value = Figur.mine.name;
+          showStart();
+        },
+      });
   }
 
   function nameOrError() {

@@ -1048,7 +1048,10 @@ window.Hodenritter3D = (() => {
   }
 
   // --- Echte Personen (figuren/personen.js): eigenes Aussehen und 3D-Kopf aus einem Foto ---
+  // Vorrang hat der eigene Charakter aus der App (figur.js), dann figuren/personen.js
   function personOf(name) {
+    const own = window.Figur?.person(name);
+    if (own) return own;
     const all = window.HR_PERSONEN || {};
     const key = String(name).trim().toLowerCase();
     return all[key] || null;
@@ -1060,6 +1063,7 @@ window.Hodenritter3D = (() => {
     for (const k in keys) if (P[k] !== undefined) L[keys[k]] = P[k];
     if (P.shirt2 !== undefined && P.streifen === undefined) L.stripes = true;
     if (P.kopf) Object.assign(L, { cap: false, glasses: false, shades: false, beard: false }); // das steckt alles schon im echten Kopf
+    else if (P.foto || P.fotoKlein) Object.assign(L, { photo: P.foto || P.fotoKlein, beard: false }); // eingescanntes Gesicht
     return L;
   }
 
@@ -1254,9 +1258,14 @@ window.Hodenritter3D = (() => {
     const female = !!L.female;
     const skinV = rim(new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.58, vertexColors: true, emissive: new THREE.Color(L.skin).multiplyScalar(0.1) }));
     head.add(mesh(headGeo(female), skinV, 0, 0, 0));
+    if (L.photo) head.add(photoFace(L.photo, female));
     // Augen: Augapfel in der Höhle, Iris und Pupille, Ober- und Unterlid
     const lidM = M.skin;
     for (const s of [-1, 1]) {
+      if (L.photo) {
+        addEar(head, s, female, M);
+        continue;
+      }
       const ex = s * 0.4;
       const e = faceAt(ex, 0.12, female);
       const ez = e.z - 0.0085;
@@ -1274,12 +1283,76 @@ window.Hodenritter3D = (() => {
       brow.rotation.set(-0.15, s * 0.32, Math.PI / 2 - 0.45);
       brow.scale.set(1, 1, 0.6);
       head.add(brow);
-      // Ohren: flach, schräg nach hinten
-      const ear = mesh(sphere(0.026, 14, 10), M.skin, s * (female ? 0.077 : 0.08), HEAD_Y - 0.004, -0.008);
-      ear.scale.set(0.32, 1, 0.68);
-      ear.rotation.y = s * 0.35;
-      head.add(ear);
+      addEar(head, s, female, M);
     }
+  }
+
+  // Ohren: flach, schräg nach hinten
+  function addEar(head, s, female, M) {
+    const ear = mesh(sphere(0.026, 14, 10), M.skin, s * (female ? 0.077 : 0.08), HEAD_Y - 0.004, -0.008);
+    ear.scale.set(0.32, 1, 0.68);
+    ear.rotation.y = s * 0.35;
+    head.add(ear);
+  }
+
+  // Eingescanntes Gesicht (figur.js): das Foto liegt wie eine Maske auf der Vorderseite des Kopfes.
+  // Das Oval im Foto geht von der Stirn bis zum Kinn; die Augen sitzen da, wo sonst die gebauten Augen sind.
+  const FACE = { cx: 0, cy: -0.11, rx: 0.89, ry: 0.676 };
+  const photoGeos = new Map();
+  const photoMats = new Map();
+  function photoFace(src, female) {
+    if (!photoGeos.has(female)) {
+      const geo = new THREE.SphereGeometry(1, 64, 48);
+      const p = geo.attributes.position;
+      const uv = geo.attributes.uv;
+      const keep = [];
+      const v = new THREE.Vector3();
+      for (let i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i);
+        const u = 0.5 + (v.x - FACE.cx) / (2 * FACE.rx);
+        const w = 0.5 + (v.y - FACE.cy) / (2 * FACE.ry);
+        keep.push(v.z > 0.2 && u > -0.02 && u < 1.02 && w > -0.02 && w < 1.02);
+        const q = headPoint(v.x, v.y, v.z, female);
+        p.setXYZ(i, q.x * 1.012, HEAD_Y + (q.y - HEAD_Y) * 1.012, q.z * 1.012 + 0.0004);
+        uv.setXY(i, u, w);
+      }
+      const idx = geo.index.array;
+      const out = [];
+      for (let i = 0; i < idx.length; i += 3) if (keep[idx[i]] && keep[idx[i + 1]] && keep[idx[i + 2]]) out.push(idx[i], idx[i + 1], idx[i + 2]);
+      geo.setIndex(out);
+      geo.computeVertexNormals();
+      photoGeos.set(female, geo);
+    }
+    if (!photoMats.has(src)) {
+      // Rand weich ausblenden, damit das Foto in die Hautfarbe übergeht
+      const c = document.createElement("canvas");
+      c.width = 224;
+      c.height = 256;
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const img = new Image();
+      img.onload = () => {
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0, c.width, c.height);
+        g.globalCompositeOperation = "destination-in";
+        g.save();
+        g.translate(c.width / 2, c.height / 2);
+        g.scale(1, c.height / c.width);
+        const grad = g.createRadialGradient(0, 0, 0, 0, 0, c.width / 2);
+        grad.addColorStop(0.7, "rgba(0,0,0,1)");
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = grad;
+        g.fillRect(-c.width / 2, -c.width / 2, c.width, c.width);
+        g.restore();
+        tex.needsUpdate = true;
+      };
+      img.src = src;
+      const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.7, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.22, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      photoMats.set(src, rim(m));
+    }
+    const face = new THREE.Mesh(photoGeos.get(female), photoMats.get(src));
+    face.renderOrder = 2;
+    return face;
   }
 
   // Ein Mensch aus Gelenken: Becken → Wirbelsäule → Brust → Hals → Kopf, Schultern → Ellbogen → Hand,

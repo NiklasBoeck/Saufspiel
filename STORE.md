@@ -34,6 +34,7 @@ In Android Studio: Build > Generate Signed App Bundle (.aab) und in der Play Con
 - [ ] Datenschutz-URL für beide Stores: https://niklasboeck.github.io/Saufspiel/info.html#datenschutz
 - [ ] Altersfreigabe: Apple 18+, Google per IARC-Fragebogen (Alkohol: ja, Glücksspiel: nein)
 - [ ] Screenshots: Menü, Einstellungen mit Alkoholfrei-Modus, je ein Spiel, Raum mit QR-Code
+- [ ] Kamera-Erlaubnis für „Gesicht scannen“ (figur.js): iOS `NSCameraUsageDescription` in `ios/App/App/Info.plist` (z. B. „Für ein Foto deines Gesichts auf deinem Charakter.“), Android `android.permission.CAMERA` im Manifest
 
 ## Hinweis an die Apple-Prüfung (App Review Notes)
 

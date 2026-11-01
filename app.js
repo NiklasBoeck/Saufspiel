@@ -149,7 +149,7 @@ function showRules() {
 $("rules-ok").onclick = () => ($("rules").hidden = true);
 $("rules").onclick = (e) => e.target === $("rules") && ($("rules").hidden = true);
 
-document.querySelectorAll(".screen:not(#screen-settings) .game-bar").forEach((bar) => {
+document.querySelectorAll(".screen:not(#screen-settings):not(#screen-figur) .game-bar").forEach((bar) => {
   const btn = document.createElement("button");
   btn.className = "btn ghost small rules-btn";
   btn.textContent = "?";
@@ -176,7 +176,7 @@ function renderPlayers() {
   list.innerHTML = "";
   state.players.forEach((name, i) => {
     const li = document.createElement("li");
-    li.textContent = name;
+    li.innerHTML = `${Figur.avatar(name)}<span>${escapeHtml(name)}</span>`;
     li.classList.toggle("bot", isBot(name));
     const remove = document.createElement("button");
     remove.textContent = "✕";
@@ -190,6 +190,11 @@ function renderPlayers() {
     li.appendChild(remove);
     list.appendChild(li);
   });
+  // Eigene Figur mit einem Tipp dazu
+  const own = Figur.mine?.name;
+  const meBtn = $("me-btn");
+  meBtn.hidden = !own || state.players.some((n) => n.toLowerCase() === own.toLowerCase());
+  if (!meBtn.hidden) meBtn.innerHTML = `${Figur.avatar(own)} ${escapeHtml(t("{name} dazu", { name: own }))}`;
   $("start-btn").disabled = state.players.length < 2;
   $("bot-btn").disabled = state.players.length >= 16;
   renderBotSeg($("bot-level"), state.players.some(isBot));
@@ -213,6 +218,13 @@ function renderBotSeg(el, show) {
     })
   );
 }
+
+$("me-btn").onclick = () => {
+  const own = Figur.mine?.name;
+  if (own && !state.players.includes(own) && state.players.length < 16) state.players.unshift(own);
+  save();
+  renderPlayers();
+};
 
 $("bot-btn").onclick = () => {
   state.players.push(newBotName(state.players));
@@ -444,7 +456,7 @@ function showDrinkAlert(items, level) {
       const verb = t(all ? "trinken" : it.give ? (you ? "verteilst" : "verteilt") : you ? "trinkst" : "trinkt");
       const li = document.createElement("li");
       li.className = `${it.give ? "give" : ""} ${mine(it) ? "me" : ""}`;
-      li.innerHTML = `<span><b>${escapeHtml(who)}</b> ${verb}${it.n ? ` <b class="da-n">${sips(it.n)}</b>` : ""}</span>${
+      li.innerHTML = `<span>${all ? "" : Figur.avatar(it.who)}<b>${escapeHtml(who)}</b> ${verb}${it.n ? ` <b class="da-n">${sips(it.n)}</b>` : ""}</span>${
         it.text ? `<small>${escapeHtml(it.text)}</small>` : ""
       }`;
       return li;
@@ -499,9 +511,11 @@ function applyLang() {
   translateDom();
   renderGames();
   renderSettingsBtn();
+  Figur.renderMenuButton();
   if (currentGame) document.querySelectorAll(".game-title").forEach((el) => (el.textContent = gameText(currentGame, "label")));
 }
 
 applyLang();
 fillDrawnIcons();
+Figur.boot();
 Room.boot();

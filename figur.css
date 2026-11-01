@@ -1,0 +1,180 @@
+/* Eigener Charakter (figur.js): Bildchen bei Namen, Knopf im Menü, Editor, Gesicht scannen */
+
+.fav {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--primary) 30%, var(--surface));
+  vertical-align: middle;
+  font-size: 1rem;
+  line-height: 1;
+}
+.fav .figur-svg { width: 100%; height: 100%; display: block; }
+.fav.bot { background: color-mix(in srgb, var(--surface) 70%, #22d3ee 30%); }
+.fav.big { width: 54px; height: 54px; font-size: 1.6rem; }
+.fav.empty { border: 1.5px dashed var(--muted); background: transparent; color: var(--muted); font-weight: 700; }
+
+.chips li:has(> .fav) { padding-left: 4px; }
+#da-list li > span > .fav { width: 34px; height: 34px; margin-right: 8px; }
+.me-add { align-self: center; display: inline-flex; align-items: center; gap: 8px; }
+.me-add[hidden] { display: none; }
+.me-add .fav { width: 26px; height: 26px; }
+
+/* Menü: eigene Figur oben links */
+.figur-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 46%;
+  padding: 3px 12px 3px 3px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 999px;
+  background: rgb(42 27 77 / 0.72);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.figur-btn .fav { width: 34px; height: 34px; }
+.fb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html:not(.neu) .menu-head { padding-top: 52px; }
+
+/* Neu, Biergarten, Wiesn: oben rechts unter den Einstellungen, Wortmarke bleibt links frei */
+html.neu .figur-btn {
+  left: auto;
+  right: 0;
+  top: calc(clamp(10px, 3dvh, 28px) + 50px);
+  max-width: 40%;
+  background: transparent;
+  border: 1px solid var(--line-strong, rgb(255 255 255 / 0.2));
+  font-family: var(--display, inherit);
+}
+html.neu .figur-btn:active { background: var(--surface); }
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit.neu .figur-btn { top: 4px; right: auto; left: 50%; transform: translateX(-50%); }
+}
+
+/* Raum: eigene Figur über dem Namen */
+.room-figur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px 6px 6px;
+  align-self: flex-start;
+  border: 1px solid var(--line-strong, rgb(255 255 255 / 0.15));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* --- Editor --- */
+.figur-title { font-weight: 700; color: var(--text); font-size: 1.15rem; }
+.figur-root { display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+.fg-welcome { margin: 0; padding: 12px 14px; border-radius: var(--radius); background: color-mix(in srgb, var(--primary) 18%, var(--surface)); color: var(--text); line-height: 1.4; }
+.fg-layout { display: flex; flex-direction: column; gap: 14px; }
+.fg-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 10px 0 4px;
+  border-radius: var(--radius);
+  background: radial-gradient(ellipse at 50% 85%, color-mix(in srgb, var(--primary) 26%, transparent), transparent 70%), var(--surface);
+}
+.fg-preview { height: clamp(190px, 34dvh, 320px); aspect-ratio: 100 / 206; }
+.fg-preview .figur-svg { width: 100%; height: 100%; display: block; }
+.fg-dice { position: absolute; right: 8px; bottom: 8px; }
+.fg-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fg-name input.bad { outline: 2px solid #ef4444; }
+.fg-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface); }
+.fg-tabs button { flex: 1; border: none; background: none; color: var(--muted); font: inherit; font-weight: 700; padding: 9px 6px; border-radius: 999px; cursor: pointer; }
+.fg-tabs button.picked { background: var(--primary); color: var(--ink, #1b1033); }
+.fg-panel { display: flex; flex-direction: column; gap: 14px; }
+.fg-row { display: flex; flex-direction: column; gap: 7px; }
+.fg-label { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.fg-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.fg-sw { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgb(255 255 255 / 0.18); background: var(--c); cursor: pointer; padding: 0; }
+.fg-sw.picked { border-color: var(--text); box-shadow: 0 0 0 3px var(--primary); }
+.fg-choice { display: flex; flex-wrap: wrap; gap: 6px; }
+.fg-choice button {
+  border: 1.5px solid var(--line-strong, rgb(255 255 255 / 0.18));
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.fg-choice button.picked { background: var(--primary); border-color: var(--primary); color: var(--ink, #1b1033); }
+.fg-styles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.fg-style { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 6px; border: 1.5px solid transparent; border-radius: 14px; background: var(--surface); color: var(--text); font: inherit; font-size: 0.78rem; cursor: pointer; }
+.fg-style .figur-svg { width: 52px; height: 52px; border-radius: 50%; background: color-mix(in srgb, var(--primary) 22%, transparent); }
+.fg-style.picked { border-color: var(--primary); }
+.fg-range { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.85rem; }
+.fg-range input { flex: 1; accent-color: var(--primary); }
+.fg-range b { color: var(--text); min-width: 4.5em; text-align: right; }
+.fg-bottom { display: flex; gap: 10px; margin-top: auto; padding-top: 4px; position: sticky; bottom: 0; padding-bottom: env(safe-area-inset-bottom); background: linear-gradient(transparent, var(--bg) 30%); }
+.fg-bottom .btn { flex: 1; }
+
+.fg-face { display: flex; flex-direction: column; align-items: stretch; gap: 10px; text-align: center; }
+.fg-face p { margin: 0; color: var(--text); line-height: 1.4; }
+.fg-face .hint { color: var(--muted); }
+.fg-face-pic { align-self: center; width: 112px; height: 128px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--surface); font-size: 3rem; }
+.fg-face-pic img { width: 100%; height: 100%; object-fit: cover; }
+.fg-file { position: relative; text-align: center; cursor: pointer; }
+
+/* Quer und auf großen Bildschirmen: Figur links, Auswahl rechts */
+@media (min-aspect-ratio: 6 / 5), (min-width: 700px) {
+  #screen-figur { max-width: 900px; }
+  .fg-layout { flex-direction: row; align-items: flex-start; }
+  .fg-stage { position: sticky; top: 8px; flex: 0 0 38%; min-height: min(70dvh, 420px); }
+  .fg-preview { height: min(60dvh, 380px); }
+  .fg-side { flex: 1; }
+}
+@media (min-width: 700px) {
+  html:has(#screen-figur.active) #app { max-width: 900px; }
+}
+
+/* --- Gesicht scannen --- */
+.fg-scan { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom)); background: #0b0a0c; color: #fff; }
+.fg-scan[hidden] { display: none; }
+.fg-scan-box { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 12px; }
+.fg-scan-title { margin: 0; text-align: center; line-height: 1.35; }
+.fg-scan-stage { position: relative; width: 100%; aspect-ratio: 100 / 114; max-height: 62dvh; margin: 0 auto; border-radius: 22px; overflow: hidden; background: #000; touch-action: none; }
+.fg-scan-stage video, .fg-scan-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fg-scan-stage video { transform: scaleX(-1); }
+.fg-oval { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.fg-scan-msg { margin: 0; display: flex; flex-direction: column; gap: 10px; text-align: center; color: #fde68a; }
+.fg-scan-msg[hidden] { display: none; }
+.fg-scan-btns { display: flex; gap: 10px; }
+.fg-scan-btns .btn { flex: 1; }
+.fg-scan .btn.ghost { color: #fff; }
+.fg-zoom { color: #fff; }
+@media (min-aspect-ratio: 6 / 5) and (max-height: 560px) {
+  .fg-scan-box { max-width: 760px; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto 1fr auto; column-gap: 16px; }
+  .fg-scan-stage { grid-row: 1 / 4; height: calc(100dvh - 40px); width: auto; max-height: none; }
+  .fg-scan-btns { align-self: end; }
+}
+
+/* Biergarten und Wiesn: rundes Bild links, auf Höhe des Einstellungen-Knopfs (rechts ist kein Platz) */
+html.neu.garten .figur-btn, html.fit.neu.garten .figur-btn,
+html.neu.wiesn .figur-btn, html.fit.neu.wiesn .figur-btn {
+  top: 26px; right: auto; left: -4px; transform: none; padding: 3px; background: var(--bg); gap: 0;
+}
+html.neu.wiesn .figur-btn, html.fit.neu.wiesn .figur-btn { top: 62px; }
+html.neu.garten .figur-btn .fb-name, html.neu.wiesn .figur-btn .fb-name { display: none; }
+html.neu.garten .figur-btn .fav, html.neu.wiesn .figur-btn .fav { width: 36px; height: 36px; }
