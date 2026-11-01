@@ -178,3 +178,13 @@ html.neu.wiesn .figur-btn, html.fit.neu.wiesn .figur-btn {
 html.neu.wiesn .figur-btn, html.fit.neu.wiesn .figur-btn { top: 62px; }
 html.neu.garten .figur-btn .fb-name, html.neu.wiesn .figur-btn .fb-name { display: none; }
 html.neu.garten .figur-btn .fav, html.neu.wiesn .figur-btn .fav { width: 36px; height: 36px; }
+
+/* 3D-Gesicht: Vorschau im Editor, Warten beim Bauen */
+.fg-3d { position: relative; align-self: center; width: min(260px, 70vw); aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--primary) 26%, var(--surface)), var(--surface) 70%); touch-action: pan-y; }
+.fg-3d canvas { width: 100%; height: 100%; display: block; }
+.fg-3d-hint { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 0.75rem; color: var(--muted); pointer-events: none; }
+.fg-busy { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 40px 0; }
+.fg-busy p { margin: 0; }
+.fg-busy .hint { color: #bbb; font-size: 0.85rem; }
+.fg-spin { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgb(255 255 255 / 0.2); border-top-color: var(--primary); animation: fg-spin 0.9s linear infinite; }
+@keyframes fg-spin { to { transform: rotate(360deg); } }

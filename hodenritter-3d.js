@@ -1063,7 +1063,8 @@ window.Hodenritter3D = (() => {
     for (const k in keys) if (P[k] !== undefined) L[keys[k]] = P[k];
     if (P.shirt2 !== undefined && P.streifen === undefined) L.stripes = true;
     if (P.kopf) Object.assign(L, { cap: false, glasses: false, shades: false, beard: false }); // das steckt alles schon im echten Kopf
-    else if (P.foto || P.fotoKlein) Object.assign(L, { photo: P.foto || P.fotoKlein, beard: false }); // eingescanntes Gesicht
+    else if (P.form && window.Gesicht3D) Object.assign(L, { face3d: P.form, face3dTex: P.formFoto || P.formFotoKlein, beard: false }); // grobes 3D-Gesicht
+    else if (P.foto || P.fotoKlein) Object.assign(L, { photo: P.foto || P.fotoKlein, beard: false }); // eingescanntes Gesicht, flach
     return L;
   }
 
@@ -1258,11 +1259,12 @@ window.Hodenritter3D = (() => {
     const female = !!L.female;
     const skinV = rim(new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.58, vertexColors: true, emissive: new THREE.Color(L.skin).multiplyScalar(0.1) }));
     head.add(mesh(headGeo(female), skinV, 0, 0, 0));
-    if (L.photo) head.add(photoFace(L.photo, female));
+    if (L.face3d) head.add(scannedFace(L, female));
+    else if (L.photo) head.add(photoFace(L.photo, female));
     // Augen: Augapfel in der Höhle, Iris und Pupille, Ober- und Unterlid
     const lidM = M.skin;
     for (const s of [-1, 1]) {
-      if (L.photo) {
+      if (L.photo || L.face3d) {
         addEar(head, s, female, M);
         continue;
       }
@@ -1293,6 +1295,56 @@ window.Hodenritter3D = (() => {
     ear.scale.set(0.32, 1, 0.68);
     ear.rotation.y = s * 0.35;
     head.add(ear);
+  }
+
+  // Grobes 3D-Gesicht aus dem Scan (figur-3d.js): 468 Punkte in cm, auf Kopfgröße gebracht. Augen auf Höhe der
+  // gebauten Augen, Nasenspitze vorne an der Nase. Kein Punkt liegt im Kopf, sonst würde die Haut durchstechen.
+  const face3dGeos = new Map();
+  const face3dMats = new Map();
+  function scannedFace(L, female) {
+    const key = `${L.face3d.slice(0, 64)}|${L.face3d.length}|${female}`;
+    if (!face3dGeos.has(key)) {
+      const { pos } = Gesicht3D.parse(L.face3d);
+      const at = (i) => [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
+      const PT = Gesicht3D.POINTS;
+      const eyes = [...PT.eyeR, ...PT.eyeL].map(at);
+      const eyeY = eyes.reduce((a, p) => a + p[1], 0) / eyes.length;
+      const width = Math.abs(at(PT.cheekL)[0] - at(PT.cheekR)[0]) || 14;
+      const k = (2 * (female ? 0.078 : 0.081) * 0.84) / width; // Meter pro cm
+      const nose = at(PT.noseTip);
+      const eyeH = faceAt(0.4, 0.12, female).y;
+      const noseZ = faceAt(0, -0.2, female).z + 0.004;
+      const cx = (at(PT.cheekL)[0] + at(PT.cheekR)[0]) / 2;
+      const rx = female ? 0.078 : 0.081;
+      const geo = Gesicht3D.geometry(THREE, L.face3d, (i, x, y, z) => {
+        let px = (x - cx) * k;
+        let py = eyeH + (y - eyeY) * k;
+        let pz = noseZ + (z - nose[2]) * k;
+        // Nicht in den Kopf: mindestens knapp über der Kopfoberfläche in derselben Richtung
+        const d = [px / rx, (py - HEAD_Y) / 0.112, pz / 0.098];
+        const n = Math.hypot(...d) || 1;
+        const q = headPoint(d[0] / n, d[1] / n, d[2] / n, female);
+        const rHead = Math.hypot(q.x, q.y - HEAD_Y, q.z) * 1.012;
+        const r = Math.hypot(px, py - HEAD_Y, pz);
+        if (r < rHead) {
+          const s = rHead / r;
+          px *= s;
+          py = HEAD_Y + (py - HEAD_Y) * s;
+          pz *= s;
+        }
+        return [px, py, pz];
+      });
+      face3dGeos.set(key, geo);
+    }
+    const src = L.face3dTex;
+    if (!face3dMats.has(src)) {
+      const tex = Gesicht3D.texture(THREE, src);
+      face3dMats.set(src, rim(new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, transparent: true, roughness: 0.65, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.15, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })));
+    }
+    const face = new THREE.Mesh(face3dGeos.get(key), face3dMats.get(src));
+    face.castShadow = false;
+    face.renderOrder = 2;
+    return face;
   }
 
   // Eingescanntes Gesicht (figur.js): das Foto liegt wie eine Maske auf der Vorderseite des Kopfes.

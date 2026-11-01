@@ -68,7 +68,8 @@ const Figur = (() => {
     if (BOTTOMS[f.unten]) out.unten = f.unten;
     if (Number.isFinite(f.groesse)) out.groesse = Math.min(2.1, Math.max(1.45, f.groesse));
     if (Number.isFinite(f.statur)) out.statur = Math.min(1.12, Math.max(0.88, f.statur));
-    for (const k of ["foto", "fotoKlein"]) if (typeof f[k] === "string" && f[k].length < 60000 && PHOTO.test(f[k])) out[k] = f[k];
+    if (window.Gesicht3D?.validForm(f.form)) out.form = f.form; // grobes 3D-Gesicht (figur-3d.js)
+    for (const k of ["foto", "fotoKlein", "formFoto", "formFotoKlein"]) if (typeof f[k] === "string" && f[k].length < 60000 && PHOTO.test(f[k])) out[k] = f[k];
     return out;
   }
 
@@ -271,8 +272,8 @@ const Figur = (() => {
 
   function wire() {
     if (!mine) return null;
-    const { foto, ...rest } = mine;
-    return rest; // mit fotoKlein (kleines Foto), das große bleibt auf dem Handy
+    const { foto, formFoto, ...rest } = mine;
+    return rest; // mit den kleinen Fotos, die großen bleiben auf dem Handy
   }
 
   function setRoom(players) {
@@ -366,12 +367,12 @@ const Figur = (() => {
     const has = !!draft.foto;
     return `
       <div class="fg-face">
-        <div class="fg-face-pic">${has ? `<img src="${draft.foto}" alt="">` : `<span>🙂</span>`}</div>
-        <p>${esc(t(has ? "Dein Gesicht ist drauf. Es liegt wie eine Maske vorne auf dem Kopf deiner Figur, Haare und Kleidung stellst du weiter selbst ein." : "Mach ein Selfie: Dein Gesicht kommt dann auf deine Figur, als Bild bei deinem Namen und in Hodenritter auf den Kopf."))}</p>
+        ${draft.form ? `<div class="fg-3d" aria-label="${esc(t("Dein Gesicht in 3D"))}"><canvas></canvas><span class="fg-3d-hint">${esc(t("3D · zum Drehen wischen"))}</span></div>` : `<div class="fg-face-pic">${has ? `<img src="${draft.foto}" alt="">` : `<span>🙂</span>`}</div>`}
+        <p>${esc(t(draft.form ? "Aus deinem Foto ist ein grobes 3D-Gesicht geworden: Nase, Augen, Mund, Wangen und Kinn haben deine Form. In Hodenritter sitzt es auf dem Kopf deiner Figur, Haare und Kleidung stellst du weiter selbst ein." : has ? "Dein Gesicht ist drauf, aber nur flach als Foto (es wurde kein Gesicht erkannt). Versuch es nochmal gerade von vorne mit gutem Licht." : "Mach ein Selfie: Daraus wird ein grobes 3D-Gesicht für deine Figur, in Hodenritter sitzt es auf dem Kopf, und als Bild steht es bei deinem Namen."))}</p>
         <button class="btn" data-do="scan">📷 ${esc(t(has ? "Neu scannen" : "Gesicht scannen"))}</button>
         <label class="btn ghost fg-file">🖼️ ${esc(t("Foto aus der Galerie"))}<input type="file" accept="image/*" data-do="file" hidden></label>
         ${has ? `<button class="btn ghost" data-do="nofoto">${esc(t("Foto entfernen"))}</button>` : ""}
-        <p class="hint small-text">${esc(t("Das ist kein echter 3D-Scan: Das Foto wird flach auf das Gesicht gelegt. Am besten gerade in die Kamera schauen, mit gutem Licht. Das Foto bleibt auf deinem Handy und geht nur an die Handys in deinem Raum, wenn ihr mit mehreren Handys spielt."))}</p>
+        <p class="hint small-text">${esc(t("Die Gesichtserkennung läuft auf deinem Handy, beim ersten Mal lädt sie etwa 13 MB. Am besten gerade in die Kamera schauen, mit gutem Licht. Foto und 3D-Gesicht bleiben auf deinem Handy und gehen nur an die Handys in deinem Raum, wenn ihr mit mehreren Handys spielt."))}</p>
       </div>`;
   }
 
@@ -395,6 +396,100 @@ const Figur = (() => {
         ${first ? `<button class="btn ghost" data-do="later">${esc(t("Später"))}</button>` : ""}
         <button class="btn" data-do="save">${esc(t("Fertig"))}</button>
       </div>`;
+    mountPreview3d();
+  }
+
+  // Gedrehte 3D-Vorschau des Gesichts im Reiter „Gesicht“
+  let preview3d = null;
+  function mountPreview3d() {
+    preview3d?.stop();
+    preview3d = null;
+    const box = document.querySelector("#figur-root .fg-3d");
+    if (!box || !draft.form) return;
+    const go = () => {
+      if (box.isConnected) preview3d = Preview3D(box, draft);
+    };
+    if (window.THREE) return go();
+    let tag = document.getElementById("hr-three") || document.getElementById("fg-three");
+    if (!tag) {
+      tag = document.createElement("script");
+      tag.id = "fg-three";
+      tag.src = "vendor/three.min.js";
+      document.head.appendChild(tag);
+    }
+    tag.addEventListener("load", go);
+  }
+
+  function Preview3D(box, L) {
+    const THREE = window.THREE;
+    const canvas = box.querySelector("canvas");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(30, 1, 1, 200);
+    cam.position.set(0, 0.5, 78);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x554433, 1.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    sun.position.set(8, 10, 20);
+    scene.add(sun);
+    const head = new THREE.Group();
+    scene.add(head);
+    // Kopf als Ellipsoid in Hautfarbe, das Gesicht liegt vorne drauf und nie darin
+    const R = [8.2, 11, 9.6];
+    const cy = 0.6;
+    const cz = -1.4;
+    const skin = new THREE.MeshStandardMaterial({ color: L.haut || "#e0b090", roughness: 0.7 });
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 36), skin);
+    skull.scale.set(...R);
+    skull.position.set(0, cy, cz);
+    head.add(skull);
+    const geo = Gesicht3D.geometry(THREE, L.form, (i, x, y, z) => {
+      const dx = x / R[0];
+      const dy = (y - cy) / R[1];
+      const dz = (z - cz) / R[2];
+      const d = Math.hypot(dx, dy, dz) || 1;
+      const k = d < 1.01 ? 1.01 / d : 1;
+      return [x * k, cy + (y - cy) * k, cz + (z - cz) * k];
+    });
+    const face = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: Gesicht3D.texture(THREE, L.formFoto || L.formFotoKlein), vertexColors: true, transparent: true, roughness: 0.65 }));
+    head.add(face);
+    let yaw = 0;
+    let drag = null;
+    let auto = true;
+    canvas.onpointerdown = (e) => {
+      drag = e.clientX;
+      auto = false;
+      canvas.setPointerCapture(e.pointerId);
+    };
+    canvas.onpointermove = (e) => {
+      if (drag == null) return;
+      yaw += (e.clientX - drag) * 0.012;
+      yaw = Math.max(-1.6, Math.min(1.6, yaw));
+      drag = e.clientX;
+    };
+    canvas.onpointerup = canvas.onpointercancel = () => (drag = null);
+    let raf = 0;
+    const t0 = performance.now();
+    const frame = (now) => {
+      raf = requestAnimationFrame(frame);
+      if (!canvas.isConnected) return stop();
+      const r = canvas.getBoundingClientRect();
+      if (canvas.width !== Math.round(r.width * renderer.getPixelRatio())) {
+        renderer.setSize(r.width, r.height, false);
+        cam.aspect = r.width / r.height;
+        cam.updateProjectionMatrix();
+      }
+      if (auto) yaw = Math.sin((now - t0) / 1400) * 0.75;
+      head.rotation.y = yaw;
+      renderer.render(scene, cam);
+    };
+    raf = requestAnimationFrame(frame);
+    function stop() {
+      cancelAnimationFrame(raf);
+      renderer.dispose();
+    }
+    return { stop };
   }
 
   function refreshPreview() {
@@ -474,8 +569,7 @@ const Figur = (() => {
           break;
         case "nofoto":
           draft.name = $("figur-name").value;
-          delete draft.foto;
-          delete draft.fotoKlein;
+          for (const k of ["foto", "fotoKlein", "form", "formFoto", "formFotoKlein"]) delete draft[k];
           render();
           break;
         case "save":
@@ -506,9 +600,11 @@ const Figur = (() => {
   }
 
   // Foto fertig zugeschnitten: aufs Gesicht, Hautfarbe aus den Wangen
-  function setPhoto(big, small, skin) {
+  function setPhoto(big, small, skin, form) {
     draft.foto = big;
     draft.fotoKlein = small;
+    for (const k of ["form", "formFoto", "formFotoKlein"]) delete draft[k];
+    if (form) Object.assign(draft, form);
     if (skin) draft.haut = skin;
     draft.bart = false;
     tab = "gesicht";
@@ -567,6 +663,7 @@ const Figur = (() => {
         </div>`;
       el.hidden = false;
       el.querySelector('[data-scan="cancel"]').onclick = close;
+      window.Gesicht3D?.preload(); // Gesichtserkennung schon mal laden, während man sich ins Oval setzt
       const video = el.querySelector("video");
       const msg = el.querySelector(".fg-scan-msg");
       try {
@@ -589,7 +686,7 @@ const Figur = (() => {
           g.drawImage(video, 0, 0);
           stream.getTracks().forEach((tr) => tr.stop());
           stream = null;
-          adjust(c);
+          process(c);
         };
       } catch {
         msg.hidden = false;
@@ -609,8 +706,7 @@ const Figur = (() => {
         c.height = Math.round(im.naturalHeight * k);
         c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        overlay().hidden = false;
-        adjust(c);
+        process(c);
       };
       im.onerror = () => URL.revokeObjectURL(url);
       im.src = url;
@@ -708,22 +804,54 @@ const Figur = (() => {
         const sy = iy(oy);
         const sw = ow / k;
         const shh = oh / k;
-        const out = (w, h, q) => {
-          const c = document.createElement("canvas");
-          c.width = w;
-          c.height = h;
-          const g = c.getContext("2d");
-          g.fillStyle = "#c8a080";
-          g.fillRect(0, 0, w, h);
-          g.drawImage(img, sx, sy, sw, shh, 0, 0, w, h);
-          return { url: c.toDataURL("image/jpeg", q), c };
-        };
-        const big = out(W * 2, Hh * 2, 0.82);
-        const small = out(W / 2, Hh / 2, 0.7);
-        const skin = cheekColor(big.c);
+        const flat = flatPhoto(img, sx, sy, sw, shh);
         close();
-        setPhoto(big.url, small.url, skin);
+        setPhoto(flat.big, flat.small, flat.skin, null);
       };
+    }
+
+    // Flaches Foto fürs runde Bildchen: Ausschnitt (sx, sy, sw, sh) des Bildes
+    function flatPhoto(src, sx, sy, sw, sh) {
+      const out = (w, h, q) => {
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const g = c.getContext("2d");
+        g.fillStyle = "#c8a080";
+        g.fillRect(0, 0, w, h);
+        g.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+        return { url: c.toDataURL("image/jpeg", q), c };
+      };
+      const big = out(W * 2, Hh * 2, 0.82);
+      const small = out(W / 2, Hh / 2, 0.7);
+      return { big: big.url, small: small.url, skin: cheekColor(big.c) };
+    }
+
+    // Foto da: Gesicht suchen, 3D-Gesicht bauen und das Bildchen selbst zuschneiden.
+    // Wird kein Gesicht gefunden, schiebt man das Foto von Hand ins Oval (dann nur flach).
+    function process(canvas) {
+      const el = overlay();
+      el.hidden = false;
+      el.innerHTML = `<div class="fg-scan-box"><div class="fg-busy"><span class="fg-spin"></span><p>${esc(t("Dein 3D-Gesicht wird gebaut…"))}</p><p class="hint">${esc(t("Beim ersten Mal lädt die Gesichtserkennung, das kann ein paar Sekunden dauern."))}</p></div></div>`;
+      setTimeout(async () => {
+        let res = null;
+        try {
+          res = window.Gesicht3D ? await Gesicht3D.fromImage(canvas) : null;
+        } catch (err) {
+          console.warn("3D-Gesicht", err);
+        }
+        if (overlay().hidden) return;
+        if (!res) {
+          adjust(canvas);
+          const title = overlay().querySelector(".fg-scan-title");
+          if (title) title.textContent = t("Kein Gesicht erkannt. Schieb das Foto von Hand ins Oval, dann kommt es flach aufs Gesicht.");
+          return;
+        }
+        const { crop, ...form } = res;
+        const flat = flatPhoto(canvas, crop.x, crop.y, crop.w, crop.h);
+        close();
+        setPhoto(flat.big, flat.small, flat.skin, form);
+      }, 60);
     }
 
     // Hautfarbe: Durchschnitt aus beiden Wangen

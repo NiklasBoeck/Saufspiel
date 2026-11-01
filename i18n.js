@@ -24,6 +24,17 @@ document.documentElement.lang = LANG;
 const STRINGS = {
   en: {
     // Eigener Charakter (figur.js)
+    "Dein Gesicht in 3D": "Your face in 3D",
+    "3D · zum Drehen wischen": "3D · swipe to turn",
+    "Aus deinem Foto ist ein grobes 3D-Gesicht geworden: Nase, Augen, Mund, Wangen und Kinn haben deine Form. In Hodenritter sitzt es auf dem Kopf deiner Figur, Haare und Kleidung stellst du weiter selbst ein.": "Your photo became a rough 3D face: nose, eyes, mouth, cheeks and chin have your shape. In Hodenritter it sits on your character's head; you still choose hair and clothes yourself.",
+    "Dein Gesicht ist drauf, aber nur flach als Foto (es wurde kein Gesicht erkannt). Versuch es nochmal gerade von vorne mit gutem Licht.": "Your face is on, but only as a flat photo (no face was detected). Try again straight from the front in good light.",
+    "Mach ein Selfie: Daraus wird ein grobes 3D-Gesicht für deine Figur, in Hodenritter sitzt es auf dem Kopf, und als Bild steht es bei deinem Namen.": "Take a selfie: it becomes a rough 3D face for your character. In Hodenritter it sits on the head, and the picture shows next to your name.",
+    "Die Gesichtserkennung läuft auf deinem Handy, beim ersten Mal lädt sie etwa 13 MB. Am besten gerade in die Kamera schauen, mit gutem Licht. Foto und 3D-Gesicht bleiben auf deinem Handy und gehen nur an die Handys in deinem Raum, wenn ihr mit mehreren Handys spielt.": "Face detection runs on your phone; the first time it downloads about 13 MB. Look straight into the camera in good light. Photo and 3D face stay on your phone and are only sent to the phones in your room when you play with several phones.",
+    "Dein 3D-Gesicht wird gebaut…": "Building your 3D face…",
+    "Beim ersten Mal lädt die Gesichtserkennung, das kann ein paar Sekunden dauern.": "The first time, face detection has to load; this can take a few seconds.",
+    "Kein Gesicht erkannt. Schieb das Foto von Hand ins Oval, dann kommt es flach aufs Gesicht.": "No face detected. Drag the photo into the oval by hand; it will go onto the face flat.",
+    "Kein Gesicht erkannt,": "No face detected,",
+    "es bleibt beim flachen Foto.": "so it stays a flat photo.",
     "Dein Charakter": "Your character",
     "Charakter": "Character",
     "Charakter ändern": "Change character",
