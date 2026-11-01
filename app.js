@@ -66,6 +66,7 @@ function renderGames() {
     tile.style.setProperty("--accent", game.color);
     tile.style.setProperty("--i", i);
     tile.innerHTML = `
+      <span class="game-icon">${drawnIcon(key, game.spot)}</span>
       <span class="game-emoji">${game.emoji ?? "🎲"}</span>
       <span class="game-info">
         <span class="game-name">${escapeHtml(game.label)}</span>
@@ -87,13 +88,14 @@ function openGame(key) {
 // --- Einstellungen ---
 
 function renderSettingsBtn() {
-  $("settings-btn").textContent = `${LEVELS[Settings.level].emoji} ⚙️`;
+  $("settings-btn").innerHTML = `<span class="sb-classic">${LEVELS[Settings.level].emoji} ⚙️</span><span class="sb-neu"><span class="ic">${drawnIcon(Settings.level)}</span>${LEVELS[Settings.level].label}</span>`;
   $("settings-btn").title = `Stufe: ${LEVELS[Settings.level].label}`;
 }
 
 function renderLevels() {
   pickList($("level-list"), LEVELS, "level");
   pickList($("bot-level-list"), BOT_LEVELS, "bots");
+  pickList($("design-list"), DESIGNS, "design");
 }
 
 // Kacheln zum Auswählen einer Einstellung (Settings[field])
@@ -105,9 +107,11 @@ function pickList(list, options, field) {
     tile.setAttribute("aria-pressed", key === Settings[field]);
     tile.innerHTML = `
       <span class="mode-emoji">${l.emoji}</span>
+      ${hasDrawnIcon(key) ? `<span class="mode-icon">${drawnIcon(key)}</span>` : ""}
       <span class="game-info">
         <span class="game-name">${escapeHtml(l.label)}</span>
         <span class="game-desc">${escapeHtml(l.desc)}</span>
+        ${l.swatch ? `<span class="design-preview">${l.swatch.map((c) => `<i style="background:${c}"></i>`).join("")}</span>` : ""}
       </span>`;
     tile.onclick = () => {
       Settings[field] = key;
@@ -488,5 +492,6 @@ window.addEventListener("resize", onScreenSize);
 screen.orientation?.addEventListener?.("change", onScreenSize);
 
 renderGames();
+fillDrawnIcons();
 renderSettingsBtn();
 Room.boot();

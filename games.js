@@ -48,6 +48,16 @@ const BOT_LEVELS = {
   mittel: { label: "Mittel", emoji: "🤖", desc: "Meistens klug, manchmal daneben.", err: 1 },
   schwer: { label: "Schwer", emoji: "😈", desc: "Die Bots treffen fast immer. Viel Glück.", err: 0.3 },
 };
+// --- Aussehen: neues Design oder das alte (klassisch) ---
+// boot.js liest das schon vor dem ersten Bild aus und setzt <html class="neu">.
+const DESIGNS = {
+  neu: { label: "Neu", emoji: "✏️", desc: "Warme Kneipenfarben, gezeichnete Icons.", swatch: ["#17130f", "#efe3c8", "#f0b429"] },
+  klassisch: { label: "Klassisch", emoji: "🟣", desc: "Das alte Lila mit Emojis.", swatch: ["#1b1033", "#7c3aed", "#f59e0b"] },
+};
+function applyDesign(d) {
+  document.documentElement.classList.toggle("neu", d !== "klassisch");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", d === "klassisch" ? "#1b1033" : "#17130f");
+}
 const SETTINGS_KEY = "saufspiel-settings";
 
 const Settings = (() => {
@@ -78,6 +88,14 @@ const Settings = (() => {
     set bots(v) {
       data.bots = v;
       save();
+    },
+    get design() {
+      return DESIGNS[data.design] ? data.design : "neu";
+    },
+    set design(v) {
+      data.design = v;
+      save();
+      applyDesign(v);
     },
   };
 })();

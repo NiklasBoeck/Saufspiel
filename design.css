@@ -1,0 +1,318 @@
+/* ==========================================================================
+   Design „Neu“: warme Kneipe am Abend.
+   Dunkles Holz statt Lila, Creme statt Weiß, Bier-Gelb als einzige Signalfarbe,
+   gezeichnete Icons auf hellen Bierdeckeln, kräftige Schrift (Bricolage Grotesque).
+
+   Alles hier gilt nur mit <html class="neu">. Ohne die Klasse sieht die App aus wie vorher
+   (Design „Klassisch“ in den Einstellungen). boot.js setzt die Klasse vor dem ersten Bild.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Bricolage";
+  src: url("vendor/fonts/bricolage-grotesque.woff2") format("woff2");
+  font-weight: 200 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+}
+
+/* Im klassischen Design sind die gezeichneten Icons aus, im neuen die Emojis */
+html:not(.neu) .game-icon,
+html:not(.neu) .mode-icon,
+html:not(.neu) .sb-neu { display: none !important; }
+html.neu .game-emoji,
+html.neu .mode-emoji,
+html.neu .sb-classic,
+html.neu .menu-logo,
+html.neu .bg-blobs { display: none !important; }
+
+/* Gezeichnete Icons: Farbfläche versetzt, darüber Tusche */
+.drawn { display: block; width: 100%; height: 100%; overflow: visible; }
+.drawn-b { fill: var(--paper, #efe3c8); stroke: var(--ink, #211910); stroke-width: 2.1; stroke-linejoin: round; }
+.drawn-f > * { fill: var(--spot); stroke: none; }
+.drawn-i { fill: none; stroke: var(--ink, #211910); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+
+html.neu {
+  --bg: #17130f;
+  --surface: #26201a;
+  --surface-2: #2f2820;
+  --text: #f3e9d4;
+  --muted: #a99d88;
+  --primary: #f0b429;
+  --primary-dark: #a8790f;
+  --paper: #efe3c8;
+  --ink: #211910;
+  --line: rgb(243 233 212 / 0.1);
+  --line-strong: rgb(243 233 212 / 0.22);
+  --radius: 14px;
+  --display: "Bricolage", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+}
+html.neu body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+/* Feine Körnung wie auf Papier, damit die Fläche nicht nach Bildschirm aussieht */
+html.neu body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.85 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* Ein einziges warmes Licht oben, wie eine Lampe über dem Tresen */
+html.neu body::after {
+  content: "";
+  position: fixed;
+  left: 50%;
+  top: -40vmax;
+  z-index: -2;
+  width: 110vmax;
+  height: 70vmax;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgb(240 180 41 / 0.09), transparent);
+}
+
+html.neu h1, html.neu h2, html.neu h3,
+html.neu .game-title, html.neu .game-name, html.neu .btn,
+html.neu .bf-title, html.neu .card-text, html.neu .room-code b, html.neu .da-count {
+  font-family: var(--display);
+}
+
+/* --- Menü ------------------------------------------------------------- */
+html.neu .menu-head,
+html.fit.neu .menu-head {
+  display: block;
+  text-align: left;
+  padding: clamp(10px, 3dvh, 28px) 0 4px;
+}
+html.neu .menu-head h1,
+html.fit.neu .menu-head h1 {
+  margin: 0;
+  text-align: left;
+  font-size: clamp(3rem, 13vw, 4.2rem);
+  font-weight: 800;
+  font-stretch: 78%;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  background: none;
+  color: var(--text);
+  -webkit-text-fill-color: currentColor;
+}
+/* Gelber Punkt am Ende, wie ein Stempel */
+html.neu .menu-head h1::after { content: "."; color: var(--primary); }
+html.neu .menu-head .hint,
+html.fit.neu .menu-head .hint {
+  display: block;
+  margin: 10px 0 0;
+  text-align: left;
+  font-size: 1rem;
+  color: var(--muted);
+  max-width: 22em;
+}
+
+html.neu .settings-btn {
+  top: clamp(10px, 3dvh, 28px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  -webkit-tap-highlight-color: transparent;
+}
+html.neu .settings-btn:active { background: var(--surface); }
+.sb-neu { display: flex; align-items: center; gap: 6px; }
+.sb-neu .ic { width: 30px; height: 30px; padding: 3px; border-radius: 50%; background: var(--paper); }
+
+html.neu .game-list,
+html.fit.neu .game-list {
+  gap: 0;
+  column-gap: 28px;
+  border-top: 1px solid var(--line);
+}
+html.neu .game-tile,
+html.fit.neu .game-tile {
+  gap: 16px;
+  padding: 14px 4px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: neu-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 35ms);
+  transition: background 0.2s;
+}
+@keyframes neu-in { from { opacity: 0; transform: translateY(8px); } }
+html.neu .game-tile:hover { transform: none; box-shadow: none; background: rgb(243 233 212 / 0.03); }
+html.neu .game-tile:active { transform: none; background: var(--surface); }
+html.neu .game-tile:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.game-icon, .mode-icon {
+  flex: none;
+  display: block;
+  width: 60px;
+  height: 60px;
+  padding: 6px;
+  border-radius: 18px;
+  background: var(--paper);
+  transition: transform 0.25s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+/* Leicht schief wie hingeworfene Bierdeckel */
+.game-tile:nth-child(3n + 1) .game-icon { transform: rotate(-2.5deg); }
+.game-tile:nth-child(3n + 2) .game-icon { transform: rotate(1.5deg); }
+.game-tile:nth-child(3n) .game-icon { transform: rotate(-0.5deg); }
+.game-tile:active .game-icon { transform: rotate(0) scale(0.94); }
+
+html.neu .game-name,
+html.fit.neu .game-name {
+  font-size: 1.22rem;
+  font-weight: 700;
+  font-stretch: 88%;
+  letter-spacing: -0.015em;
+}
+html.neu .game-desc { color: var(--muted); font-size: 0.88rem; }
+html.neu .game-arrow {
+  width: 22px;
+  height: 22px;
+  background: none;
+  color: var(--line-strong);
+  font-size: 1.6rem;
+  font-weight: 300;
+}
+html.neu .game-tile:hover .game-arrow, html.neu .game-tile:active .game-arrow { background: none; color: var(--primary); }
+
+html.neu .disclaimer { text-align: left; color: var(--muted); opacity: 0.8; padding-top: 6px; }
+
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit.neu .menu-head { padding: 4px 0 0; }
+  html.fit.neu .menu-head h1 { font-size: clamp(2rem, 9dvh, 3rem); }
+  html.fit.neu .menu-head .hint { display: block; margin-top: 4px; font-size: 0.9rem; }
+  html.fit.neu .settings-btn { top: 4px; }
+  html.fit.neu .game-tile { padding: 10px 4px; }
+  html.neu .game-icon { width: 52px; height: 52px; border-radius: 15px; padding: 5px; }
+}
+
+/* --- Leisten, Knöpfe, Felder ------------------------------------------ */
+html.neu .game-title { font-weight: 700; font-stretch: 88%; font-size: 1.15rem; letter-spacing: -0.01em; }
+html.neu .hint { color: var(--muted); }
+
+html.neu .btn {
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  box-shadow: 0 3px 0 var(--primary-dark);
+  transition: transform 0.08s, box-shadow 0.08s;
+  -webkit-tap-highlight-color: transparent;
+}
+html.neu .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--primary-dark); }
+html.neu .btn.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--line-strong);
+  box-shadow: none;
+}
+html.neu .btn.ghost:active:not(:disabled) { transform: none; background: var(--surface); }
+html.neu .game-bar .btn.ghost { border: none; font-family: system-ui, sans-serif; }
+html.neu .btn:disabled { opacity: 0.35; box-shadow: none; }
+
+html.neu #player-input,
+html.neu .field input,
+html.neu .join-row input {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+html.neu #player-input:focus,
+html.neu .field input:focus,
+html.neu .join-row input:focus { border-color: var(--primary); }
+html.neu input::placeholder { color: rgb(169 157 136 / 0.7); }
+
+html.neu .chips li { background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+html.neu .chips li.bot { background: color-mix(in srgb, var(--surface) 82%, #6fa8d6 18%); }
+html.neu .bot-seg { background: var(--surface); border: 1px solid var(--line); }
+html.neu .bot-seg button.picked { background: var(--primary); color: var(--ink); }
+html.neu .your-turn { color: var(--ink); }
+
+/* --- Ein Handy / Jeder sein Handy, Einstellungen ---------------------- */
+html.neu .mode-tile {
+  gap: 16px;
+  padding: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.neu .mode-tile:hover { transform: none; border-color: var(--line-strong); }
+html.neu .mode-tile:active { transform: scale(0.985); border-color: var(--primary); }
+html.neu .mode-tile .game-name { font-size: 1.15rem; }
+.mode-icon { width: 56px; height: 56px; border-radius: 16px; }
+html.neu .level-tile.picked { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%); }
+html.neu .level-tile.picked .game-name::after { content: "  ✓"; color: var(--primary); }
+html.neu .recommended { color: var(--primary); font-family: system-ui, sans-serif; }
+html.neu #screen-settings > .hint { text-align: left; margin-top: 8px; font-family: var(--display); font-weight: 600; color: var(--text); font-size: 1.05rem; }
+html.neu #screen-settings > .hint.small-text { font-family: inherit; font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-top: 0; }
+
+/* Vorschau neben „Neu“ und „Klassisch“ */
+.design-preview { display: flex; gap: 3px; margin-top: 6px; }
+.design-preview i { width: 18px; height: 10px; border-radius: 3px; }
+
+/* --- Raum ------------------------------------------------------------- */
+html.neu .room-code b { color: var(--primary); font-weight: 800; }
+html.neu .qr svg { background: var(--paper); border-radius: 18px; }
+html.neu .error { background: #5a1d14; color: #ffd9cf; }
+html.neu .or { font-size: 0.85rem; }
+
+/* --- Karten-Spiele ---------------------------------------------------- */
+html.neu .card { border-radius: 22px; border-top-width: 6px; background: var(--surface); }
+html.neu .card-text { font-weight: 600; letter-spacing: -0.01em; }
+html.neu .bf-phase { color: var(--muted); }
+html.neu .bf-title { font-weight: 700; letter-spacing: -0.01em; }
+
+/* --- Trink-Meldung, Hinweis, Regeln ----------------------------------- */
+html.neu .drink-alert,
+html.neu .rules-sheet { background: rgb(14 11 8 / 0.86); }
+html.neu .da-box {
+  border-radius: 24px;
+  background: var(--primary);
+  color: var(--ink);
+  box-shadow: 0 6px 0 var(--primary-dark), 0 30px 70px rgb(0 0 0 / 0.55);
+}
+html.neu .da-box h2 { font-weight: 800; font-stretch: 80%; font-size: 2.3rem; letter-spacing: -0.02em; line-height: 1; }
+html.neu #da-list li { background: rgb(255 248 230 / 0.55); border-radius: 14px; font-weight: 600; }
+html.neu #da-list li.give { background: rgb(255 248 230 / 0.28); }
+html.neu #da-list li.me { background: var(--ink); color: var(--primary); }
+html.neu .da-box .btn { background: var(--ink); color: var(--primary); box-shadow: 0 3px 0 rgb(0 0 0 / 0.35); }
+html.neu .toast { background: #211b15; border: 1.5px solid var(--primary); border-radius: 14px; }
+html.neu .rules-box { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; }
+html.neu .rules-box h2 { font-weight: 800; font-stretch: 85%; letter-spacing: -0.02em; }
+html.neu .drink-note { border-radius: 12px; }
+
+/* Stellen im alten Look, die noch Lila hatten */
+html.neu .pd-zone.mine { background: linear-gradient(160deg, #3a2a1c, var(--surface)); }
+html.neu .fd-status > *, html.neu .fd-role, html.neu .fd-dealer { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* --- Info-Seite ------------------------------------------------------- */
+html.neu .info-nav a { background: var(--surface); border: 1px solid var(--line); }
+html.neu .info-page h2 { font-weight: 800; font-stretch: 85%; letter-spacing: -0.02em; }
+
+/* --- Flunky Ball (eigene Seite) --------------------------------------- */
+html.neu body:has(.fb-screen) { background: var(--bg); }
+html.neu .fb-screen h1 { font-family: var(--display); font-weight: 800; font-stretch: 80%; letter-spacing: -0.03em; }

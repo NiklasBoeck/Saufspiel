@@ -2,6 +2,17 @@
 (() => {
   const AGE_KEY = "saufspiel-age-ok";
 
+  // --- Aussehen: neues Design (Standard) oder klassisch, eingestellt in den Einstellungen ---
+  try {
+    const design = JSON.parse(localStorage.getItem("saufspiel-settings"))?.design;
+    if (design === "klassisch") {
+      document.documentElement.classList.remove("neu");
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#1b1033");
+    }
+  } catch {
+    // ohne Speicher bleibt es beim neuen Design
+  }
+
   // --- Offline: Die App speichert sich selbst, damit „Ein Handy“ auch ohne Internet läuft. ---
   // In der App aus dem Store (Capacitor) liegen die Dateien eh auf dem Handy, da braucht es das nicht.
   if ("serviceWorker" in navigator && !window.Capacitor && (location.protocol === "https:" || location.hostname === "localhost")) {
