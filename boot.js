@@ -8,9 +8,9 @@
     if (design === "klassisch") {
       document.documentElement.classList.remove("neu");
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#1b1033");
-    } else if (design === "garten") {
-      document.documentElement.classList.add("garten");
-      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#0f2620");
+    } else if (design === "garten" || design === "wiesn") {
+      document.documentElement.classList.add(design);
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", design === "garten" ? "#0f2620" : "#0d2a52");
     }
   } catch {
     // ohne Speicher bleibt es beim neuen Design

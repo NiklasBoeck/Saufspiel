@@ -273,7 +273,7 @@ html.neu #screen-settings > .hint.small-text { font-family: inherit; font-weight
 
 /* Vorschau neben „Neu“ und „Klassisch“ */
 .design-preview { display: flex; gap: 3px; margin-top: 6px; }
-.design-preview i { width: 18px; height: 10px; border-radius: 3px; }
+.design-preview i { width: 18px; height: 10px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.35); }
 
 /* --- Raum ------------------------------------------------------------- */
 html.neu .room-code b { color: var(--primary); font-weight: 800; }
@@ -478,4 +478,174 @@ html.neu.garten .pd-zone.mine { background: linear-gradient(160deg, #24503f, var
   html.neu.garten .game-list,
   html.fit.neu.garten .game-list { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
   html.neu.garten .game-icon { width: 48px; height: 48px; }
+}
+
+/* ==========================================================================
+   Design „Wiesn“: <html class="neu wiesn">
+   Oktoberfest: weiß-blaue Rauten, Wimpelkette, Lebkuchenherz als Logo,
+   weiße Bierdeckel-Karten, Schrift Pacifico (Zuckerguss) und Fraunces.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Pacifico";
+  src: url("vendor/fonts/pacifico.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+html.neu.wiesn {
+  --bg: #0d2a52;
+  --surface: #163a6b;
+  --surface-2: #1d4880;
+  --text: #ffffff;
+  --muted: #b9c8e3;
+  --primary: #f2b632;
+  --primary-dark: #a97a12;
+  --paper: #fbf8f1;
+  --ink: #0d2a52;
+  --blau: #1f8fd8;
+  --rot: #c8102e;
+  --line: rgb(255 255 255 / 0.12);
+  --line-strong: rgb(255 255 255 / 0.3);
+  --radius: 12px;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+}
+html.neu.wiesn :is(h1, h2, h3, .game-title, .game-name, .btn, .bf-title, .card-text, .room-code b, .da-count) {
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-stretch: normal;
+}
+/* Ganz leise Rauten im Hintergrund */
+html.neu.wiesn body::before {
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20'%3E%3Crect width='32' height='20' fill='%23fff'/%3E%3Cpath d='M16 0L32 10 16 20 0 10z' fill='%231f8fd8'/%3E%3C/svg%3E");
+  background-size: 64px 40px;
+}
+html.neu.wiesn body::after { background: radial-gradient(closest-side, rgb(31 143 216 / 0.25), transparent); }
+
+/* Kopf: Rauten-Band wie das Zeltdach, darunter Wimpel, dann das Lebkuchenherz */
+html.neu.wiesn .menu-head,
+html.fit.neu.wiesn .menu-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-wrap: nowrap;
+  text-align: center;
+  padding: 58px 0 4px;
+}
+html.neu.wiesn .menu-head::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  right: -16px;
+  top: 0;
+  height: 54px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='30'%3E%3Cpath d='M0 3Q28 10 56 3' fill='none' stroke='%23fff' stroke-opacity='.7' stroke-width='1.5'/%3E%3Cpath d='M4 4.5L26 7.8 14 28z' fill='%231f8fd8'/%3E%3Cpath d='M30 7.8L52 4.5 42 28z' fill='%23fff'/%3E%3C/svg%3E") 0 22px / 56px 30px repeat-x, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20'%3E%3Crect width='32' height='20' fill='%23fff'/%3E%3Cpath d='M16 0L32 10 16 20 0 10z' fill='%231f8fd8'/%3E%3C/svg%3E") 0 0 / 32px 20px repeat-x;
+}
+html.neu.wiesn .menu-head h1,
+html.fit.neu.wiesn .menu-head h1 {
+  display: grid;
+  place-items: center;
+  width: min(66vw, 250px);
+  aspect-ratio: 300 / 236;
+  margin: 0;
+  padding: 0 0 0.55em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 236'%3E %3Cpath d='M150 30 L132 0 M150 30 L168 0' stroke='%23c8102e' stroke-width='6' stroke-linecap='round'/%3E %3Cpath d='M150 228C80 186 14 136 14 78 14 40 44 16 80 16c32 0 56 18 70 42 14-24 38-42 70-42 36 0 66 24 66 62 0 58-66 108-136 150z' fill='%238b4a24'/%3E %3Cpath d='M150 228C80 186 14 136 14 78 14 40 44 16 80 16c32 0 56 18 70 42 14-24 38-42 70-42 36 0 66 24 66 62 0 58-66 108-136 150z' fill='none' stroke='%23fff' stroke-width='7' stroke-linecap='round' stroke-dasharray='0.1 13'/%3E %3Cpath d='M150 206C90 170 34 128 34 80 34 52 56 36 82 36c28 0 50 18 68 46 18-28 40-46 68-46 26 0 48 16 48 44 0 48-56 90-116 126z' fill='none' stroke='%23f49ac1' stroke-width='3.5' stroke-dasharray='10 5'/%3E %3Cpath d='M84 182c10 8 20 4 26-2M190 180c8 6 18 6 26-2' stroke='%2378c850' stroke-width='5' stroke-linecap='round' fill='none'/%3E %3Ccircle cx='150' cy='192' r='7' fill='%23c8102e'/%3E%3Ccircle cx='138' cy='186' r='5' fill='%23f2b632'/%3E%3Ccircle cx='162' cy='186' r='5' fill='%23f2b632'/%3E %3C/svg%3E") center / contain no-repeat;
+  font-family: "Pacifico", cursive;
+  font-weight: 400;
+  font-size: clamp(1.8rem, 9vw, 2.5rem);
+  letter-spacing: 0;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 2px 2px 0 #e0457b;
+  transform: rotate(-3deg);
+  transform-origin: 50% 0;
+  animation: herz 4s ease-in-out infinite;
+}
+@keyframes herz { 50% { transform: rotate(3deg); } }
+html.neu.wiesn .menu-head h1::after { display: none; }
+html.neu.wiesn .menu-head .hint,
+html.fit.neu.wiesn .menu-head .hint {
+  flex-basis: auto;
+  margin: 6px 0 0;
+  text-align: center;
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--muted);
+}
+html.neu.wiesn .settings-btn,
+html.fit.neu.wiesn .settings-btn {
+  top: 62px;
+  right: -4px;
+  padding: 3px;
+  background: var(--bg);
+  border-color: var(--line-strong);
+  font-size: 0;
+  gap: 0;
+}
+html.neu.wiesn .sb-neu .ic { width: 36px; height: 36px; padding: 0; background: none; }
+
+/* Spiele: weiße Karten wie lange Bierbänke, Text dunkelblau */
+html.neu.wiesn .game-list,
+html.fit.neu.wiesn .game-list { gap: 10px; column-gap: 14px; border: none; }
+html.neu.wiesn .game-tile,
+html.fit.neu.wiesn .game-tile,
+html.neu.wiesn .mode-tile {
+  padding: 12px 14px 12px 12px;
+  border: none;
+  border-radius: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.25);
+}
+html.neu.wiesn .game-tile:hover { background: #fff; }
+html.neu.wiesn .game-tile:active,
+html.neu.wiesn .mode-tile:active { background: #e9eef7; transform: translateY(2px); box-shadow: 0 2px 0 rgb(0 0 0 / 0.25); }
+html.neu.wiesn :is(.game-tile, .mode-tile) .game-name { color: var(--ink); font-weight: 700; }
+html.neu.wiesn :is(.game-tile, .mode-tile) .game-desc { color: #4a5d80; }
+html.neu.wiesn .game-arrow { color: var(--blau); font-weight: 600; }
+html.neu.wiesn .game-tile:hover .game-arrow, html.neu.wiesn .game-tile:active .game-arrow { color: var(--rot); }
+html.neu.wiesn .mode-tile:hover { border: none; }
+html.neu.wiesn .level-tile.picked { background: #fff; box-shadow: inset 0 0 0 2.5px var(--rot), 0 4px 0 rgb(0 0 0 / 0.25); }
+html.neu.wiesn .level-tile.picked .game-name::after { color: var(--rot); }
+html.neu.wiesn .recommended { color: var(--rot); }
+html.neu.wiesn .disclaimer { text-align: center; }
+
+/* Icons als runde Bierdeckel mit gezacktem blauen Rand */
+html.neu.wiesn :is(.game-icon, .mode-icon) { padding: 0; border-radius: 50%; background: none; }
+html.neu.wiesn .game-icon { width: 58px; height: 58px; }
+html.neu.wiesn .drawn-bg { display: inline; fill: #fff; stroke: var(--blau); stroke-width: 3; stroke-dasharray: 2.2 1.6; }
+html.neu.wiesn .drawn-c { transform: translate(6.2px, 6.2px) scale(0.74); }
+html.neu.wiesn .drawn-i, html.neu.wiesn .drawn-b { stroke: var(--ink); }
+html.neu.wiesn .drawn-b { fill: #fff; }
+html.neu.wiesn .sb-neu .drawn-bg { stroke-width: 2.4; }
+
+/* Knöpfe: Bier-Gold mit dunkelblauer Schrift */
+html.neu.wiesn .btn { color: var(--ink); }
+html.neu.wiesn .btn.ghost { color: var(--text); }
+html.neu.wiesn .game-bar .btn.ghost { color: var(--text); }
+
+/* Trink-Meldung: weißer Bierdeckel mit Rauten-Rand, Überschrift in Zuckerguss-Schrift */
+html.neu.wiesn .da-box {
+  border: 20px solid transparent;
+  background: linear-gradient(#fff, #fff) padding-box, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='20'%3E%3Crect width='32' height='20' fill='%23fff'/%3E%3Cpath d='M16 0L32 10 16 20 0 10z' fill='%231f8fd8'/%3E%3C/svg%3E") 0 0 / 32px 20px border-box;
+  color: var(--ink);
+  box-shadow: 0 30px 70px rgb(0 0 0 / 0.55);
+}
+html.neu.wiesn .da-box h2 { font-family: "Pacifico", cursive; font-weight: 400; font-stretch: normal; text-transform: none; color: var(--rot); font-size: 2.4rem; line-height: 1.2; }
+html.neu.wiesn .da-count { color: var(--ink); }
+html.neu.wiesn #da-list li { background: #e8eef8; }
+html.neu.wiesn #da-list li.give { background: #f3f6fb; }
+html.neu.wiesn #da-list li.me { background: var(--ink); color: var(--primary); }
+html.neu.wiesn .da-box .btn { background: var(--ink); color: var(--primary); box-shadow: 0 3px 0 rgb(0 0 0 / 0.3); }
+html.neu.wiesn .toast { background: var(--ink); border-color: var(--primary); }
+html.neu.wiesn .rules-box { border: 2px solid var(--line-strong); }
+html.neu.wiesn .pd-zone.mine { background: linear-gradient(160deg, #1d4880, var(--surface)); }
+
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit.neu.wiesn .menu-head { flex-direction: row; justify-content: center; gap: 18px; padding-top: 50px; }
+  html.fit.neu.wiesn .menu-head h1 { width: auto; height: min(34dvh, 130px); font-size: clamp(1.2rem, 5.5dvh, 1.7rem); }
+  html.fit.neu.wiesn .menu-head .hint { display: block; }
+  html.neu.wiesn .game-icon { width: 48px; height: 48px; }
 }

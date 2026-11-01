@@ -157,6 +157,13 @@ const DRAWN_ICONS = (() => {
       i: `<path d="M24 41c-9 0-16-5-16-13 0-7 5-12 10.5-12 3.5 0 5.5 2.5 5.5 6 0-3.5 2-6 5.5-6C35 16 40 21 40 28c0 8-7 13-16 13z"/>
           <path d="M15 38l13-14M33 38L20 24"/><path d="M16 28.5v.4M32 28.5v.4M24 34.5v.4M20 20v.4M28 20v.4"/>`,
     },
+    // Wiesn-Design: Lebkuchenherz
+    wiesn: {
+      f: `<path d="M24 41C14 34 6 27 6 18.5 6 12 10.5 8 15.5 8c4 0 7 2.3 8.5 5.5C25.5 10.3 28.5 8 32.5 8 37.5 8 42 12 42 18.5 42 27 34 34 24 41z"/>`,
+      i: `<path d="M24 41C14 34 6 27 6 18.5 6 12 10.5 8 15.5 8c4 0 7 2.3 8.5 5.5C25.5 10.3 28.5 8 32.5 8 37.5 8 42 12 42 18.5 42 27 34 34 24 41z"/>
+          <path d="M24 36.5C16 31 10.5 25.5 10.5 19c0-4 2.5-6.5 5.5-6.5 3.5 0 6 2.5 8 6 2-3.5 4.5-6 8-6 3 0 5.5 2.5 5.5 6.5 0 6.5-5.5 12-13.5 17.5z" stroke-dasharray="0.1 3.2"/>
+          <path d="M17 22c2 2.5 4.5 3.5 7 3.5s5-1 7-3.5"/>`,
+    },
     klassisch: {
       f: `<rect x="9" y="9" width="30" height="30" rx="9"/>`,
       i: `<rect x="9" y="9" width="30" height="30" rx="9"/><circle cx="19" cy="21" r="1.6"/><circle cx="29" cy="21" r="1.6"/><path d="M18 28c3.5 3 8.5 3 12 0"/>`,
@@ -172,7 +179,7 @@ const DRAWN_ICONS = (() => {
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",
-    neu: "#e9b949", garten: "#c9814a", klassisch: "#8f6fd8",
+    neu: "#e9b949", garten: "#c9814a", wiesn: "#a0582c", klassisch: "#8f6fd8",
   };
 
   return { I, SPOT };
