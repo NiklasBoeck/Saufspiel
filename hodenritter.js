@@ -769,7 +769,14 @@
       el.onerror = () => (loading = false);
       document.head.appendChild(el);
     };
-    const go = () => add("hodenritter-3d.js", () => typeof run !== "undefined" && run?.key === "hodenritter" && window.Hodenritter3D.mount(document.getElementById("game-root"), run.s, run.me));
+    const people = (next) => {
+      // echte Personen (figuren/personen.js); fehlt die Datei, geht es ohne weiter
+      const el = document.createElement("script");
+      el.src = "figuren/personen.js";
+      el.onload = el.onerror = next;
+      document.head.appendChild(el);
+    };
+    const go = () => people(() => add("hodenritter-3d.js", () => typeof run !== "undefined" && run?.key === "hodenritter" && window.Hodenritter3D.mount(document.getElementById("game-root"), run.s, run.me)));
     if (window.THREE) go();
     else add("vendor/three.min.js", go);
   }

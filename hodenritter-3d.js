@@ -1018,7 +1018,7 @@ window.Hodenritter3D = (() => {
     const shirt = pick(SHIRTS);
     let shirt2 = pick(SHIRTS);
     if (shirt2 === shirt) shirt2 = "#ffffff";
-    return {
+    const L = {
       female,
       height: female ? 1.6 + r() * 0.16 : 1.72 + r() * 0.2,
       build: 0.92 + r() * 0.18,
@@ -1039,6 +1039,82 @@ window.Hodenritter3D = (() => {
       shoes: pick(["#f5f5f5", "#111827", "#b91c1c", "#1d4ed8", "#9ca3af", "#7c5a3a"]),
       capColor: pick(["#b91c1c", "#1d4ed8", "#111827", "#f5f5f5", "#15803d"]),
     };
+    return withPerson(L, personOf(name));
+  }
+
+  // --- Echte Personen (figuren/personen.js): eigenes Aussehen und 3D-Kopf aus einem Foto ---
+  function personOf(name) {
+    const all = window.HR_PERSONEN || {};
+    const key = String(name).trim().toLowerCase();
+    return all[key] || null;
+  }
+
+  function withPerson(L, P) {
+    if (!P) return L;
+    const keys = { haut: "skin", haare: "hair", augen: "iris", frisur: "style", frau: "female", bart: "beard", brille: "glasses", sonnenbrille: "shades", kappe: "cap", groesse: "height", statur: "build", oben: "top", shirt: "shirt", shirt2: "shirt2", streifen: "stripes", unten: "bottom", hose: "pants", schuhe: "shoes", kappenfarbe: "capColor" };
+    for (const k in keys) if (P[k] !== undefined) L[keys[k]] = P[k];
+    if (P.shirt2 !== undefined && P.streifen === undefined) L.stripes = true;
+    if (P.kopf) Object.assign(L, { cap: false, glasses: false, shades: false, beard: false }); // das steckt alles schon im echten Kopf
+    return L;
+  }
+
+  const heads = { ready: new Map(), waiting: new Map(), loader: null };
+
+  function loadHead(file, cb) {
+    if (heads.ready.has(file)) return cb(heads.ready.get(file));
+    if (heads.waiting.has(file)) return heads.waiting.get(file).push(cb);
+    heads.waiting.set(file, [cb]);
+    const done = (g) => {
+      heads.ready.set(file, g);
+      for (const f of heads.waiting.get(file)) f(g);
+      heads.waiting.delete(file);
+    };
+    const go = () => {
+      if (!heads.loader) {
+        heads.loader = new THREE.GLTFLoader();
+        heads.loader.setMeshoptDecoder(THREE.MeshoptDecoder);
+      }
+      heads.loader.load(`figuren/koepfe/${file}`, (g) => done(g.scene), undefined, () => done(null));
+    };
+    if (THREE.GLTFLoader) return go();
+    let tag = document.getElementById("hr-gltf");
+    if (!tag) {
+      tag = document.createElement("script");
+      tag.id = "hr-gltf";
+      tag.src = "vendor/three-gltf.js";
+      document.head.appendChild(tag);
+    }
+    tag.addEventListener("load", go);
+    tag.addEventListener("error", () => done(null));
+  }
+
+  // Den Fotokopf statt des gebauten Kopfes zeigen: auf Kopfgröße bringen, unten an den Hals setzen.
+  function applyHead(p, scene, P) {
+    if (!scene || !G.people || [...G.people.values()].indexOf(p) < 0) return;
+    const model = THREE.SkeletonUtils ? THREE.SkeletonUtils.clone(scene) : scene.clone(true); // auch Köpfe mit Knochen
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material = o.material.clone();
+      if (o.material.map) o.material.map.colorSpace = THREE.SRGBColorSpace;
+      o.material.metalness = 0;
+      o.material.roughness = Math.max(0.6, o.material.roughness ?? 0.6);
+      rim(o.material);
+      o.castShadow = true;
+      o.frustumCulled = false;
+    });
+    model.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(model, true);
+    const size = box.getSize(new THREE.Vector3());
+    const s = (P.hoehe ?? 0.25) / Math.max(size.y, 1e-6);
+    const c = box.getCenter(new THREE.Vector3());
+    const holder = new THREE.Group();
+    model.position.set(-c.x * s, -box.min.y * s, -c.z * s);
+    model.scale.setScalar(s);
+    holder.add(model);
+    holder.position.set(0, -0.015 + (P.hoch ?? 0), 0.005 + (P.vor ?? 0));
+    holder.rotation.y = ((P.drehen ?? 0) * Math.PI) / 180;
+    for (const c of p.head.children) c.visible = false;
+    p.head.add(holder);
   }
 
   function stripeTex(a, b) {
@@ -1556,6 +1632,8 @@ window.Hodenritter3D = (() => {
       if (!p) {
         p = makeHuman(name);
         G.people.set(name, p);
+        const P = personOf(name);
+        if (P?.kopf) loadHead(P.kopf, (scene) => applyHead(p, scene, P));
         G.scene.add(p.root);
         const seat = seatOf(name);
         p.pos = { x: seat.x, y: seat.y };
