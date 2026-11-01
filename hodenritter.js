@@ -26,16 +26,24 @@
   const WHITE_MIN = 3; // so weit muss die rote Kugel mindestens fliegen
   const DRINK_SECS = 60;
   const MAX_OBSTACLES = 10;
-  const TREE = { x: -5.6, y: 12.6, r: 0.2 }; // Apfelbaum im Rasen, auch ein Hindernis
+  const TREE = { x: -5.6, y: 12.6, r: 0.2, h: 2.2 }; // Apfelbaum im Rasen, auch ein Hindernis
 
   const KINDS = {
-    zwerg: { label: "Gartenzwerg", emoji: "🧙", r: 0.16 },
-    kasten: { label: "Bierkasten", emoji: "🍺", r: 0.25 },
-    topf: { label: "Blumentopf", emoji: "🪴", r: 0.19 },
-    kanne: { label: "Gießkanne", emoji: "💧", r: 0.17 },
-    flamingo: { label: "Flamingo", emoji: "🦩", r: 0.09 },
-    stein: { label: "Stein", emoji: "🪨", r: 0.2 },
-    huegel: { label: "Maulwurfshügel", emoji: "🟤", r: 0.23 },
+    // r: Radius am Boden, h: so hoch, dass eine fliegende Kugel daran hängen bleibt
+    zwerg: { label: "Gartenzwerg", emoji: "🧙", r: 0.16, h: 0.5 },
+    kasten: { label: "Bierkasten", emoji: "🍺", r: 0.25, h: 0.4 },
+    topf: { label: "Blumentopf", emoji: "🪴", r: 0.19, h: 0.45 },
+    kanne: { label: "Gießkanne", emoji: "💧", r: 0.17, h: 0.3 },
+    flamingo: { label: "Flamingo", emoji: "🦩", r: 0.11, h: 0.85 },
+    stein: { label: "Stein", emoji: "🪨", r: 0.21, h: 0.2 },
+    huegel: { label: "Maulwurfshügel", emoji: "🟤", r: 0.23, h: 0.12 },
+    dose: { label: "Monster-Dose", emoji: "🥫", r: 0.11, h: 0.5 },
+    katze: { label: "Katze", emoji: "🐈", r: 0.17, h: 0.32 },
+    // Große Dinge: r umfasst alles (zum Aufstellen), parts sind die festen Teile (Kreise c, Kästen b),
+    // gemessen wie im 3D-Modell: x quer, z nach vorne
+    liege: { label: "Gartenliege", emoji: "🛏️", r: 1.0, h: 0.42, parts: [{ b: [0, 0, 0.34, 0.97], h: 0.42 }] },
+    tor: { label: "Fußballtor", emoji: "🥅", r: 1.6, h: 2, parts: [{ c: [-1.5, 0, 0.05], h: 2 }, { c: [1.5, 0, 0.05], h: 2 }, { b: [0, -0.95, 1.5, 0.04], h: 1.9 }, { b: [-1.5, -0.48, 0.04, 0.48], h: 1.9 }, { b: [1.5, -0.48, 0.04, 0.48], h: 1.9 }] },
+    auto: { label: "Auto", emoji: "🚗", r: 2.25, h: 1.45, parts: [{ b: [0, 0, 0.9, 2.15], h: 1.45 }] },
   };
 
   // a = wie die Figur die Aufgabe in 3D macht, g = Mini-Spiel am Handy (hodenritter-3d.js)
@@ -170,9 +178,64 @@
 
   // shot: { id, from, ang, power, white }
   // Ergebnis: neue Positionen, ob die rote Kugel berührt wurde, und die Bahnen für die Animation.
+  // Die festen Teile eines Hindernisses auf dem Rasen (Spielfeld-Koordinaten)
+  // Kreis: { x, y, r, h }; Kasten: { x, y, c, s, hx, hz, h } (c/s: Drehung wie im 3D-Modell)
+  function partsOf(o) {
+    const K = KINDS[o.k];
+    if (!K) return [o]; // der Baum
+    if (!K.parts) return [{ x: o.x, y: o.y, r: K.r, h: K.h }];
+    const c = Math.cos(o.rot ?? 0);
+    const sn = Math.sin(o.rot ?? 0);
+    // Modell (lx, lz) → Rasen: dx = lx·c + lz·s, dy = lx·s − lz·c (in beide Richtungen dieselbe Formel)
+    return K.parts.map((p) => {
+      const [lx, lz, a, b] = p.c ?? p.b;
+      const x = o.x + lx * c + lz * sn;
+      const y = o.y + lx * sn - lz * c;
+      return p.c ? { x, y, r: a, h: p.h } : { x, y, c, s: sn, hx: a, hz: b, h: p.h };
+    });
+  }
+
+  // Nächster Punkt eines Teils zu (x, y), als fester Kreis für collide()
+  function nearest(p, x, y) {
+    if (!p.hx) return { x: p.x, y: p.y, r: p.r, fixed: true, vx: 0, vy: 0 };
+    const dx = x - p.x;
+    const dy = y - p.y;
+    const lx = Math.max(-p.hx, Math.min(p.hx, dx * p.c + dy * p.s));
+    const lz = Math.max(-p.hz, Math.min(p.hz, dx * p.s - dy * p.c));
+    return { x: p.x + lx * p.c + lz * p.s, y: p.y + lx * p.s - lz * p.c, r: 0, fixed: true, vx: 0, vy: 0 };
+  }
+
+  function allParts(s) {
+    return [...s.obstacles, TREE].flatMap(partsOf);
+  }
+
+  // Höhe der fliegenden Kugel bei u (0 = Hand, 1 = Landung), wie hodenritter-3d.js sie zeichnet
+  function flightH(u, d, r) {
+    return (1 - u) * 0.85 + u * r + (0.35 + d * 0.15) * 4 * u * (1 - u);
+  }
+
+  // Stößt die Kugel im Flug gegen ein Hindernis? Dann: wo und wie hoch (sonst null)
+  function airHit(s, shot, d, r) {
+    const obs = allParts(s);
+    const sx = Math.sin(shot.ang);
+    const sy = Math.cos(shot.ang);
+    for (let u = 0; u <= 1; u += 0.004) {
+      const x = shot.from.x + sx * d * u;
+      const y = shot.from.y + sy * d * u;
+      const h = flightH(u, d, r);
+      for (const p of obs) {
+        if (h - r >= p.h) continue;
+        const o = nearest(p, x, y);
+        if (Math.hypot(x - o.x, y - o.y) < o.r + r) return { u, x, y, h, o };
+      }
+    }
+    return null;
+  }
+
   function simulate(s, shot) {
     const d = shot.power * RANGE;
-    const land = { x: shot.from.x + Math.sin(shot.ang) * d, y: shot.from.y + Math.cos(shot.ang) * d };
+    let land = { x: shot.from.x + Math.sin(shot.ang) * d, y: shot.from.y + Math.cos(shot.ang) * d };
+    const hit = airHit(s, shot, d, shot.white ? W_R : B_R);
     const bodies = [];
     if (s.white && !shot.white) bodies.push({ id: "@w", x: s.white.x, y: s.white.y, r: W_R, m: 0.3, vx: 0, vy: 0 });
     for (const [id, b] of Object.entries(s.balls)) bodies.push({ id, x: b.x, y: b.y, r: B_R, m: 1, vx: 0, vy: 0 });
@@ -187,8 +250,38 @@
       vx: Math.sin(shot.ang) * v0,
       vy: Math.cos(shot.ang) * v0,
     };
+    if (hit) {
+      // Prallt im Flug ab: fällt vor dem Hindernis runter und rollt ein Stück zurück
+      // Von oben drauf (schon über der Mitte): rollt hinten runter; von vorne: springt zurück
+      const sx = Math.sin(shot.ang);
+      const sy = Math.cos(shot.ang);
+      let nx = hit.x - hit.o.x;
+      let ny = hit.y - hit.o.y;
+      if (nx * sx + ny * sy >= 0) {
+        nx = sx;
+        ny = sy;
+      }
+      const nl = Math.hypot(nx, ny) || 1;
+      const edge = hit.o.r + ball.r + 0.01;
+      ball.x = hit.o.x + (nx / nl) * edge;
+      ball.y = hit.o.y + (ny / nl) * edge;
+      // Auf etwas Großem gelandet (Auto, Liege): oben weiterrollen, bis sie hinten runterfällt
+      const parts = allParts(s);
+      const inside = () => parts.some((p) => {
+        const q = nearest(p, ball.x, ball.y);
+        return Math.hypot(ball.x - q.x, ball.y - q.y) < q.r + ball.r;
+      });
+      for (let i = 0; i < 120 && inside(); i++) {
+        ball.x += (nx / nl) * 0.05;
+        ball.y += (ny / nl) * 0.05;
+      }
+      land = { x: ball.x, y: ball.y };
+      const v = (d / (0.5 + d * 0.06)) * 0.12;
+      ball.vx = (nx / nl) * v;
+      ball.vy = (ny / nl) * v;
+    }
     bodies.push(ball);
-    const fixed = [...s.obstacles.map((o) => ({ x: o.x, y: o.y, r: KINDS[o.k].r })), TREE].map((o) => ({ ...o, fixed: true, vx: 0, vy: 0 }));
+    const fixed = allParts(s);
     const start = bodies.map((b) => [b.x, b.y]);
     const samples = bodies.map((b) => [r2(b.x), r2(b.y)]);
     const DT = 1 / 120;
@@ -214,7 +307,7 @@
           const b = bodies[j];
           if (collide(a, b, 0.55) && ((a === ball && b.id === "@w") || (b === ball && a.id === "@w"))) touched = true;
         }
-        for (const o of fixed) collide(o, bodies[i], 0.35);
+        for (const p of fixed) collide(nearest(p, bodies[i].x, bodies[i].y), bodies[i], 0.35);
         const b = bodies[i];
         if (Math.abs(b.x) > FIELD.x) {
           b.x = Math.sign(b.x) * FIELD.x;
@@ -241,7 +334,7 @@
       while (t.length > 4 && t[t.length - 1] === t[t.length - 3] && t[t.length - 2] === t[t.length - 4]) t.length -= 2;
       tracks[b.id] = t;
     });
-    const T = 0.5 + d * 0.06;
+    const T = (0.5 + d * 0.06) * (hit ? hit.u : 1);
     const longest = Math.max(...Object.values(tracks).map((t) => t.length / 2));
     const anim = {
       id: rid(),
@@ -249,6 +342,9 @@
       white: !!shot.white,
       from: [r2(shot.from.x), r2(shot.from.y)],
       land: [r2(land.x), r2(land.y)],
+      full: hit ? [r2(shot.from.x + Math.sin(shot.ang) * d), r2(shot.from.y + Math.cos(shot.ang) * d)] : undefined, // Flugbahn ohne Hindernis
+      cut: hit ? r2(hit.u) : undefined, // so weit kam sie im Flug
+      drop: hit ? r2(hit.h) : undefined, // aus dieser Höhe fällt sie runter
       T: r2(T),
       h: r2(0.35 + d * 0.15),
       dt: EVERY / 120,
@@ -431,15 +527,18 @@
 
   function placeObstacle(s, kind, x, y) {
     if (!KINDS[kind]) return;
+    // Große Dinge (Auto, Tor) nicht in die Stuhlreihe oder die Hecke
+    const ylo = Math.max(1.5, 0.3 + KINDS[kind].r);
+    const yhi = Math.min(14.8, FIELD.y1 - 0.2 - KINDS[kind].r * 0.7);
     x = clamp(Number(x) || 0, -6.4, 6.4);
-    y = clamp(Number(y) || 0, 1.5, 14.8);
+    y = clamp(Number(y) || 0, ylo, yhi);
     // nicht in andere Hindernisse oder den Baum
     for (let tries = 0; tries < 30; tries++) {
       const hit = [...s.obstacles.map((o) => ({ ...o, r: KINDS[o.k].r })), TREE].find((o) => Math.hypot(o.x - x, o.y - y) < o.r + KINDS[kind].r + 0.05);
       if (!hit) break;
       const a = Math.atan2(y - hit.y, x - hit.x) || 0.5;
       x = clamp(hit.x + Math.cos(a) * (hit.r + KINDS[kind].r + 0.1), -6.4, 6.4);
-      y = clamp(hit.y + Math.sin(a) * (hit.r + KINDS[kind].r + 0.1), 1.5, 14.8);
+      y = clamp(hit.y + Math.sin(a) * (hit.r + KINDS[kind].r + 0.1), ylo, yhi);
     }
     s.obstacles.push({ k: kind, x: r2(x), y: r2(y), rot: r2(Math.random() * Math.PI * 2), id: rid() });
     while (s.obstacles.length > MAX_OBSTACLES) s.obstacles.shift();
@@ -569,7 +668,7 @@
     const D = Math.hypot(dx, dy);
     // Kurz vor die rote Kugel werfen, den Rest rollt sie
     const p = (D - 0.15) / (RANGE * (1 + ROLL.boule));
-    return { type: "throw", k: s.k, a: Math.atan2(dx, dy) + gauss() * 0.03 * e, p: p * (1 + gauss() * 0.055 * e) };
+    return { type: "throw", k: s.k, a: Math.atan2(dx, dy) + gauss() * 0.075 * e, p: p * (1 + gauss() * 0.13 * e) };
   }
 
   function botBow(s) {
@@ -832,5 +931,5 @@
   });
 
   // Für hodenritter-3d.js und Tests
-  window.Hodenritter = { HOME, STEP, taskGoal, SEAT_GAP, CHAIR_Y, THROW_Y, RANGE, B_R, W_R, FIELD, TREE, KINDS, TASKS, DRINK_SECS, seatX, thrower, bowTargets, beerOf, act, setup };
+  window.Hodenritter = { simulate, HOME, STEP, taskGoal, SEAT_GAP, CHAIR_Y, THROW_Y, RANGE, B_R, W_R, FIELD, TREE, KINDS, TASKS, DRINK_SECS, seatX, thrower, bowTargets, beerOf, act, setup };
 })();

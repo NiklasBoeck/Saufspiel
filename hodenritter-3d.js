@@ -108,9 +108,11 @@ window.Hodenritter3D = (() => {
     if (!a) return null;
     const r = id === "@w" ? H.W_R : H.B_R;
     if (id === a.ball && t < a.T) {
-      const u = t / a.T;
-      const x = a.from[0] + (a.land[0] - a.from[0]) * u;
-      const y = a.from[1] + (a.land[1] - a.from[1]) * u;
+      // Prallt sie im Flug an ein Hindernis, fliegt sie die volle Bahn nur bis dorthin (cut)
+      const u = (t / a.T) * (a.cut ?? 1);
+      const to = a.full ?? a.land;
+      const x = a.from[0] + (to[0] - a.from[0]) * u;
+      const y = a.from[1] + (to[1] - a.from[1]) * u;
       return { x, y, h: (1 - u) * 0.85 + u * r + a.h * 4 * u * (1 - u), air: true };
     }
     const tr = a.tracks[id];
@@ -120,7 +122,9 @@ window.Hodenritter3D = (() => {
     const i = Math.min(n - 1, Math.floor(f));
     const j = Math.min(n - 1, i + 1);
     const k = Math.min(1, f - i);
-    return { x: tr[i * 2] + (tr[j * 2] - tr[i * 2]) * k, y: tr[i * 2 + 1] + (tr[j * 2 + 1] - tr[i * 2 + 1]) * k, h: r };
+    // Nach dem Abprall: kurz runterfallen statt in der Luft zu stehen
+    const fall = id === a.ball && a.drop ? Math.max(0, 1 - (t - a.T) / 0.3) : 0;
+    return { x: tr[i * 2] + (tr[j * 2] - tr[i * 2]) * k, y: tr[i * 2 + 1] + (tr[j * 2 + 1] - tr[i * 2 + 1]) * k, h: fall ? r + (a.drop - r) * fall * fall : r };
   }
 
   // --- Hilfen ---
@@ -1151,6 +1155,132 @@ window.Hodenritter3D = (() => {
     return holder;
   }
 
+  // --- Kopf: eine glatte, modellierte Form statt zusammengesteckter Kugeln ---
+  // Kugel, deren Punkte zu Schädel, Kiefer, Kinn, Wangen, Nase, Augenhöhlen und Lippen verschoben werden.
+  // Einheiten in Metern, Mitte bei (0, HEAD_Y, 0), Gesicht nach +z.
+  const HEAD_Y = 0.1;
+  const gs = (d, w) => Math.exp((-d * d) / (2 * w * w));
+  const smooth = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+  // Punkt auf dem Kopf für eine Richtung (ux, uy, uz); lip = wie sehr der Punkt zur Lippe gehört
+  function headPoint(ux, uy, uz, female) {
+    let x = ux * (female ? 0.078 : 0.081);
+    let y = uy * 0.112;
+    let z = uz * 0.098;
+    const low = smooth(0.1, -1, uy); // 0 oben, 1 am Kinn
+    // Kiefer und Kinn: unten schmaler, hinten unten zum Nacken eingezogen
+    x *= 1 - (female ? 0.34 : 0.24) * low * low;
+    if (uz < 0) z *= 1 - 0.28 * low;
+    // Hinterkopf etwas voller
+    if (uz < 0 && uy > -0.2) z *= 1.04;
+    // Gesichtsfläche flacher, die Züge kommen obendrauf
+    const front = smooth(0.25, 0.85, uz);
+    z -= front * 0.006;
+    const ax = Math.abs(ux);
+    let dz = 0;
+    dz += 0.005 * gs(uy - 0.3, 0.07) * gs(ux, 0.45); // Stirnwulst über den Augen
+    dz -= 0.0075 * gs(ax - 0.37, 0.12) * gs(uy - 0.12, 0.09); // Augenhöhlen
+    dz += 0.011 * gs(ux, 0.075) * smooth(0.22, 0.05, uy) * smooth(-0.32, -0.12, uy); // Nasenrücken
+    dz += 0.012 * gs(ux, 0.1) * gs(uy + 0.2, 0.075); // Nasenspitze
+    dz += 0.005 * gs(ax - 0.13, 0.055) * gs(uy + 0.25, 0.05); // Nasenflügel
+    dz += 0.006 * gs(ax - 0.52, 0.17) * gs(uy + 0.04, 0.13); // Wangenknochen
+    const upper = gs(ux, female ? 0.2 : 0.22) * gs(uy + 0.43, 0.035);
+    const lower = gs(ux, female ? 0.17 : 0.19) * gs(uy + 0.53, 0.04);
+    dz += (female ? 0.0065 : 0.005) * upper + (female ? 0.0075 : 0.006) * lower;
+    dz -= 0.0035 * gs(ux, 0.24) * gs(uy + 0.475, 0.013); // Mundspalte
+    dz += 0.008 * gs(ux, female ? 0.24 : 0.32) * gs(uy + 0.8, 0.11); // Kinn
+    z += dz * front;
+    const lip = Math.min(1, (upper + lower) * 1.3) * front;
+    return { x, y: y + HEAD_Y, z, lip };
+  }
+
+  const headGeos = new Map();
+  function headGeo(female) {
+    if (headGeos.has(female)) return headGeos.get(female);
+    const geo = new THREE.SphereGeometry(1, 72, 56);
+    const p = geo.attributes.position;
+    const col = new Float32Array(p.count * 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const q = headPoint(v.x, v.y, v.z, female);
+      p.setXYZ(i, q.x, q.y, q.z);
+      // Lippen dunkler und röter (Farbe wird mit der Hautfarbe multipliziert)
+      col[i * 3] = 1 - q.lip * 0.12;
+      col[i * 3 + 1] = 1 - q.lip * 0.38;
+      col[i * 3 + 2] = 1 - q.lip * 0.33;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    headGeos.set(female, geo);
+    return geo;
+  }
+
+  // Bart: der untere Teil der Kopfform, etwas dicker; Mund und Lippen bleiben frei
+  let beardCache = null;
+  function beardGeo() {
+    if (beardCache) return beardCache;
+    const src = new THREE.SphereGeometry(1, 56, 40);
+    const p = src.attributes.position;
+    const keep = [];
+    const v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i);
+      const mouth = v.z > 0.55 && ((Math.abs(v.x) < 0.3 && v.y > -0.6 && v.y < -0.4) || (Math.abs(v.x) < 0.2 && v.y > -0.33));
+      keep.push(v.y < -0.2 && !mouth && !(v.z < -0.2 && v.y < -0.75));
+      const q = headPoint(v.x, v.y, v.z, false);
+      const c = new THREE.Vector3(q.x, q.y - HEAD_Y, q.z).multiplyScalar(1.045);
+      p.setXYZ(i, c.x, c.y + HEAD_Y, c.z);
+    }
+    const idx = src.index.array;
+    const out = [];
+    for (let i = 0; i < idx.length; i += 3) if (keep[idx[i]] && keep[idx[i + 1]] && keep[idx[i + 2]]) out.push(idx[i], idx[i + 1], idx[i + 2]);
+    src.setIndex(out);
+    src.computeVertexNormals();
+    beardCache = src;
+    return src;
+  }
+
+  // Wo die Hautoberfläche vorne bei (ux, uy) ist
+  function faceAt(ux, uy, female) {
+    const uz = Math.sqrt(Math.max(0, 1 - ux * ux - uy * uy));
+    return headPoint(ux, uy, uz, female);
+  }
+
+  function buildFace(head, L, M) {
+    const female = !!L.female;
+    const skinV = rim(new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.58, vertexColors: true, emissive: new THREE.Color(L.skin).multiplyScalar(0.1) }));
+    head.add(mesh(headGeo(female), skinV, 0, 0, 0));
+    // Augen: Augapfel in der Höhle, Iris und Pupille, Ober- und Unterlid
+    const lidM = M.skin;
+    for (const s of [-1, 1]) {
+      const ex = s * 0.4;
+      const e = faceAt(ex, 0.12, female);
+      const ez = e.z - 0.0085;
+      addTo(head, mesh(sphere(0.0118, 18, 14), M.eyeM, e.x, e.y, ez, false));
+      addTo(head, mesh(sphere(0.0058, 16, 12), M.irisM, e.x, e.y, ez + 0.0094, false)).scale.set(1, 1, 0.42);
+      addTo(head, mesh(sphere(0.0027, 10, 8), M.pupilM, e.x, e.y, ez + 0.0113, false)).scale.set(1, 1, 0.35);
+      const top = mesh(new THREE.SphereGeometry(0.0128, 18, 8, 0, TAU, 0, Math.PI * 0.36), lidM, e.x, e.y, ez, false);
+      top.rotation.x = 0.25;
+      head.add(top);
+      const bot = mesh(new THREE.SphereGeometry(0.0125, 18, 6, 0, TAU, Math.PI * 0.74, Math.PI * 0.26), lidM, e.x, e.y, ez, false);
+      head.add(bot);
+      // Augenbraue: flacher, leicht gebogener Strich über dem Stirnwulst
+      const b = faceAt(s * 0.4, 0.3, female);
+      const brow = mesh(new THREE.TorusGeometry(0.03, female ? 0.0016 : 0.0024, 6, 16, 0.9), M.hairM, b.x - s * 0.002, b.y - 0.026, b.z - 0.006, false);
+      brow.rotation.set(-0.15, s * 0.32, Math.PI / 2 - 0.45);
+      brow.scale.set(1, 1, 0.6);
+      head.add(brow);
+      // Ohren: flach, schräg nach hinten
+      const ear = mesh(sphere(0.026, 14, 10), M.skin, s * (female ? 0.077 : 0.08), HEAD_Y - 0.004, -0.008);
+      ear.scale.set(0.32, 1, 0.68);
+      ear.rotation.y = s * 0.35;
+      head.add(ear);
+    }
+  }
+
   // Ein Mensch aus Gelenken: Becken → Wirbelsäule → Brust → Hals → Kopf, Schultern → Ellbogen → Hand,
   // Hüften → Knie → Knöchel. Gebaut für 1,78 m, dann auf die eigene Größe skaliert. Schaut nach +z.
   function makeHuman(name) {
@@ -1195,43 +1325,12 @@ window.Hodenritter3D = (() => {
     neck.add(mesh(new THREE.CylinderGeometry(0.047, 0.055, 0.12, 14), skin, 0, 0.03, 0));
     const head = new THREE.Group();
     head.position.y = 0.085;
-    head.scale.setScalar(1.12); // etwas größerer Kopf: comichafter
+    head.scale.setScalar(1.03);
     neck.add(head);
-    addTo(head, mesh(sphere(0.1, 32, 24), skin, 0, 0.1, 0)).scale.set(0.9, 1.08, 1.0);
-    addTo(head, mesh(sphere(0.08, 24, 16), skin, 0, 0.045, 0.02)).scale.set(0.92, 0.8, 1.0);
-    // Natürliches Gesicht: Augen mit Lidern auf halber Kopfhöhe, schmale Brauen, Nase mit Rücken, ruhiger Mund
-    addTo(head, mesh(sphere(0.0105, 14, 10), skin, 0, 0.084, 0.1)).scale.set(1, 0.85, 1.0); // Nasenspitze
-    const bridge = mesh(capsule(0.0075, 0.03, 8), skin, 0, 0.098, 0.096);
-    bridge.rotation.x = -0.3;
-    head.add(bridge);
-    const lidM = skin;
-    for (const s of [-1, 1]) {
-      addTo(head, mesh(sphere(0.026, 12, 10), skin, s * 0.09, 0.095, -0.005)).scale.set(0.45, 1, 0.75); // Ohren
-      addTo(head, mesh(sphere(0.013, 16, 12), eyeM, s * 0.034, 0.108, 0.086, false)).scale.set(1.15, 0.72, 0.6);
-      addTo(head, mesh(sphere(0.0078, 14, 10), irisM, s * 0.034, 0.1075, 0.0925, false)).scale.set(1, 1, 0.45);
-      addTo(head, mesh(sphere(0.0038, 10, 8), pupilM, s * 0.034, 0.1075, 0.0952, false)).scale.set(1, 1, 0.4);
-      // Oberlid: halbe Kugel in Hautfarbe über dem Auge, nimmt den starren Blick
-      const lid = mesh(new THREE.SphereGeometry(0.0142, 14, 8, 0, TAU, 0, Math.PI * 0.3), lidM, s * 0.034, 0.1075, 0.0855, false);
-      lid.scale.set(1.18, 0.8, 0.72);
-      head.add(lid);
-      const brow = mesh(capsule(0.0026, 0.024, 8), hairM, s * 0.035, 0.127, 0.095, false);
-      brow.rotation.z = Math.PI / 2 - s * 0.1;
-      brow.rotation.y = s * 0.25;
-      head.add(brow);
-    }
-    // Mund: Oberlippe als flacher Bogen, Unterlippe etwas voller
-    const upper = mesh(new THREE.TorusGeometry(0.017, 0.0034, 8, 18, Math.PI * 0.62), lipM, 0, 0.07, 0.098, false);
-    upper.rotation.z = Math.PI + Math.PI * 0.19;
-    upper.rotation.x = -0.2;
-    head.add(upper);
-        addHair(head, L, hairM);
+    buildFace(head, L, { skin, eyeM, irisM, pupilM, hairM, lipM });
+    addHair(head, L, hairM);
     if (L.beard) {
-      const beard = mesh(new THREE.SphereGeometry(0.084, 24, 12, 0, TAU, Math.PI * 0.45, Math.PI * 0.55), hairM, 0, 0.065, 0.012);
-      beard.scale.set(0.95, 0.95, 1.06);
-      head.add(beard);
-      const stache = mesh(capsule(0.008, 0.035, 8), hairM, 0, 0.064, 0.094, false);
-      stache.rotation.z = Math.PI / 2;
-      head.add(stache);
+      head.add(mesh(beardGeo(), hairM, 0, 0, 0));
     }
     if (L.cap) {
       const capM = mat(L.capColor, 0.7);
@@ -1268,7 +1367,7 @@ window.Hodenritter3D = (() => {
       el.add(mesh(limbGeo(0.25, [[0, 0.036], [0.25, 0.037], [1, 0.024]]), sleeveLong ? shirtM : skin, 0, 0, 0));
       const hand = new THREE.Group();
       hand.position.y = -0.255;
-      hand.scale.setScalar(1.22);
+      hand.scale.setScalar(1.1);
       el.add(hand);
       addTo(hand, mesh(sphere(1, 14, 10), skin, 0, -0.035, 0.004)).scale.set(0.022, 0.048, 0.041);
       const fingers = mesh(capsule(0.019, 0.04, 10), skin, 0, -0.085, 0.006);
@@ -1285,7 +1384,7 @@ window.Hodenritter3D = (() => {
     arms[0].hand.add(bottle);
     const ball = mesh(sphere(H.B_R, 20, 14), mat(0xbfc4ca, 0.3, { metalness: 1 }), 0, -0.085, 0.03);
     ball.visible = false;
-    ball.scale.setScalar(1 / 1.22);
+    ball.scale.setScalar(1 / 1.1);
     arms[1].hand.add(ball);
 
     // Beine
@@ -1305,7 +1404,7 @@ window.Hodenritter3D = (() => {
       knee.add(shin);
       const ankle = new THREE.Group();
       ankle.position.y = -0.45;
-      ankle.scale.setScalar(1.15);
+      ankle.scale.setScalar(1.05);
       knee.add(ankle);
       const shoe = mesh(capsule(0.046, 0.14), shoeM, 0, -0.022, 0.045);
       shoe.rotation.x = Math.PI / 2;
@@ -1384,7 +1483,7 @@ window.Hodenritter3D = (() => {
   // --- Posen: Gelenkwinkel ---
 
   const POSES = {
-    stand: { bot: 1.15, botZ: 0, hipY: 0.95, pelvis: 0, spine: 0, chest: 0, neck: 0, headX: 0, headY: 0, lShX: -0.25, lShZ: 0.14, lEl: -1.1, rShX: 0.04, rShZ: -0.1, rEl: -0.18, lHip: 0, lHipZ: 0.03, lKnee: 0.04, rHip: 0, rHipZ: -0.03, rKnee: 0.04 },
+    stand: { bot: 1.15, botZ: 0, twist: 0, hipY: 0.95, pelvis: 0, spine: 0, chest: 0, neck: 0, headX: 0, headY: 0, lShX: -0.25, lShZ: 0.14, lEl: -1.1, rShX: 0.04, rShZ: -0.1, rEl: -0.18, lHip: 0, lHipZ: 0.03, lKnee: 0.04, rHip: 0, rHipZ: -0.03, rKnee: 0.04 },
   };
   POSES.sit = { ...POSES.stand, hipY: 0.53, spine: -0.12, chest: 0.06, lShX: -0.3, lShZ: -0.04, lEl: -1.2, rShX: -0.28, rShZ: 0.06, rEl: -1.15, lHip: -1.45, lHipZ: 0.1, lKnee: 1.42, rHip: -1.45, rHipZ: -0.1, rKnee: 1.42 };
   POSES.drink = { ...POSES.stand, spine: -0.08, headX: -0.4, lShX: -1.3, lShZ: 0.3, lEl: -1.75 };
@@ -1443,9 +1542,9 @@ window.Hodenritter3D = (() => {
 
   function applyPose(p, J) {
     p.hips.position.y = J.hipY;
-    p.hips.rotation.x = J.pelvis;
+    p.hips.rotation.set(J.pelvis, J.twist ?? 0, 0);
     p.spine.rotation.x = J.spine;
-    p.chest.rotation.x = J.chest;
+    p.chest.rotation.set(J.chest, -(J.twist ?? 0) * 1.6, 0);
     p.neck.rotation.x = J.neck;
     p.head.rotation.set(J.headX, J.headY, 0);
     p.arms[0].sh.rotation.set(J.lShX, 0, J.lShZ);
@@ -1748,7 +1847,11 @@ window.Hodenritter3D = (() => {
         J.lKnee += Math.max(0, -Math.cos(p.walk)) * (run ? 1.4 : 0.7) * p.moveW;
         J.rKnee += Math.max(0, Math.cos(p.walk)) * (run ? 1.4 : 0.7) * p.moveW;
         J.rShX += sw * amp * 0.8;
-        J.rEl -= run * 1.1 * p.moveW;
+        J.lShX -= sw * amp * 0.45; // Arm mit der Flasche schwingt weniger
+        J.rEl -= run * 1.1 * p.moveW + Math.max(0, sw) * 0.25 * p.moveW;
+        J.lEl -= run * 0.4 * p.moveW;
+        J.twist = (J.twist ?? 0) + sw * (run ? 0.16 : 0.1) * p.moveW; // Becken dreht mit, Schultern gegen
+        J.headX -= run * 0.12 * p.moveW; // Blick bleibt beim Rennen nach vorne
         J.spine += run * 0.15 * p.moveW;
         J.hipY += Math.abs(Math.cos(p.walk)) * 0.02 * p.moveW;
       }
@@ -1756,6 +1859,16 @@ window.Hodenritter3D = (() => {
       // Bier in der Hand (beim Trinken leert es sich)
       p.bottle.visible = true;
       p.ball.visible = !!plan.ball;
+      if (plan.ball) {
+        // In der Hand: bei der roten Kugel die rote, sonst die eigene Boule-Kugel in Spielerfarbe
+        const red = S.phase === "white";
+        const want = red ? "red" : name;
+        if (p.ball.userData.kind !== want) {
+          p.ball.userData.kind = want;
+          p.ball.material = red ? G.whiteBall.material : new THREE.MeshStandardMaterial({ map: bouleTex(ballColor(name)), metalness: 1, roughness: 0.3 });
+          p.ball.scale.setScalar((red ? H.W_R / H.B_R : 1) / 1.1);
+        }
+      }
     }
     for (const [name, p] of G.people) {
       if (!seen.has(name)) {
@@ -1864,7 +1977,7 @@ window.Hodenritter3D = (() => {
 
   // --- Hindernisse ---
 
-  function makeObstacle(kind) {
+  function makeObstacle(kind, id) {
     const g = new THREE.Group();
     const add = (geo, m, x, y, z) => {
       const o = mesh(geo, m, x, y, z);
@@ -1953,6 +2066,151 @@ window.Hodenritter3D = (() => {
         add(geo, mat("#9a9a94", 0.8), 0, 0.07, 0);
         break;
       }
+      case "dose": {
+        // Übergroße Energy-Dose: schwarz, grüne Kralle, Alu-Deckel
+        const tex = canvasTex(256, 128, (c, w, h) => {
+          c.fillStyle = "#0b0b0b";
+          c.fillRect(0, 0, w, h);
+          c.strokeStyle = "#7CFF2E";
+          c.lineCap = "round";
+          for (const [x, off] of [[0.36, 0], [0.5, 6], [0.64, 0]]) {
+            c.lineWidth = 9;
+            c.beginPath();
+            c.moveTo(w * x - 8, h * 0.18);
+            c.bezierCurveTo(w * x + 6 - off, h * 0.4, w * x - 10, h * 0.6, w * x + 2, h * 0.84);
+            c.stroke();
+          }
+          c.fillStyle = "#7CFF2E";
+          c.font = "bold 15px sans-serif";
+          c.textAlign = "center";
+          c.fillText("ENERGY", w * 0.5, h * 0.97);
+        }, [2, 1]); // Kralle zweimal rundherum
+        add(new THREE.CylinderGeometry(0.1, 0.1, 0.44, 32, 1, true), rim(new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35, metalness: 0.4 })), 0, 0.25, 0);
+        const alu = mat("#c9ccd1", 0.25, { metalness: 0.9 });
+        add(new THREE.CylinderGeometry(0.085, 0.1, 0.035, 32), alu, 0, 0.485, 0);
+        add(new THREE.CylinderGeometry(0.1, 0.085, 0.03, 32), alu, 0, 0.015, 0);
+        add(new THREE.TorusGeometry(0.02, 0.004, 6, 14), alu, 0.03, 0.505, 0).rotation.x = Math.PI / 2;
+        break;
+      }
+      case "katze": {
+        // Sitzende Katze, getigert, schaut sich um (Kopf und Schwanz bewegen sich)
+        const fur = mat("#d98a3d", 0.85);
+        const light = mat("#f3d2a6", 0.85);
+        const body = add(sphere(0.12, 20, 16), fur, 0, 0.12, -0.02);
+        body.scale.set(0.85, 1.05, 1.15);
+        add(sphere(0.07, 16, 12), light, 0, 0.13, 0.07).scale.set(0.9, 1.2, 0.6);
+        for (const sx of [-1, 1]) add(capsule(0.025, 0.09), light, sx * 0.045, 0.05, 0.08);
+        const head = new THREE.Group();
+        head.position.set(0, 0.26, 0.05);
+        g.add(head);
+        head.add(mesh(sphere(0.075, 20, 16), fur, 0, 0, 0));
+        addTo(head, mesh(sphere(0.035, 12, 10), light, 0, -0.02, 0.055)).scale.set(1.2, 0.8, 0.8);
+        addTo(head, mesh(sphere(0.008, 8, 6), mat("#e7849a", 0.4), 0, -0.005, 0.083, false));
+        for (const sx of [-1, 1]) {
+          const ear = mesh(new THREE.ConeGeometry(0.03, 0.06, 4), fur, sx * 0.042, 0.065, 0);
+          ear.rotation.z = -sx * 0.3;
+          head.add(ear);
+          addTo(head, mesh(sphere(0.014, 12, 10), mat("#c5e04a", 0.2), sx * 0.03, 0.012, 0.062, false)).scale.set(1, 1, 0.5);
+          addTo(head, mesh(sphere(0.008, 8, 6), mat("#111", 0.2), sx * 0.03, 0.012, 0.068, false)).scale.set(0.45, 1, 0.5);
+        }
+        const tail = new THREE.Group();
+        tail.position.set(0, 0.04, -0.13);
+        g.add(tail);
+        const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.08, 0.01, -0.08), new THREE.Vector3(0.16, 0.06, -0.04), new THREE.Vector3(0.2, 0.16, 0.0)]);
+        tail.add(mesh(new THREE.TubeGeometry(curve, 16, 0.018, 8), fur, 0, 0, 0));
+        // Streifen
+        for (let i = 0; i < 4; i++) {
+          const st = mesh(new THREE.TorusGeometry(0.1, 0.008, 4, 20, Math.PI), mat("#a35a1f", 0.9), 0, 0.1 + i * 0.045, -0.03);
+          st.scale.set(0.88, 1, 1.18);
+          st.rotation.set(Math.PI / 2, 0, Math.PI);
+          g.add(st);
+        }
+        g.userData.tick = (t) => {
+          head.rotation.y = Math.sin(t * 0.6) * 0.6 + Math.sin(t * 1.7) * 0.15;
+          tail.rotation.y = Math.sin(t * 1.3) * 0.35;
+        };
+        break;
+      }
+      case "liege": {
+        // Gartenliege: Alu-Gestell, gestreifte Auflage, Rückenteil hochgestellt (Kopfende hinten, -z)
+        const metal = mat("#d6d9de", 0.3, { metalness: 0.8 });
+        const pad = rim(new THREE.MeshStandardMaterial({ map: stripeTex("#0ea5e9", "#f8fafc"), roughness: 0.85 }));
+        for (const sx of [-1, 1]) {
+          add(new THREE.BoxGeometry(0.04, 0.04, 1.94), metal, sx * 0.31, 0.33, 0);
+          for (const z of [-0.85, 0.85]) add(new THREE.CylinderGeometry(0.018, 0.018, 0.33, 8), metal, sx * 0.31, 0.165, z);
+        }
+        add(new THREE.BoxGeometry(0.6, 0.07, 1.3), pad, 0, 0.385, 0.3);
+        const back = new THREE.Group();
+        back.position.set(0, 0.38, -0.35);
+        back.rotation.x = -0.75;
+        g.add(back);
+        back.add(mesh(new THREE.BoxGeometry(0.6, 0.07, 0.62), pad, 0, 0.0, -0.31));
+        back.add(mesh(new THREE.BoxGeometry(0.62, 0.03, 0.04), metal, 0, -0.04, -0.6));
+        add(new THREE.BoxGeometry(0.38, 0.1, 0.16), pad, 0, 0.5, -0.66).rotation.x = -0.75; // Kissen
+        break;
+      }
+      case "tor": {
+        // Fußballtor 3 × 2 m, Öffnung nach vorne (+z), Netz hinten
+        const white = mat("#f5f5f5", 0.35);
+        for (const sx of [-1.5, 1.5]) {
+          add(new THREE.CylinderGeometry(0.05, 0.05, 2, 14), white, sx, 1, 0);
+          add(new THREE.CylinderGeometry(0.025, 0.025, 0.95, 8), white, sx, 0.02, -0.48).rotation.x = Math.PI / 2;
+          const strut = add(new THREE.CylinderGeometry(0.02, 0.02, Math.hypot(0.95, 1.9), 8), white, sx, 1.0, -0.48);
+          strut.rotation.x = Math.atan2(0.95, 1.9);
+        }
+        add(new THREE.CylinderGeometry(0.05, 0.05, 3.1, 14), white, 0, 2, 0).rotation.z = Math.PI / 2;
+        add(new THREE.CylinderGeometry(0.025, 0.025, 3, 8), white, 0, 0.02, -0.95).rotation.z = Math.PI / 2;
+        const netTex = canvasTex(64, 64, (c, w, h) => {
+          c.clearRect(0, 0, w, h);
+          c.strokeStyle = "rgba(255,255,255,0.95)";
+          c.lineWidth = 3;
+          c.strokeRect(0, 0, w, h);
+        }, [12, 8]);
+        const net = new THREE.MeshStandardMaterial({ map: netTex, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.9 });
+        const back = mesh(new THREE.PlaneGeometry(3, 1.92), net, 0, 0.96, -0.95, false);
+        g.add(back);
+        const roof = mesh(new THREE.PlaneGeometry(3, Math.hypot(0.95, 0.1)), net, 0, 1.95, -0.475, false);
+        roof.rotation.x = -Math.PI / 2 + 0.1;
+        g.add(roof);
+        for (const sx of [-1.5, 1.5]) {
+          const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0, 2), new THREE.Vector2(-0.95, 1.9), new THREE.Vector2(-0.95, 0)]);
+          const side = mesh(new THREE.ShapeGeometry(shape), net, sx, 0, 0, false);
+          side.rotation.y = -Math.PI / 2;
+          // UV aus der Form, so dass die Maschen so groß sind wie hinten
+          const uv = side.geometry.attributes.uv;
+          for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 3, uv.getY(i) / 1.92);
+          g.add(side);
+        }
+        break;
+      }
+      case "auto": {
+        // Auto in echter Größe (4,3 × 1,8 m), Front nach +z
+        const paint = mat(["#c81e1e", "#1d4ed8", "#f5f5f4", "#15803d", "#111827"][hash(id ?? "") % 5], 0.3, { metalness: 0.5 }); // gleiche Farbe auf allen Handys
+        const glass = mat("#1e293b", 0.08, { metalness: 0.6 });
+        const black = mat("#151515", 0.8);
+        const chrome = mat("#e5e7eb", 0.2, { metalness: 1 });
+        const body = add(slab(4.3, 0.58, 1.6, 0.26, 0.06), paint, 0, 0.66, 0);
+        body.rotation.y = Math.PI / 2;
+        const cabin = add(slab(2.3, 0.52, 1.5, 0.22, 0.04), glass, 0, 1.17, -0.2);
+        cabin.rotation.y = Math.PI / 2;
+        const roof = add(slab(1.9, 0.08, 1.46, 0.2, 0.03), paint, 0, 1.43, -0.25);
+        roof.rotation.y = Math.PI / 2;
+        for (const sx of [-1, 1]) {
+          for (const z of [-1.35, 1.3]) {
+            const w = add(new THREE.CylinderGeometry(0.34, 0.34, 0.24, 24), black, sx * 0.84, 0.34, z);
+            w.rotation.z = Math.PI / 2;
+            const hub = add(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 16), chrome, sx * 0.86, 0.34, z);
+            hub.rotation.z = Math.PI / 2;
+          }
+          add(new THREE.BoxGeometry(0.32, 0.12, 0.05), mat("#fffbe6", 0.2, { emissive: 0xfff3c4, emissiveIntensity: 0.5 }), sx * 0.58, 0.72, 2.17);
+          add(new THREE.BoxGeometry(0.3, 0.1, 0.05), mat("#b91c1c", 0.3, { emissive: 0x7f1d1d, emissiveIntensity: 0.5 }), sx * 0.6, 0.78, -2.17);
+          add(new THREE.BoxGeometry(0.06, 0.08, 0.16), paint, sx * 0.88, 1.0, 0.75); // Spiegel
+        }
+        add(new THREE.BoxGeometry(1.6, 0.14, 0.08), black, 0, 0.42, 2.18);
+        add(new THREE.BoxGeometry(1.6, 0.14, 0.08), black, 0, 0.42, -2.18);
+        add(new THREE.BoxGeometry(0.7, 0.16, 0.03), mat("#f8fafc", 0.4), 0, 0.6, -2.2); // Nummernschild
+        break;
+      }
       case "huegel": {
         const geo = new THREE.SphereGeometry(0.24, 20, 10, 0, TAU, 0, Math.PI / 2);
         const p = geo.attributes.position;
@@ -1978,7 +2236,7 @@ window.Hodenritter3D = (() => {
     for (const o of S.obstacles) {
       let m = G.obstacles.get(o.id);
       if (!m) {
-        m = makeObstacle(o.k);
+        m = makeObstacle(o.k, o.id);
         m.position.copy(P(o.x, o.y));
         m.rotation.y = o.rot;
         m.userData.born = o.id === S.lastPlaced && !firstObstacles ? now : 0;
@@ -1991,6 +2249,7 @@ window.Hodenritter3D = (() => {
         const fall = Math.max(0, 1 - t / 0.45);
         m.position.y = fall * fall * 3 + (t > 0.45 ? Math.abs(Math.sin((t - 0.45) * 9)) * 0.08 * (1.2 - t) : 0);
       } else m.position.y = 0;
+      m.userData.tick?.(now / 1000);
     }
     firstObstacles = false;
   }
@@ -2061,6 +2320,12 @@ window.Hodenritter3D = (() => {
       }
       case "task": {
         const still = ["jacks", "squat"].includes(H.TASKS[S.task.i].a);
+        if (S.task.stage === "run" && H.TASKS[S.task.i].a === "chairs") {
+          // Um die Stühle: vom Rasen aus schräg von oben auf die ganze Reihe, auch hinter die Stühle
+          const rx = ((S.players.length - 1) / 2) * H.SEAT_GAP + 1.2;
+          const dist = Math.max(4.5, fitDist(rx * 2 + 1.2) * 0.9);
+          return { pos: P(0, H.CHAIR_Y + dist * 0.75, dist * 0.8), look: P(0, H.CHAIR_Y - 0.3, 0.3), k: 1.6 };
+        }
         if (S.task.stage === "run" && !still) return { pos: P(0, -4.2, 4.6), look: P(0, 5.5, 0), k: 1.5 };
         return { pos: P(1.2, 3.6, 1.6), look: P(0, 0.4, 0.9), k: 1.8 };
       }

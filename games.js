@@ -46,7 +46,7 @@ const LEVELS = {
 const BOT_LEVELS = {
   leicht: { label: "Leicht", emoji: "🐣", desc: "Die Bots patzen oft. Gut zum Reinkommen.", err: 2.2 },
   mittel: { label: "Mittel", emoji: "🤖", desc: "Meistens klug, manchmal daneben.", err: 1 },
-  schwer: { label: "Schwer", emoji: "😈", desc: "Die Bots treffen fast immer. Viel Glück.", err: 0.3 },
+  schwer: { label: "Schwer", emoji: "😈", desc: "Die Bots treffen fast immer. Viel Glück.", err: 0.4 },
 };
 // --- Aussehen: neues Design oder das alte (klassisch) ---
 // boot.js liest das schon vor dem ersten Bild aus und setzt <html class="neu">.
