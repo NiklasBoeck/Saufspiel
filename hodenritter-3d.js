@@ -572,6 +572,7 @@ window.Hodenritter3D = (() => {
     blades.count = Math.min(max, GRASS[Q]);
     blades.userData.max = max;
     blades.receiveShadow = false;
+    blades.visible = false; // keine Grashalme (Lena), der Rasen ist nur noch das Bild am Boden
     scene.add(blades);
 
     // Gänseblümchen, Löwenzahn und ein paar bunte Blumen
