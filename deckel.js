@@ -380,12 +380,14 @@
       if (s.k >= MAX) {
         s.stage = "done";
         s.result = { kind: "king", who, k: s.k, pot: s.pot };
+        score(s, [who]);
         drink(s, [{ who, n: s.pot, give: true, text: `👑 ${deckel(MAX)} gefangen, Deckel-König` }]);
       } else s.stage = "decide";
       return;
     }
     s.stage = "done";
     s.result = { kind: "drop", who, k: s.k, res, pot: 0 };
+    score(s, [], [who]);
     s.tally[who].sips += LEVELS[levelOf(s)].scale(s.k);
     s.tally[who].drops++;
     drink(s, [{ who, n: s.k, text: `${deckel(s.k)} ${res === "weg" ? "weggeschnippt" : "fallen gelassen"}${s.pot ? `, Pott (${s.pot}) ist weg` : ""}` }]);
@@ -474,6 +476,7 @@
           const who = s.players[s.cur];
           s.stage = "done";
           s.result = { kind: "stop", who, k: s.k, pot: s.pot };
+          score(s, [who]);
           drink(s, [{ who, n: s.pot, give: true, text: `Pott von ${deckel(s.k)} gefangen` }]);
         }
       } else if (s.stage === "done" && a.type === "next" && a.id === s.turn) {

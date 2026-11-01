@@ -112,6 +112,7 @@
     const wrong = ps.filter((p) => !right.includes(p));
     const items = wrong.map((p) => ({ who: p, n: WRONG, text: `auf ${r.bets[p] === "luege" ? "Lüge" : "Wahrheit"} gewettet` }));
     r.outcome = null;
+    score(s, right, wrong);
     if (r.lie && ps.length && right.length * 2 > ps.length) {
       items.push({ who: r.k, n: CAUGHT, text: "Lüge durchschaut" });
       r.outcome = "caught";

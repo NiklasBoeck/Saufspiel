@@ -364,6 +364,7 @@
   }
 
   function startGame() {
+    S.gid = randomString("abcdefghijkmnopqrstuvwxyz23456789", 10); // für die Statistik
     S.turnTeam = Math.random() < 0.5 ? 0 : 1;
     S.rot = [0, 0];
     S.shot = null;
@@ -560,6 +561,11 @@
       shotT0 = S.phase === "flying" ? performance.now() : -1e9;
     }
     const m = me();
+    // Statistik: gespielt, gewonnen, verloren (stats.js)
+    if (typeof Stats !== "undefined" && m && !m.bot && S.gid && m.team != null && !["lobby", "teams"].includes(S.phase)) {
+      Stats.record("flunky", S.gid, "g");
+      if (S.phase === "over" && S.winner != null) Stats.record("flunky", S.gid, S.winner === m.team ? "w" : "l");
+    }
     if (S.phase !== lastPhase) {
       if (S.phase === "drink" && m && m.team === S.drinkTeam && !m.done) vibrate([300, 100, 300]);
       if (S.phase === "aim" && S.throwerId === session.id) vibrate(120);
@@ -1839,6 +1845,7 @@
     store(NAME_KEY, s.name);
     saveSession();
     history.replaceState(null, "", `${location.pathname}?raum=${s.code}${brokerParam()}`);
+    if (typeof Freunde !== "undefined") Freunde.setRoom({ game: "flunky", code: s.code, page: "flunky" });
     $("fb-room").textContent = s.code;
     renderQr();
     if (S) onState();
@@ -1876,6 +1883,7 @@
     session = null;
     S = null;
     store(SESSION_KEY, null);
+    if (typeof Freunde !== "undefined") Freunde.setRoom(null);
     history.replaceState(null, "", `${location.pathname}${brokerParam().replace("&", "?")}`);
     showStart(error);
   }

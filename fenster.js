@@ -264,6 +264,7 @@
     give(s, p);
     s.winner = p;
     s.stage = "end";
+    score(s, [p], s.players.filter((x) => x !== p));
   }
 
   function nextTurn(s) {

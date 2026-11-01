@@ -255,6 +255,10 @@
     s.played.push(card);
     s.tally[who] += LEVELS[levelOf(s)].scale(n); // so viele, wie die Trink-Meldung sagt
     s.result = { id: Math.random().toString(36).slice(2), kind, who, n, card, guesses };
+    const guesser = s.players[s.guesser];
+    const dealer = s.players[s.dealer];
+    if (kind === "miss") score(s, [dealer], [guesser]);
+    else score(s, [guesser], [dealer]);
     const items = [{ who, n, text: kind === "miss" ? "fürs Danebenraten" : `als Dealer, ${label(card.value)} wurde erraten` }];
     if (playedCount(s, card.value) === 4) {
       // Alle 4 Karten eines Werts liegen: Die Karten werden umgedreht und alle trinken einen.

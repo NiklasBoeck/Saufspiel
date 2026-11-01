@@ -73,6 +73,7 @@
     }
     s.tally[lose].sips += LEVELS[levelOf(s)].scale(items[0].n);
     s.tally[win].wins++;
+    score(s, [win], [lose]);
     s.streak = s.streak.who === win ? { who: win, n: s.streak.n + 1 } : { who: win, n: 1 };
     if (s.streak.n >= STREAK) {
       items.push({ who: win, n: STREAK, give: true, text: `🤠 Revolverheld: ${STREAK} Duelle in Folge gewonnen` });

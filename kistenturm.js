@@ -95,6 +95,7 @@
       const n = Math.min(MAX_SIPS, fell);
       s.stage = "fall";
       s.fall = { id: rid(), k, who: p, n, fell, height: s.tower.length - 1 };
+      score(s, [], [p]);
       s.tally[p].sips += LEVELS[levelOf(s)].scale(n);
       s.tally[p].fell++;
       drink(s, [{ who: p, n, text: `${fell === 1 ? "1 Kiste" : `${fell} Kisten`} runtergefallen` }]);

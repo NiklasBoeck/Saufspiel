@@ -248,6 +248,7 @@
     if (to > G.edge) {
       s.stage = "done";
       s.result = { kind: "over", who: p, n };
+      score(s, [], [p]);
       s.tally[p].sips += LEVELS[levelOf(s)].scale(n);
       s.tally[p].over++;
       const items = [{ who: p, n, text: `${n}-mal in ${g.label === "Maß" ? "die Maß" : g.label === "Pils-Tulpe" ? "die Tulpe" : "das Schnapsglas"} gezapft, übergelaufen` }];
@@ -256,6 +257,7 @@
     } else if (G.edge - to <= FULL) {
       s.stage = "done";
       s.result = { kind: "full", who: p, n };
+      score(s, [p]);
       s.tally[p].full++;
       const items = [{ who: p, n, give: true, text: "Randvoll gezapft, ohne Überlaufen" }];
       if (g.shot) {

@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="design.css">
   <link rel="stylesheet" href="figur.css">
+  <link rel="stylesheet" href="profil.css">
 </head>
 <body>
   <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -138,7 +139,10 @@
       </header>
       <p class="room-code">Raum <b id="lobby-code"></b></p>
       <div id="lobby-qr" class="qr"></div>
-      <button id="lobby-share" class="btn ghost small share-btn">Link teilen</button>
+      <div class="lobby-share-row">
+        <button id="lobby-share" class="btn ghost small share-btn">Link teilen</button>
+        <button id="lobby-invite" class="btn ghost small share-btn">👥 Freunde einladen</button>
+      </div>
       <ul id="lobby-players" class="chips"></ul>
       <button id="lobby-bot" class="btn ghost small bot-add" hidden>🤖 Bot dazu</button>
       <div id="lobby-bot-level" class="bot-seg" role="group" aria-label="Wie gut spielen die Bots?" hidden></div>
@@ -204,7 +208,10 @@
   <script src="hodenritter.js"></script>
   <script src="flunky.js"></script>
   <script src="net.js"></script>
+  <script src="stats.js"></script>
+  <script src="freunde.js"></script>
   <script src="room.js"></script>
   <script src="app.js"></script>
+  <script src="profil.js"></script>
 </body>
 </html>

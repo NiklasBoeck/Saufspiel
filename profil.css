@@ -1,0 +1,82 @@
+/* Profil: Charakter, Statistik, Freunde (profil.js, freunde.js). Auch auf flunky.html geladen. */
+
+#screen-profil { gap: 14px; }
+.pf-title { font-weight: 700; color: var(--text); font-size: 1.15rem; font-family: var(--display, inherit); }
+.pf-head { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: var(--radius, 18px); background: var(--surface, #2a1b4d); }
+.pf-me-av .fav.big, .pf-me-av .pf-initial.big { width: 72px; height: 72px; font-size: 2rem; }
+.pf-me { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.pf-me b { font-size: 1.3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; font-family: var(--display, inherit); }
+
+.pf-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface, #2a1b4d); }
+.pf-tabs button { position: relative; flex: 1; border: none; background: none; color: var(--muted, #b6a8d6); font: inherit; font-weight: 700; padding: 9px 12px; border-radius: 999px; cursor: pointer; }
+.pf-tabs button small { opacity: 0.7; font-weight: 600; }
+.pf-tabs button.picked { background: var(--primary, #f59e0b); color: var(--ink, #1b1033); }
+.pf-badge { position: absolute; top: 2px; right: 10px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ef4444; color: #fff; font-style: normal; font-size: 0.72rem; line-height: 18px; }
+
+.pf-body { display: flex; flex-direction: column; gap: 12px; }
+.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 44%), 1fr)); gap: 8px; }
+.pf-tile { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: var(--radius, 18px); background: var(--surface, #2a1b4d); border: 1px solid var(--line, rgb(255 255 255 / 0.08)); min-width: 0; }
+.pf-tile .pf-e { font-size: 1.2rem; }
+.pf-tile b { font-size: 1.6rem; line-height: 1.1; color: var(--text); font-family: var(--display, inherit); }
+.pf-tile small { color: var(--muted, #b6a8d6); font-size: 0.8rem; line-height: 1.25; }
+.pf-tile.big { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 12px; background: color-mix(in srgb, var(--primary, #f59e0b) 18%, var(--surface, #2a1b4d)); }
+.pf-tile.big b { font-size: 2.4rem; }
+.pf-tile.big .pf-e { font-size: 2rem; }
+
+.pf-facts { display: flex; flex-direction: column; gap: 4px; }
+.pf-facts p { margin: 0; display: flex; justify-content: space-between; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--line, rgb(255 255 255 / 0.08)); }
+.pf-facts span { color: var(--muted, #b6a8d6); }
+.pf-facts b { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pf-h { margin: 6px 0 0; font-size: 1rem; color: var(--muted, #b6a8d6); font-family: var(--display, inherit); }
+.pf-games, .pf-friends { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.pf-games li { display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 14px; background: var(--surface, #2a1b4d); }
+.pf-gi { width: 36px; height: 36px; flex: none; display: grid; place-items: center; }
+.pf-gi svg { width: 100%; height: 100%; }
+.pf-gn { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-gs { color: var(--muted, #b6a8d6); font-size: 0.85rem; white-space: nowrap; }
+
+.pf-friends li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; background: var(--surface, #2a1b4d); cursor: pointer; }
+.pf-friends li.off .fav, .pf-friends li.off .pf-initial { filter: grayscale(0.8); opacity: 0.7; }
+.pf-friends li.wait { opacity: 0.7; }
+.pf-fname { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pf-fname b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-fname small { color: var(--muted, #b6a8d6); font-size: 0.8rem; }
+.pf-friends li.on .pf-fname small { color: #4ade80; }
+.pf-arrow { color: var(--muted, #b6a8d6); font-size: 1.4rem; }
+.pf-friends .btn.small { flex: none; padding: 6px 12px; }
+
+.pf-mycode { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px; border-radius: var(--radius, 18px); background: var(--surface, #2a1b4d); }
+.pf-mycode p { margin: 0; display: flex; flex-direction: column; align-items: center; color: var(--muted, #b6a8d6); font-size: 0.85rem; }
+.pf-mycode b { color: var(--text); font-size: 1.4rem; letter-spacing: 0.12em; font-family: ui-monospace, monospace; }
+.pf-mycode .qr svg { width: 150px; height: 150px; }
+.pf-muted { margin: 0; color: var(--muted, #b6a8d6); line-height: 1.45; }
+.pf-muted.small { font-size: 0.8rem; }
+.pf-reset { align-self: center; }
+.pf-danger { color: #fca5a5; align-self: center; }
+
+.pf-initial { display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: color-mix(in srgb, var(--primary, #f59e0b) 30%, var(--surface, #2a1b4d)); color: var(--text, #fff); font-weight: 800; }
+.pf-initial.big { width: 54px; height: 54px; font-size: 1.5rem; }
+
+/* Fenster über allem: Einladung, Anfrage, Freund ansehen */
+.pf-sheet { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); background: rgb(10 7 5 / 0.82); animation: pf-fade 0.15s ease-out; }
+.pf-box { width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 22px 18px; border-radius: 22px; background: var(--surface, #2a1b4d); border: 1px solid var(--line, transparent); box-shadow: 0 20px 60px rgb(0 0 0 / 0.5); color: var(--text, #fff); text-align: center; }
+.pf-sheet.pf-wide .pf-box { text-align: left; max-width: 480px; }
+.pf-box h2 { margin: 0; font-size: 1.35rem; font-family: var(--display, inherit); }
+.pf-box .pf-friends { text-align: left; }
+.pf-box .pf-friends li { background: var(--surface-2, rgb(255 255 255 / 0.06)); cursor: default; }
+.pf-box .pf-tile, .pf-box .pf-games li { background: var(--surface-2, rgb(255 255 255 / 0.06)); }
+.pf-pop-av { display: flex; justify-content: center; }
+.pf-pop-av .fav.big, .pf-pop-av .pf-initial.big { width: 84px; height: 84px; font-size: 2.2rem; }
+.pf-pop-head { display: flex; align-items: center; gap: 14px; }
+.pf-pop-head .pf-muted { font-size: 0.85rem; }
+@keyframes pf-fade { from { opacity: 0; } }
+.pf-toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 999px; background: #111; color: #fff; font-weight: 700; }
+
+/* Lobby: Link teilen + Freunde einladen nebeneinander, ➕ neben Mitspielern */
+.lobby-share-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.add-friend { font-size: 0.8rem; }
+.friend-mark { font-size: 0.85rem; }
+
+/* Flunky Ball hat eigene Knöpfe; die Fenster brauchen dort die Grundknöpfe */
+.pf-box .btn:not(.fb-btn) { cursor: pointer; }

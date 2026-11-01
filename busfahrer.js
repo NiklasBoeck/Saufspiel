@@ -126,6 +126,7 @@
         drink(s, [{ who: b.driver, n: b.pos, text: "und fängt von vorne an" }]);
       } else if (b.pos === BUS_LENGTH - 1) {
         b.stage = "done";
+        score(s, [b.driver]);
       }
     },
   };

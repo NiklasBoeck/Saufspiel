@@ -435,6 +435,7 @@
     const byDist = [...s.order].sort((a, b) => dist[a] - dist[b]);
     const clean = byDist.filter((n) => !s.touched.includes(n));
     s.result = { dist, far: byDist[byDist.length - 1], near: (clean.length ? clean : byDist)[0] };
+    if (s.order.length > 1) score(s, [s.result.near], [s.result.far]);
     s.phase = "result";
   }
 

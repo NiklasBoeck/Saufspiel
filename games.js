@@ -126,7 +126,14 @@ function newGame(key, players, level = Settings.level) {
   playLevel = level; // setup() kann schon die erste Trink-Meldung auslösen
   const s = GAMES[key].setup(players);
   s.level = level;
+  s.gid ??= Math.random().toString(36).slice(2); // für die Statistik: jedes Spiel zählt einmal
   return s;
+}
+
+// Ergebnis für die Statistik (stats.js): wer hat diese Runde / dieses Duell / dieses Spiel gewonnen, wer verloren.
+// Jedes Ergebnis zählt auf jedem Handy genau einmal.
+function score(s, win = [], lose = []) {
+  s.score = { id: Math.random().toString(36).slice(2), win: win.filter(Boolean), lose: lose.filter(Boolean) };
 }
 
 function drinkEmoji(s) {

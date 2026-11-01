@@ -288,6 +288,7 @@ function playGame(r) {
   setGame(r.key);
   // fit: Spiel passt immer genau auf den Bildschirm, nichts scrollt.
   document.documentElement.classList.toggle("fit", GAMES[r.key].fit !== false);
+  Stats.see(r.key, r.s, r.me);
   const v = GAMES[r.key].view(r.s, r.me);
   const actions = v.actions.filter(canPress);
   // v.turn: wer dran ist, wenn das Spiel ohne Knöpfe gesteuert wird (Tippen im Spielfeld)

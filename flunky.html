@@ -15,6 +15,7 @@
   <meta name="apple-mobile-web-app-title" content="Saufomat">
   <link rel="stylesheet" href="flunky.css">
   <link rel="stylesheet" href="design.css">
+  <link rel="stylesheet" href="profil.css">
 </head>
 <body>
   <!-- Start: Name, Raum erstellen oder beitreten -->
@@ -74,6 +75,7 @@
     </div>
     <div id="fb-qr" class="fb-qr"></div>
     <button id="fb-share" class="fb-btn secondary small">Link teilen</button>
+    <button id="fb-invite" class="fb-btn secondary small" onclick="Freunde.inviteSheet()">👥 Freunde einladen</button>
 
     <div id="fb-waiting">
       <h2 id="fb-count" class="fb-section"></h2>
@@ -159,6 +161,9 @@
   <script src="vendor/qrcode.js"></script>
   <script src="vendor/three.min.js"></script>
   <script src="net.js"></script>
+  <script src="stats.js"></script>
+  <script src="freunde.js"></script>
   <script src="flunky-game.js"></script>
+  <script>Freunde.boot();</script>
 </body>
 </html>

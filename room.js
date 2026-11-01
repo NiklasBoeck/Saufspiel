@@ -290,6 +290,20 @@ const Room = (() => {
           remove.onclick = () => send({ type: "bot-remove", id: p.id });
           li.appendChild(remove);
         }
+        // Mitspieler als Freund hinzufügen (die Id im Raum ist auch der Freundescode)
+        const fr = typeof Freunde !== "undefined" && Freunde.friend(p.id);
+        if (typeof Freunde !== "undefined" && !p.bot && p.id !== session.id && !fr) {
+          const add = document.createElement("button");
+          add.textContent = "➕";
+          add.className = "remove add-friend";
+          add.title = add.ariaLabel = t("{name} als Freund hinzufügen", { name: p.name });
+          add.onclick = () => {
+            Freunde.add(p.id, p.name);
+            showToast({ notice: { emoji: "📨", title: t("Anfrage an {name} geschickt.", { name: p.name }) } });
+            renderLobby();
+          };
+          li.appendChild(add);
+        } else if (fr) li.insertAdjacentHTML("beforeend", `<span class="friend-mark" title="${escapeHtml(t(fr.ok ? "Freund" : "Anfrage geschickt"))}">${fr.ok ? "🤝" : "⏳"}</span>`);
         return li;
       })
     );
@@ -352,6 +366,7 @@ const Room = (() => {
     store(NAME_KEY, s.name);
     saveSession();
     history.replaceState(null, "", `${location.pathname}?spiel=${s.game}&raum=${s.code}${brokerParam()}`);
+    if (typeof Freunde !== "undefined") Freunde.setRoom({ game: s.game, code: s.code });
     setGame(s.game);
     if (S) onState();
     else {
@@ -372,6 +387,7 @@ const Room = (() => {
     session = null;
     S = null;
     store(SESSION_KEY, null);
+    if (typeof Freunde !== "undefined") Freunde.setRoom(null);
     history.replaceState(null, "", `${location.pathname}${brokerParam().replace("&", "?")}`);
     setConn("");
     hideDrinkAlert();
@@ -440,6 +456,7 @@ const Room = (() => {
   $("lobby-back").onclick = leave;
   $("lobby-start").onclick = () => send({ type: "start" });
   $("lobby-bot").onclick = () => send({ type: "bot-add" });
+  $("lobby-invite").onclick = () => Freunde.inviteSheet({ game: session.game, code: session.code });
 
   $("room-create").onclick = () => {
     const name = nameOrError();
@@ -496,6 +513,8 @@ const Room = (() => {
       gameKey = key;
       $("room-code").value = code;
       showStart();
+      // Einladung von einem Freund (&los=1): mit bekanntem Namen gleich beitreten
+      if (params.get("los") && $("room-name").value.trim()) return $("room-join").click();
       setTimeout(() => ($("room-name").value ? $("room-join") : $("room-name")).focus(), 50);
     },
 
