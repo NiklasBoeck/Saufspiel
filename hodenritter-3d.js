@@ -471,7 +471,7 @@ window.Hodenritter3D = (() => {
   // Comic-Rasen: kräftiges Grün mit weichen hellen und dunklen Flecken statt Rauschen
   function addGround(scene, renderer, rnd) {
     const grass = canvasTex(512, 512, (g, w, h) => {
-      g.fillStyle = "#3f9a2c";
+      g.fillStyle = "#5fb53a";
       g.fillRect(0, 0, w, h);
       const blob = (x, y, r, col, a) => {
         for (const dx of [-w, 0, w]) {
@@ -484,13 +484,12 @@ window.Hodenritter3D = (() => {
           }
         }
       };
-      // Gepflegter Rasen: kaum Flecken, dafür viele feine Halme
-      for (let i = 0; i < 18; i++) blob(rnd() * w, rnd() * h, 60 + rnd() * 90, rnd() < 0.5 ? "rgba(120,200,70,A)" : "rgba(40,110,30,A)", 0.18);
-      const greens = ["#56b43c", "#3e9a2c", "#64c046", "#4aa835", "#358f27"];
-      for (let i = 0; i < 6000; i++) {
+      for (let i = 0; i < 40; i++) blob(rnd() * w, rnd() * h, 40 + rnd() * 90, rnd() < 0.5 ? "rgba(140,214,80,A)" : "rgba(52,128,38,A)", 0.35);
+      const greens = ["#6cc444", "#4fa532", "#7ccf4f", "#58ad38"];
+      for (let i = 0; i < 2500; i++) {
         g.strokeStyle = greens[Math.floor(rnd() * greens.length)];
-        g.globalAlpha = 0.45;
-        g.lineWidth = 1.5;
+        g.globalAlpha = 0.35;
+        g.lineWidth = 2;
         const x = rnd() * w;
         const y = rnd() * h;
         g.beginPath();
@@ -507,11 +506,11 @@ window.Hodenritter3D = (() => {
     ground.receiveShadow = false; // keine Schatten auf dem Rasen (Lenas Wunsch), nur auf der Terrasse
     scene.add(ground);
 
-    // Frisch gemäht wie im Stadion: breite helle und dunkle Bahnen quer über den Rasen (je 1 m)
-    const stripes = canvasTex(64, 4, (g, w, h) => {
+    // Gemähte Streifen auf dem Spielrasen
+    const stripes = canvasTex(4, 32, (g, w, h) => {
       for (let i = 0; i < 16; i++) {
-        g.fillStyle = i % 2 ? "rgba(210,255,150,0.26)" : "rgba(8,55,8,0.22)";
-        g.fillRect((i * w) / 16, 0, w / 16, h);
+        g.fillStyle = i % 2 ? "rgba(220,255,150,0.18)" : "rgba(20,80,10,0.10)";
+        g.fillRect(0, (i * h) / 16, w, h / 16);
       }
     });
     stripes.magFilter = THREE.LinearFilter;
@@ -566,11 +565,9 @@ window.Hodenritter3D = (() => {
       const near = i % 2 === 0;
       const x = (rnd() - 0.5) * (near ? 13 : 15);
       const y = near ? -0.1 + rnd() * rnd() * 7 : rnd() * 16.2;
-      const sc = 0.6 + rnd() * 0.45;
-      blades.setMatrixAt(i, M(P(x, y).x, 0, P(x, y).z, 0, rnd() * TAU, 0, sc, sc * (0.5 + rnd() * 0.35), sc)); // kurz gemäht
-      // Halme in den hellen Mähbahnen heller, in den dunklen dunkler (Bahnen je 1 m, wie der Boden)
-      const band = y >= 0 && y < H.FIELD.y1 && Math.abs(x) < H.FIELD.x ? (Math.floor((y + 0.3) / ((H.FIELD.y1 + 0.6) / 16)) % 2 ? 1.18 : 0.8) : 1;
-      blades.setColorAt(i, col.set(greens[Math.floor(rnd() * greens.length)]).multiplyScalar(band));
+      const sc = 0.65 + rnd() * 0.55;
+      blades.setMatrixAt(i, M(P(x, y).x, 0, P(x, y).z, 0, rnd() * TAU, 0, sc, sc * (0.7 + rnd() * 0.6), sc));
+      blades.setColorAt(i, col.set(greens[Math.floor(rnd() * greens.length)]));
     }
     blades.count = Math.min(max, GRASS[Q]);
     blades.userData.max = max;
@@ -578,12 +575,12 @@ window.Hodenritter3D = (() => {
     scene.add(blades);
 
     // Gänseblümchen, Löwenzahn und ein paar bunte Blumen
-    const flowers = new THREE.InstancedMesh(new THREE.CircleGeometry(0.02, 8), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), 140);
-    const fcol = [0xffffff, 0xffffff, 0xffffff, 0xffd21f]; // nur ein paar Gänseblümchen, der Rasen ist gepflegt
-    for (let i = 0; i < 140; i++) {
+    const flowers = new THREE.InstancedMesh(new THREE.CircleGeometry(0.022, 8), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), 600);
+    const fcol = [0xffffff, 0xffffff, 0xffffff, 0xffd21f, 0xff7eb6, 0xb69cff];
+    for (let i = 0; i < 600; i++) {
       const x = (rnd() - 0.5) * 14;
       const y = rnd() * 16;
-      const p = P(x, y, 0.04 + rnd() * 0.03);
+      const p = P(x, y, 0.06 + rnd() * 0.05);
       flowers.setMatrixAt(i, M(p.x, p.y, p.z, -Math.PI / 2 + (rnd() - 0.5) * 0.4, 0, rnd() * TAU, 0.8 + rnd() * 0.6));
       flowers.setColorAt(i, col.set(fcol[Math.floor(rnd() * fcol.length)]));
     }
