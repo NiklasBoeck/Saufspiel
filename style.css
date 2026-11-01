@@ -1423,27 +1423,3 @@ html[data-game="kistenturm"] #screen-game:has(.kt-view) .conn { position: fixed;
 .ww-cat-e { font-size: 1.6rem; }
 .ww-cat small { display: block; color: var(--muted); font-size: 0.78rem; }
 
-/* --- Saufkalender --- */
-.sk-doors { display: flex; justify-content: center; gap: clamp(6px, 2vw, 12px); margin-bottom: clamp(8px, 2dvh, 18px); }
-.sk-door { width: clamp(44px, min(15vw, 11dvh), 76px); aspect-ratio: 3 / 4; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--surface); border: 2px solid rgb(255 255 255 / 0.08); }
-.sk-door span { font-size: clamp(1.3rem, 4dvh, 1.9rem); line-height: 1; }
-.sk-door small { font-size: 0.7rem; color: var(--muted); }
-.sk-past { opacity: 0.55; }
-.sk-locked { opacity: 0.4; border-style: dashed; }
-.sk-today { border-color: #f59e0b; background: linear-gradient(160deg, #b45309, #78350f); box-shadow: 0 0 18px rgb(245 158 11 / 0.45); transform: scale(1.12); }
-.sk-today b { font-size: clamp(1.5rem, 4.5dvh, 2.2rem); color: #fde68a; line-height: 1; }
-.sk-today small { color: #fde68a; }
-.sk-today[data-act] { cursor: pointer; animation: sk-wiggle 2.4s ease-in-out infinite; }
-@keyframes sk-wiggle { 0%, 80%, 100% { transform: scale(1.12) rotate(0); } 85% { transform: scale(1.12) rotate(-4deg); } 90% { transform: scale(1.12) rotate(4deg); } 95% { transform: scale(1.12) rotate(-2deg); } }
-.sk-opened { background: var(--surface); }
-.sk-rule { display: flex; flex-direction: column; align-items: center; text-align: center; gap: clamp(6px, 1.5dvh, 14px); padding: clamp(16px, 3.5dvh, 32px) 20px; border-radius: 24px; background: var(--surface); border-top: 6px solid #f59e0b; margin-bottom: clamp(8px, 2dvh, 16px); }
-.sk-rule p { margin: 0; font-size: clamp(1.2rem, 3.4dvh, 1.7rem); font-weight: 700; line-height: 1.3; }
-.sk-rule small { color: #fcd34d; font-weight: 700; }
-.sk-emoji { font-size: clamp(2.6rem, 8dvh, 4rem); line-height: 1; }
-.sk-reveal { animation: sk-open 0.9s cubic-bezier(0.2, 1.3, 0.4, 1); transform-origin: left center; }
-@keyframes sk-open { 0% { opacity: 0; transform: perspective(600px) rotateY(-80deg); } 100% { opacity: 1; transform: none; } }
-.sk-none { text-align: center; margin: 0; }
-.sk-small { text-align: center; color: var(--muted); margin: 0; line-height: 1.4; }
-.bf-actions.sk-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
-.sk-chip { width: 44px; padding-left: 0 !important; padding-right: 0 !important; margin-left: auto; }
-.sk-chip + .rules-btn { margin-left: 0; }
