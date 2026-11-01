@@ -20,6 +20,7 @@ const FILES = [
   "eher.js",
   "kistenturm.js",
   "kistenturm-3d.js",
+  "deckel.js",
   "hodenritter.js",
   "hodenritter-3d.js",
   "saufkalender.js",
