@@ -174,7 +174,89 @@ const Gesicht3D = (() => {
     const h = Math.max(10, (mouthY - eyeY) / 0.44);
     const cx = ((mean(eyeIds, "x") + L[POINTS.noseTip].x) / 2) * W;
     const flat = { x: cx - h * 0.4375, y: eyeY - h * 0.33, w: h * 0.875, h };
-    return { form: toB64(bytes), formFoto: crop(256, 0.85), formFotoKlein: crop(128, 0.72), crop: flat };
+    return {
+      form: toB64(bytes),
+      formFoto: crop(384, 0.86),
+      formFotoKlein: crop(128, 0.72),
+      zug: features(A),
+      farben: colors(canvas, L),
+      crop: flat,
+    };
+  }
+
+  // --- Gesichtszüge fürs gezeichnete Gesicht: Verhältnisse im Vergleich zum Standard-Gesicht ---
+  // Nur in der Bildebene messen (die geschätzte Tiefe ist ungenauer), Maßstab = Abstand der Augenmitten
+  const dist = (v, a, b) => Math.hypot(v[a * 3] - v[b * 3], v[a * 3 + 1] - v[b * 3 + 1]);
+  function ratios(v) {
+    const mid = (a, b) => [(v[a * 3] + v[b * 3]) / 2, (v[a * 3 + 1] + v[b * 3 + 1]) / 2];
+    const l = mid(33, 133);
+    const r = mid(362, 263);
+    const W = Math.hypot(l[0] - r[0], l[1] - r[1]) * 1.6;
+    const eyeW = (dist(v, 33, 133) + dist(v, 362, 263)) / 2;
+    return {
+      laenge: dist(v, 10, 152) / W, // Gesichtslänge
+      kiefer: dist(v, 172, 397) / W, // Kieferbreite unten
+      augen: eyeW / W, // Augengröße
+      offen: (dist(v, 159, 145) + dist(v, 386, 374)) / 2 / eyeW, // wie weit offen
+      nase: dist(v, 64, 294) / W, // Nasenflügel
+      nasenlaenge: dist(v, 168, 2) / W,
+      mund: dist(v, 61, 291) / W, // Mundbreite
+      lippen: (dist(v, 0, 13) + dist(v, 14, 17)) / W, // Lippen dick oder schmal
+      brauen: (dist(v, 105, 33) + dist(v, 334, 263)) / 2 / W, // Abstand Braue–Auge
+    };
+  }
+  let canonRatios = null;
+  function features(A) {
+    canonRatios ??= ratios(CANON.v);
+    const r = ratios(A);
+    const out = {};
+    for (const k in r) out[k] = Math.round(Math.min(1.4, Math.max(0.7, r[k] / canonRatios[k])) * 100) / 100;
+    return out;
+  }
+
+  // --- Farben aus dem Foto: Haare (über der Stirn), Augen (Iris) ---
+  function colors(canvas, L) {
+    const g = canvas.getContext("2d", { willReadFrequently: true });
+    const W = canvas.width;
+    const H = canvas.height;
+    const patch = (x, y, r) => {
+      const x0 = Math.max(0, Math.round(x - r));
+      const y0 = Math.max(0, Math.round(y - r));
+      const w = Math.max(1, Math.min(W - x0, Math.round(r * 2)));
+      const h = Math.max(1, Math.min(H - y0, Math.round(r * 2)));
+      const d = g.getImageData(x0, y0, w, h).data;
+      const px = [];
+      for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i + 1], d[i + 2]]);
+      // Median je Kanal (Glanzlichter und Schatten fallen raus)
+      return [0, 1, 2].map((k) => px.map((p) => p[k]).sort((a, b) => a - b)[Math.floor(px.length / 2)]);
+    };
+    const hex = (c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+    const out = {};
+    try {
+      const top = L[10];
+      const chin = L[152];
+      const fh = Math.hypot((chin.x - top.x) * W, (chin.y - top.y) * H);
+      // Haare: ein Stück über der Stirn, Richtung Scheitel
+      const ux = (top.x - chin.x) * W / fh;
+      const uy = (top.y - chin.y) * H / fh;
+      const hp = patch(top.x * W + ux * fh * 0.14, top.y * H + uy * fh * 0.14, fh * 0.05);
+      const skin = patch(L[50].x * W, L[50].y * H, fh * 0.03);
+      const lum = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+      const diff = Math.hypot(hp[0] - skin[0], hp[1] - skin[1], hp[2] - skin[2]);
+      if (diff > 40 && lum(hp) < 215) out.haare = hex(hp); // sonst Glatze, Hintergrund oder Stirn
+      // Augen: Ring in der Iris, ohne Pupille
+      if (L.length >= 478) {
+        const iris = [];
+        for (const [c, e] of [[468, 469], [473, 474]]) {
+          const rr = Math.hypot((L[e].x - L[c].x) * W, (L[e].y - L[c].y) * H);
+          for (const a of [0, 1.6, 3.1, 4.7]) iris.push(patch(L[c].x * W + Math.cos(a) * rr * 0.6, L[c].y * H + Math.sin(a) * rr * 0.6, Math.max(1, rr * 0.15)));
+        }
+        out.augen = hex([0, 1, 2].map((k) => iris.map((p) => p[k]).sort((a, b) => a - b)[Math.floor(iris.length / 2)]));
+      }
+    } catch {
+      // ohne Farben
+    }
+    return out;
   }
 
   function validForm(f) {
@@ -270,6 +352,6 @@ const Gesicht3D = (() => {
     return tex;
   }
 
-  return { fromImage, validForm, parse, geometry, texture, POINTS, N, preload: () => load().catch(() => null) };
+  return { rings: edgeRings, fromImage, validForm, parse, geometry, texture, POINTS, N, preload: () => load().catch(() => null) };
 })();
 window.Gesicht3D = Gesicht3D;

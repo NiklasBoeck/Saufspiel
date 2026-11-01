@@ -56,6 +56,7 @@ const Figur = (() => {
 
   // Nur bekannte Felder mit gültigen Werten übernehmen (Figuren kommen auch von anderen Handys).
   const COLOR = /^#[0-9a-f]{6}$/i;
+  const ZUG = ["laenge", "kiefer", "augen", "offen", "nase", "nasenlaenge", "mund", "lippen", "brauen"];
   const PHOTO = /^data:image\/jpeg;base64,[a-z0-9+/=]+$/i;
   function clean(f) {
     if (!f || typeof f !== "object") return null;
@@ -69,7 +70,13 @@ const Figur = (() => {
     if (Number.isFinite(f.groesse)) out.groesse = Math.min(2.1, Math.max(1.45, f.groesse));
     if (Number.isFinite(f.statur)) out.statur = Math.min(1.12, Math.max(0.88, f.statur));
     if (window.Gesicht3D?.validForm(f.form)) out.form = f.form; // grobes 3D-Gesicht (figur-3d.js)
-    for (const k of ["foto", "fotoKlein", "formFoto", "formFotoKlein"]) if (typeof f[k] === "string" && f[k].length < 60000 && PHOTO.test(f[k])) out[k] = f[k];
+    for (const k of ["foto", "fotoKlein", "formFoto", "formFotoKlein"]) if (typeof f[k] === "string" && f[k].length < 120000 && PHOTO.test(f[k])) out[k] = f[k];
+    if (f.stil === "3d" || f.stil === "gezeichnet") out.stil = f.stil;
+    if (f.zug && typeof f.zug === "object") {
+      const z = {};
+      for (const k of ZUG) if (Number.isFinite(f.zug[k])) z[k] = Math.min(1.4, Math.max(0.7, f.zug[k]));
+      if (Object.keys(z).length) out.zug = z;
+    }
     return out;
   }
 
@@ -152,7 +159,10 @@ const Figur = (() => {
     const fem = !!L.frau;
     const rx = fem ? 18 : 19;
     const s = L.frisur;
-    const foto = L.fotoKlein || L.foto;
+    const foto = L.stil === "gezeichnet" ? null : L.fotoKlein || L.foto;
+    const Z = { laenge: 1, kiefer: 1, augen: 1, offen: 1, nase: 1, nasenlaenge: 1, mund: 1, lippen: 1, brauen: 1, ...(L.zug || {}) };
+    const chinY = 65.5 + (Z.laenge - 1) * 18;
+    const jaw = (fem ? 0.5 : 0.62) * Math.min(1.35, Math.max(0.7, 1 + (Z.kiefer - 1) * 1.6));
     let back = "";
     let front = "";
     if (s === "long") back = `<path d="M29 38C26 62 27 80 33 90L67 90C73 80 74 62 71 38Z" fill="${H}"/>`;
@@ -174,13 +184,27 @@ const Figur = (() => {
         <image href="${foto}" x="32.5" y="27" width="35" height="40" preserveAspectRatio="none" mask="url(#m${id})"/>`;
     } else {
       const iris = L.augen;
+      const f = (v) => v.toFixed(2);
+      const ex = 3.4 * Z.augen;
+      const ey = 2.7 * Z.augen * Math.pow(Z.offen, 0.7);
+      const ir = Math.min(ey * 0.95, 2 * Z.augen);
       for (const x of [42, 58]) {
-        face += `<ellipse cx="${x}" cy="42" rx="3.4" ry="2.7" fill="#fbfaf6"/><circle cx="${x}" cy="42.2" r="2" fill="${iris}"/><circle cx="${x}" cy="42.2" r="0.95" fill="#111"/><circle cx="${x + 0.7}" cy="41.4" r="0.5" fill="#fff"/>`;
+        face += `<ellipse cx="${x}" cy="42" rx="${f(ex)}" ry="${f(ey)}" fill="#fbfaf6"/><circle cx="${x}" cy="42.2" r="${f(ir)}" fill="${iris}"/><circle cx="${x}" cy="42.2" r="${f(ir * 0.48)}" fill="#111"/><circle cx="${x + 0.7}" cy="41.4" r="0.5" fill="#fff"/>`;
+        face += `<path d="M${f(x - ex - 0.3)} 42Q${x} ${f(42 - ey * 1.5)} ${f(x + ex + 0.3)} 42" stroke="${shade(skin, -0.45)}" stroke-width="0.7" fill="none"/>`;
       }
-      face += `<path d="M38 36.6Q42 34.6 46 36.2M54 36.2Q58 34.6 62 36.6" stroke="${H}" stroke-width="${fem ? 1.2 : 1.7}" fill="none" stroke-linecap="round"/>`;
-      face += `<path d="M50.2 44Q48.4 49.5 50.6 50.4" stroke="${shade(skin, -0.28)}" stroke-width="1.2" fill="none" stroke-linecap="round"/>`;
-      if (L.bart) face += `<path d="M31.5 46C32 62 40 67.5 50 67.5C60 67.5 68 62 68.5 46C66 54 62 57.5 56 57.5Q50 55.5 44 57.5C38 57.5 34 54 31.5 46Z" fill="${H}"/>`;
-      face += `<path d="M44.6 55.2Q50 ${fem ? 59.2 : 58.4} 55.4 55.2" stroke="${fem ? "#b0485a" : "#8a3f3a"}" stroke-width="${fem ? 1.9 : 1.5}" fill="none" stroke-linecap="round"/>`;
+      const by = 36.4 - (Z.brauen - 1) * 7;
+      face += `<path d="M38 ${f(by + 0.2)}Q42 ${f(by - 1.8)} 46 ${f(by - 0.2)}M54 ${f(by - 0.2)}Q58 ${f(by - 1.8)} 62 ${f(by + 0.2)}" stroke="${H}" stroke-width="${fem ? 1.2 : 1.7}" fill="none" stroke-linecap="round"/>`;
+      const ny = 50.4 + (Z.nasenlaenge - 1) * 6 + (Z.laenge - 1) * 4;
+      const nw = 2.6 * Z.nase;
+      face += `<path d="M50.2 44Q48.6 ${f(ny - 3)} 49.6 ${f(ny - 0.6)}M${f(50 - nw)} ${f(ny - 0.8)}Q${f(50 - nw * 0.6)} ${f(ny + 0.8)} 50 ${f(ny)}Q${f(50 + nw * 0.6)} ${f(ny + 0.8)} ${f(50 + nw)} ${f(ny - 0.8)}" stroke="${shade(skin, -0.28)}" stroke-width="1.1" fill="none" stroke-linecap="round"/>`;
+      if (L.bart) face += `<path d="M31.5 46C32 ${f(chinY - 3.5)} 40 ${f(chinY + 2)} 50 ${f(chinY + 2)}C60 ${f(chinY + 2)} 68 ${f(chinY - 3.5)} 68.5 46C66 54 62 ${f(chinY - 8)} 56 ${f(chinY - 8)}Q50 ${f(chinY - 10)} 44 ${f(chinY - 8)}C38 ${f(chinY - 8)} 34 54 31.5 46Z" fill="${H}"/>`;
+      const my = 55.4 + (Z.laenge - 1) * 9;
+      const mw = 5.4 * Z.mund;
+      const lip = fem ? "#b0485a" : shade(skin, -0.3);
+      const lt = (fem ? 1.3 : 0.9) * Z.lippen;
+      face += `<path d="M${f(50 - mw)} ${f(my)}Q50 ${f(my + 3.2 * lt)} ${f(50 + mw)} ${f(my)}Q50 ${f(my + 1.2)} ${f(50 - mw)} ${f(my)}Z" fill="${lip}" opacity="0.85"/>`;
+      face += `<path d="M${f(50 - mw)} ${f(my)}Q${f(50 - mw * 0.5)} ${f(my - 1.4 * lt)} 50 ${f(my - 0.6 * lt)}Q${f(50 + mw * 0.5)} ${f(my - 1.4 * lt)} ${f(50 + mw)} ${f(my)}Q50 ${f(my + 1.3)} ${f(50 - mw)} ${f(my)}Z" fill="${lip}"/>`;
+      face += `<path d="M${f(50 - mw)} ${f(my)}Q50 ${f(my + 1.6)} ${f(50 + mw)} ${f(my)}" stroke="${shade(lip, -0.45)}" stroke-width="0.7" fill="none" stroke-linecap="round"/>`;
     }
     let extra = "";
     if (L.brille || L.sonnenbrille) {
@@ -193,7 +217,7 @@ const Figur = (() => {
     }
     return `${back}
       <ellipse cx="${50 - rx}" cy="45" rx="3.2" ry="5" fill="${skin}"/><ellipse cx="${50 + rx}" cy="45" rx="3.2" ry="5" fill="${skin}"/>
-      <path d="M${50 - rx} 40C${50 - rx} 26 ${50 - rx * 0.55} 19 50 19C${50 + rx * 0.55} 19 ${50 + rx} 26 ${50 + rx} 40C${50 + rx} 54 ${50 + rx * (fem ? 0.5 : 0.62)} 65.5 50 65.5C${50 - rx * (fem ? 0.5 : 0.62)} 65.5 ${50 - rx} 54 ${50 - rx} 40Z" fill="${skin}"/>
+      <path d="M${50 - rx} 40C${50 - rx} 26 ${50 - rx * 0.55} 19 50 19C${50 + rx * 0.55} 19 ${50 + rx} 26 ${50 + rx} 40C${50 + rx} 54 ${(50 + rx * jaw).toFixed(2)} ${chinY.toFixed(2)} 50 ${chinY.toFixed(2)}C${(50 - rx * jaw).toFixed(2)} ${chinY.toFixed(2)} ${50 - rx} 54 ${50 - rx} 40Z" fill="${skin}"/>
       ${face}${front}${extra}`;
   }
 
@@ -273,6 +297,12 @@ const Figur = (() => {
   function wire() {
     if (!mine) return null;
     const { foto, formFoto, ...rest } = mine;
+    if (rest.stil === "gezeichnet") {
+      // gezeichnet: es reichen die gemessenen Gesichtszüge, Fotos bleiben auf dem Handy
+      delete rest.fotoKlein;
+      delete rest.form;
+      delete rest.formFotoKlein;
+    }
     return rest; // mit den kleinen Fotos, die großen bleiben auf dem Handy
   }
 
@@ -367,8 +397,12 @@ const Figur = (() => {
     const has = !!draft.foto;
     return `
       <div class="fg-face">
-        ${draft.form ? `<div class="fg-3d" aria-label="${esc(t("Dein Gesicht in 3D"))}"><canvas></canvas><span class="fg-3d-hint">${esc(t("3D · zum Drehen wischen"))}</span></div>` : `<div class="fg-face-pic">${has ? `<img src="${draft.foto}" alt="">` : `<span>🙂</span>`}</div>`}
-        <p>${esc(t(draft.form ? "Aus deinem Foto ist ein grobes 3D-Gesicht geworden: Nase, Augen, Mund, Wangen und Kinn haben deine Form. In Hodenritter sitzt es auf dem Kopf deiner Figur, Haare und Kleidung stellst du weiter selbst ein." : has ? "Dein Gesicht ist drauf, aber nur flach als Foto (es wurde kein Gesicht erkannt). Versuch es nochmal gerade von vorne mit gutem Licht." : "Mach ein Selfie: Daraus wird ein grobes 3D-Gesicht für deine Figur, in Hodenritter sitzt es auf dem Kopf, und als Bild steht es bei deinem Namen."))}</p>
+        ${draft.form ? `<div class="fg-choice fg-stil" role="group" aria-label="${esc(t("Wie soll dein Gesicht aussehen?"))}">
+          <button class="${draft.stil !== "gezeichnet" ? "picked" : ""}" data-set="stil" data-val='"3d"' aria-pressed="${draft.stil !== "gezeichnet"}">📸 ${esc(t("Echt in 3D"))}</button>
+          <button class="${draft.stil === "gezeichnet" ? "picked" : ""}" data-set="stil" data-val='"gezeichnet"' aria-pressed="${draft.stil === "gezeichnet"}">✏️ ${esc(t("Gezeichnet"))}</button>
+        </div>` : ""}
+        ${draft.form && draft.stil !== "gezeichnet" ? `<div class="fg-3d" aria-label="${esc(t("Dein Gesicht in 3D"))}"><canvas></canvas><span class="fg-3d-hint">${esc(t("3D · zum Drehen wischen"))}</span></div>` : draft.form ? `<div class="fg-face-pic fg-drawn">${bust({ ...draft, kappe: false })}</div>` : `<div class="fg-face-pic">${has ? `<img src="${draft.foto}" alt="">` : `<span>🙂</span>`}</div>`}
+        <p>${esc(t(draft.form && draft.stil === "gezeichnet" ? "Gezeichnet: Aus deinem Foto wurden Gesichtsform, Augen, Nase, Mund, Lippen, Haut-, Haar- und Augenfarbe gemessen und im Stil der App gezeichnet. So siehst du auch in Hodenritter aus." : draft.form ? "Echt in 3D: Aus deinem Foto ist ein 3D-Gesicht geworden, Nase, Augen, Mund, Wangen und Kinn haben deine Form. In Hodenritter sitzt es auf dem Kopf deiner Figur." : has ? "Dein Gesicht ist drauf, aber nur flach als Foto (es wurde kein Gesicht erkannt). Versuch es nochmal gerade von vorne mit gutem Licht." : "Mach ein Selfie: Du kannst danach wählen, ob dein echtes Gesicht in 3D auf die Figur kommt oder ob es gezeichnet wird."))}</p>
         <button class="btn" data-do="scan">📷 ${esc(t(has ? "Neu scannen" : "Gesicht scannen"))}</button>
         <label class="btn ghost fg-file">🖼️ ${esc(t("Foto aus der Galerie"))}<input type="file" accept="image/*" data-do="file" hidden></label>
         ${has ? `<button class="btn ghost" data-do="nofoto">${esc(t("Foto entfernen"))}</button>` : ""}
@@ -603,13 +637,37 @@ const Figur = (() => {
   function setPhoto(big, small, skin, form) {
     draft.foto = big;
     draft.fotoKlein = small;
-    for (const k of ["form", "formFoto", "formFotoKlein"]) delete draft[k];
-    if (form) Object.assign(draft, form);
+    for (const k of ["form", "formFoto", "formFotoKlein", "zug"]) delete draft[k];
+    if (form) {
+      const { farben, ...rest } = form;
+      Object.assign(draft, rest);
+      draft.stil ??= "3d";
+      // Haar- und Augenfarbe aus dem Foto: die nächste Farbe aus der Auswahl
+      if (farben?.haare) draft.haare = nearest(farben.haare, HAIRS.slice(0, 10));
+      if (farben?.augen) draft.augen = nearest(farben.augen, IRIS);
+    }
     if (skin) draft.haut = skin;
     draft.bart = false;
+    if (form) draft.brille = draft.sonnenbrille = false; // eine echte Brille ist schon im Foto
     tab = "gesicht";
     render();
     showScreen("figur");
+  }
+
+  function nearest(hex, list) {
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const a = rgb(hex);
+    let best = list[0];
+    let bd = Infinity;
+    for (const c of list) {
+      const b = rgb(c);
+      const d = (a[0] - b[0]) ** 2 * 0.3 + (a[1] - b[1]) ** 2 * 0.59 + (a[2] - b[2]) ** 2 * 0.11;
+      if (d < bd) {
+        bd = d;
+        best = c;
+      }
+    }
+    return best;
   }
 
   // --- Gesicht scannen: Kamera (Selfie) oder Foto, dann zurechtschieben ---

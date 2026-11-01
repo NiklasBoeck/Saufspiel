@@ -24,6 +24,12 @@ document.documentElement.lang = LANG;
 const STRINGS = {
   en: {
     // Eigener Charakter (figur.js)
+    "Wie soll dein Gesicht aussehen?": "How should your face look?",
+    "Echt in 3D": "Real in 3D",
+    "Gezeichnet": "Drawn",
+    "Gezeichnet: Aus deinem Foto wurden Gesichtsform, Augen, Nase, Mund, Lippen, Haut-, Haar- und Augenfarbe gemessen und im Stil der App gezeichnet. So siehst du auch in Hodenritter aus.": "Drawn: face shape, eyes, nose, mouth, lips, skin, hair and eye colour were measured from your photo and drawn in the app's style. That's how you look in Hodenritter too.",
+    "Echt in 3D: Aus deinem Foto ist ein 3D-Gesicht geworden, Nase, Augen, Mund, Wangen und Kinn haben deine Form. In Hodenritter sitzt es auf dem Kopf deiner Figur.": "Real in 3D: your photo became a 3D face; nose, eyes, mouth, cheeks and chin have your shape. In Hodenritter it sits on your character's head.",
+    "Mach ein Selfie: Du kannst danach wählen, ob dein echtes Gesicht in 3D auf die Figur kommt oder ob es gezeichnet wird.": "Take a selfie: afterwards you can choose whether your real face goes onto the character in 3D or gets drawn.",
     "Dein Gesicht in 3D": "Your face in 3D",
     "3D · zum Drehen wischen": "3D · swipe to turn",
     "Aus deinem Foto ist ein grobes 3D-Gesicht geworden: Nase, Augen, Mund, Wangen und Kinn haben deine Form. In Hodenritter sitzt es auf dem Kopf deiner Figur, Haare und Kleidung stellst du weiter selbst ein.": "Your photo became a rough 3D face: nose, eyes, mouth, cheeks and chin have your shape. In Hodenritter it sits on your character's head; you still choose hair and clothes yourself.",

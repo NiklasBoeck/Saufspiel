@@ -188,3 +188,7 @@ html.neu.garten .figur-btn .fav, html.neu.wiesn .figur-btn .fav { width: 36px; h
 .fg-busy .hint { color: #bbb; font-size: 0.85rem; }
 .fg-spin { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgb(255 255 255 / 0.2); border-top-color: var(--primary); animation: fg-spin 0.9s linear infinite; }
 @keyframes fg-spin { to { transform: rotate(360deg); } }
+.fg-stil { justify-content: center; }
+.fg-stil button { flex: 1; max-width: 180px; padding: 10px 12px; }
+.fg-face-pic.fg-drawn { width: 180px; height: 180px; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--primary) 26%, var(--surface)), var(--surface) 70%); }
+.fg-face-pic.fg-drawn .figur-svg { width: 100%; height: 100%; }

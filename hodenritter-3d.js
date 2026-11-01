@@ -1063,7 +1063,8 @@ window.Hodenritter3D = (() => {
     for (const k in keys) if (P[k] !== undefined) L[keys[k]] = P[k];
     if (P.shirt2 !== undefined && P.streifen === undefined) L.stripes = true;
     if (P.kopf) Object.assign(L, { cap: false, glasses: false, shades: false, beard: false }); // das steckt alles schon im echten Kopf
-    else if (P.form && window.Gesicht3D) Object.assign(L, { face3d: P.form, face3dTex: P.formFoto || P.formFotoKlein, beard: false }); // grobes 3D-Gesicht
+    else if (P.zug && P.stil === "gezeichnet") L.zug = P.zug; // gezeichnet: gemessene Züge auf dem gebauten Kopf
+    else if (P.form && window.Gesicht3D) Object.assign(L, { face3d: P.form, face3dTex: P.formFoto || P.formFotoKlein, zug: P.zug, beard: false }); // grobes 3D-Gesicht
     else if (P.foto || P.fotoKlein) Object.assign(L, { photo: P.foto || P.fotoKlein, beard: false }); // eingescanntes Gesicht, flach
     return L;
   }
@@ -1171,13 +1172,22 @@ window.Hodenritter3D = (() => {
     return t * t * (3 - 2 * t);
   };
   // Punkt auf dem Kopf für eine Richtung (ux, uy, uz); lip = wie sehr der Punkt zur Lippe gehört
-  function headPoint(ux, uy, uz, female) {
+  // F: Gesichtszüge aus dem Scan (figur-3d.js, 1 = normal): laenge, kiefer, nase, nasenlaenge, mund, lippen, augen …
+  const NF = {};
+  function headPoint(ux, uy, uz, female, F = NF) {
+    const fl = F.laenge ?? 1;
+    const fk = F.kiefer ?? 1;
+    const fn = F.nase ?? 1;
+    const fm = F.mund ?? 1;
+    const fli = F.lippen ?? 1;
     let x = ux * (female ? 0.078 : 0.081);
     let y = uy * 0.112;
     let z = uz * 0.098;
     const low = smooth(0.1, -1, uy); // 0 oben, 1 am Kinn
-    // Kiefer und Kinn: unten schmaler, hinten unten zum Nacken eingezogen
-    x *= 1 - (female ? 0.34 : 0.24) * low * low;
+    // langes oder kurzes Gesicht: die untere Hälfte wird gestreckt
+    y *= 1 + (fl - 1) * 1.3 * smooth(0.15, -0.7, uy);
+    // Kiefer und Kinn: unten schmaler, hinten unten zum Nacken eingezogen (breiter Kiefer: weniger)
+    x *= 1 - Math.max(0, (female ? 0.34 : 0.24) * (1 - (fk - 1) * 2.2)) * low * low;
     if (uz < 0) z *= 1 - 0.28 * low;
     // Hinterkopf etwas voller
     if (uz < 0 && uy > -0.2) z *= 1.04;
@@ -1188,14 +1198,15 @@ window.Hodenritter3D = (() => {
     let dz = 0;
     dz += 0.005 * gs(uy - 0.3, 0.07) * gs(ux, 0.45); // Stirnwulst über den Augen
     dz -= 0.0075 * gs(ax - 0.37, 0.12) * gs(uy - 0.12, 0.09); // Augenhöhlen
-    dz += 0.011 * gs(ux, 0.075) * smooth(0.22, 0.05, uy) * smooth(-0.32, -0.12, uy); // Nasenrücken
-    dz += 0.012 * gs(ux, 0.1) * gs(uy + 0.2, 0.075); // Nasenspitze
-    dz += 0.005 * gs(ax - 0.13, 0.055) * gs(uy + 0.25, 0.05); // Nasenflügel
+    const nl = (F.nasenlaenge ?? 1) - 1;
+    dz += 0.011 * fn ** 0.5 * gs(ux, 0.075 * fn) * smooth(0.22, 0.05, uy) * smooth(-0.32 - nl * 0.4, -0.12 - nl * 0.4, uy); // Nasenrücken
+    dz += 0.012 * fn ** 0.5 * gs(ux, 0.1 * fn) * gs(uy + 0.2 + nl * 0.4, 0.075); // Nasenspitze
+    dz += 0.005 * gs(ax - 0.13 * fn, 0.055 * fn) * gs(uy + 0.25 + nl * 0.4, 0.05); // Nasenflügel
     dz += 0.006 * gs(ax - 0.52, 0.17) * gs(uy + 0.04, 0.13); // Wangenknochen
-    const upper = gs(ux, female ? 0.2 : 0.22) * gs(uy + 0.43, 0.035);
-    const lower = gs(ux, female ? 0.17 : 0.19) * gs(uy + 0.53, 0.04);
-    dz += (female ? 0.0065 : 0.005) * upper + (female ? 0.0075 : 0.006) * lower;
-    dz -= 0.0035 * gs(ux, 0.24) * gs(uy + 0.475, 0.013); // Mundspalte
+    const upper = gs(ux, (female ? 0.2 : 0.22) * fm) * gs(uy + 0.43, 0.035 * fli);
+    const lower = gs(ux, (female ? 0.17 : 0.19) * fm) * gs(uy + 0.53, 0.04 * fli);
+    dz += ((female ? 0.0065 : 0.005) * upper + (female ? 0.0075 : 0.006) * lower) * fli;
+    dz -= 0.0035 * gs(ux, 0.24 * fm) * gs(uy + 0.475, 0.013); // Mundspalte
     dz += 0.008 * gs(ux, female ? 0.24 : 0.32) * gs(uy + 0.8, 0.11); // Kinn
     z += dz * front;
     const lip = Math.min(1, (upper + lower) * 1.3) * front;
@@ -1203,15 +1214,16 @@ window.Hodenritter3D = (() => {
   }
 
   const headGeos = new Map();
-  function headGeo(female) {
-    if (headGeos.has(female)) return headGeos.get(female);
+  function headGeo(female, F = NF) {
+    const key = `${female}|${JSON.stringify(F)}`;
+    if (headGeos.has(key)) return headGeos.get(key);
     const geo = new THREE.SphereGeometry(1, 72, 56);
     const p = geo.attributes.position;
     const col = new Float32Array(p.count * 3);
     const v = new THREE.Vector3();
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i);
-      const q = headPoint(v.x, v.y, v.z, female);
+      const q = headPoint(v.x, v.y, v.z, female, F);
       p.setXYZ(i, q.x, q.y, q.z);
       // Lippen dunkler und röter (Farbe wird mit der Hautfarbe multipliziert)
       col[i * 3] = 1 - q.lip * 0.12;
@@ -1220,7 +1232,7 @@ window.Hodenritter3D = (() => {
     }
     geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
     geo.computeVertexNormals();
-    headGeos.set(female, geo);
+    headGeos.set(key, geo);
     return geo;
   }
 
@@ -1250,15 +1262,16 @@ window.Hodenritter3D = (() => {
   }
 
   // Wo die Hautoberfläche vorne bei (ux, uy) ist
-  function faceAt(ux, uy, female) {
+  function faceAt(ux, uy, female, F) {
     const uz = Math.sqrt(Math.max(0, 1 - ux * ux - uy * uy));
-    return headPoint(ux, uy, uz, female);
+    return headPoint(ux, uy, uz, female, F);
   }
 
   function buildFace(head, L, M) {
     const female = !!L.female;
     const skinV = rim(new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.58, vertexColors: true, emissive: new THREE.Color(L.skin).multiplyScalar(0.1) }));
-    head.add(mesh(headGeo(female), skinV, 0, 0, 0));
+    const F = L.zug || NF;
+    head.add(mesh(headGeo(female, F), skinV, 0, 0, 0));
     if (L.face3d) head.add(scannedFace(L, female));
     else if (L.photo) head.add(photoFace(L.photo, female));
     // Augen: Augapfel in der Höhle, Iris und Pupille, Ober- und Unterlid
@@ -1269,8 +1282,9 @@ window.Hodenritter3D = (() => {
         continue;
       }
       const ex = s * 0.4;
-      const e = faceAt(ex, 0.12, female);
+      const e = faceAt(ex, 0.12, female, F);
       const ez = e.z - 0.0085;
+      const before = head.children.length;
       addTo(head, mesh(sphere(0.0118, 18, 14), M.eyeM, e.x, e.y, ez, false));
       addTo(head, mesh(sphere(0.0058, 16, 12), M.irisM, e.x, e.y, ez + 0.0094, false)).scale.set(1, 1, 0.42);
       addTo(head, mesh(sphere(0.0027, 10, 8), M.pupilM, e.x, e.y, ez + 0.0113, false)).scale.set(1, 1, 0.35);
@@ -1279,8 +1293,12 @@ window.Hodenritter3D = (() => {
       head.add(top);
       const bot = mesh(new THREE.SphereGeometry(0.0125, 18, 6, 0, TAU, Math.PI * 0.74, Math.PI * 0.26), lidM, e.x, e.y, ez, false);
       head.add(bot);
+      // gemessene Augengröße und wie weit offen (Scan, gezeichnet)
+      const ea = F.augen ?? 1;
+      const eo = (F.offen ?? 1) ** 0.6;
+      if (ea !== 1 || eo !== 1) for (const m of head.children.slice(before)) m.scale.multiply(new THREE.Vector3(ea, ea * eo, ea));
       // Augenbraue: flacher, leicht gebogener Strich über dem Stirnwulst
-      const b = faceAt(s * 0.4, 0.3, female);
+      const b = faceAt(s * 0.4, 0.3 + ((F.brauen ?? 1) - 1) * 0.5, female, F);
       const brow = mesh(new THREE.TorusGeometry(0.03, female ? 0.0016 : 0.0024, 6, 16, 0.9), M.hairM, b.x - s * 0.002, b.y - 0.026, b.z - 0.006, false);
       brow.rotation.set(-0.15, s * 0.32, Math.PI / 2 - 0.45);
       brow.scale.set(1, 1, 0.6);
@@ -1302,7 +1320,8 @@ window.Hodenritter3D = (() => {
   const face3dGeos = new Map();
   const face3dMats = new Map();
   function scannedFace(L, female) {
-    const key = `${L.face3d.slice(0, 64)}|${L.face3d.length}|${female}`;
+    const F = L.zug || NF;
+    const key = `${L.face3d.slice(0, 64)}|${L.face3d.slice(-64)}|${female}|${JSON.stringify(F)}`;
     if (!face3dGeos.has(key)) {
       const { pos } = Gesicht3D.parse(L.face3d);
       const at = (i) => [pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]];
@@ -1312,8 +1331,9 @@ window.Hodenritter3D = (() => {
       const width = Math.abs(at(PT.cheekL)[0] - at(PT.cheekR)[0]) || 14;
       const k = (2 * (female ? 0.078 : 0.081) * 0.84) / width; // Meter pro cm
       const nose = at(PT.noseTip);
-      const eyeH = faceAt(0.4, 0.12, female).y;
-      const noseZ = faceAt(0, -0.2, female).z + 0.004;
+      const eyeH = faceAt(0.4, 0.12, female, F).y;
+      const noseZ = faceAt(0, -0.2, female, F).z + 0.004;
+      const ring = Gesicht3D.rings();
       const cx = (at(PT.cheekL)[0] + at(PT.cheekR)[0]) / 2;
       const rx = female ? 0.078 : 0.081;
       const geo = Gesicht3D.geometry(THREE, L.face3d, (i, x, y, z) => {
@@ -1323,11 +1343,14 @@ window.Hodenritter3D = (() => {
         // Nicht in den Kopf: mindestens knapp über der Kopfoberfläche in derselben Richtung
         const d = [px / rx, (py - HEAD_Y) / 0.112, pz / 0.098];
         const n = Math.hypot(...d) || 1;
-        const q = headPoint(d[0] / n, d[1] / n, d[2] / n, female);
-        const rHead = Math.hypot(q.x, q.y - HEAD_Y, q.z) * 1.012;
+        const q = headPoint(d[0] / n, d[1] / n, d[2] / n, female, F);
+        const rHead = Math.hypot(q.x, q.y - HEAD_Y, q.z) * 1.006;
         const r = Math.hypot(px, py - HEAD_Y, pz);
-        if (r < rHead) {
-          const s = rHead / r;
+        // Am Rand weich auf die Kopfhaut legen, damit keine Kante bleibt
+        const w = [0, 0.3, 0.6, 0.85][ring[i]] ?? 1;
+        const want = rHead + Math.max(0, r - rHead) * w;
+        if (Math.abs(want - r) > 1e-6) {
+          const s = want / r;
           px *= s;
           py = HEAD_Y + (py - HEAD_Y) * s;
           pz *= s;
