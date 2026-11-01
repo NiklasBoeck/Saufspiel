@@ -25,7 +25,8 @@ html.neu .sb-classic,
 html.neu .menu-logo,
 html.neu .bg-blobs { display: none !important; }
 
-/* Gezeichnete Icons: Farbfläche versetzt, darüber Tusche */
+/* Gezeichnete Icons: Farbfläche versetzt, darüber Tusche (runder Hintergrund nur im Biergarten) */
+.drawn-bg { display: none; }
 .drawn { display: block; width: 100%; height: 100%; overflow: visible; }
 .drawn-b { fill: var(--paper, #efe3c8); stroke: var(--ink, #211910); stroke-width: 2.1; stroke-linejoin: round; }
 .drawn-f > * { fill: var(--spot); stroke: none; }
@@ -316,3 +317,165 @@ html.neu .info-page h2 { font-weight: 800; font-stretch: 85%; letter-spacing: -0
 /* --- Flunky Ball (eigene Seite) --------------------------------------- */
 html.neu body:has(.fb-screen) { background: var(--bg); }
 html.neu .fb-screen h1 { font-family: var(--display); font-weight: 800; font-stretch: 80%; letter-spacing: -0.03em; }
+
+/* ==========================================================================
+   Design „Biergarten“: <html class="neu garten">
+   Baut auf „Neu“ auf und ändert Farben, Schrift und Menü:
+   Flaschengrün, Brezel-Orange, rot-weiß karierte Tischdecke, Serifenschrift (Fraunces),
+   runde Sticker statt Bierdeckel, Spiele als Kacheln in zwei Spalten.
+   ========================================================================== */
+
+@font-face {
+  font-family: "Fraunces";
+  src: url("vendor/fonts/fraunces.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+html.neu.garten {
+  --bg: #0f2620;
+  --surface: #17382e;
+  --surface-2: #1e4538;
+  --text: #fbf3e2;
+  --muted: #a8c2b4;
+  --primary: #f6a04d;
+  --primary-dark: #b0682a;
+  --red: #d9483b;
+  --paper: #fbf3e2;
+  --ink: #1d1a14;
+  --line: rgb(251 243 226 / 0.1);
+  --line-strong: rgb(251 243 226 / 0.25);
+  --radius: 999px;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+}
+html.neu.garten body::before { opacity: 0.05; }
+html.neu.garten body::after { background: radial-gradient(closest-side, rgb(246 160 77 / 0.1), transparent); }
+
+/* Serifen weich und rund */
+html.neu.garten :is(h1, h2, h3, .game-title, .game-name, .btn, .bf-title, .card-text, .room-code b, .da-count) {
+  font-variation-settings: "SOFT" 100, "WONK" 0;
+  font-stretch: normal;
+}
+
+/* Kopf: Stück karierte Tischdecke, Name groß in der Mitte */
+html.neu.garten .menu-head,
+html.fit.neu.garten .menu-head {
+  position: relative;
+  text-align: center;
+  padding: 76px 0 6px;
+}
+html.neu.garten .menu-head::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  right: -16px;
+  top: 0;
+  height: clamp(20px, 3.5dvh, 28px);
+  background:
+    repeating-linear-gradient(90deg, rgb(217 72 59 / 0.75) 0 12px, transparent 12px 24px),
+    repeating-linear-gradient(0deg, rgb(217 72 59 / 0.75) 0 12px, transparent 12px 24px),
+    #f3e7cf;
+  -webkit-mask: linear-gradient(#000 70%, transparent);
+  mask: linear-gradient(#000 70%, transparent);
+  opacity: 0.9;
+}
+html.neu.garten .menu-head h1,
+html.fit.neu.garten .menu-head h1 {
+  text-align: center;
+  font-size: clamp(3rem, 14vw, 4.4rem);
+  font-weight: 900;
+  font-style: normal;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+}
+html.neu.garten .menu-head h1::after { content: ""; }
+html.neu.garten .menu-head .hint,
+html.fit.neu.garten .menu-head .hint {
+  margin: 6px auto 0;
+  text-align: center;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.05rem;
+  color: var(--primary);
+}
+html.neu.garten .settings-btn,
+html.fit.neu.garten .settings-btn {
+  top: 26px;
+  right: -4px;
+  padding: 3px;
+  background: var(--bg);
+  font-size: 0;
+  gap: 0;
+}
+html.neu.garten .sb-neu .ic { width: 36px; height: 36px; padding: 0; background: none; }
+
+/* Spiele als Kacheln, zwei Spalten (breiter: mehr) */
+html.neu.garten .game-list,
+html.fit.neu.garten .game-list {
+  grid-template-columns: repeat(auto-fill, minmax(min(46%, 200px), 1fr));
+  gap: 12px;
+  border: none;
+}
+html.neu.garten .game-tile,
+html.fit.neu.garten .game-tile {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+}
+html.neu.garten .game-tile:active { background: var(--surface-2); border-color: var(--primary); }
+html.neu.garten .game-arrow { display: none; }
+html.neu.garten .game-name,
+html.fit.neu.garten .game-name { font-size: 1.12rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+html.neu.garten .game-desc,
+html.fit.neu.garten .game-desc { font-size: 0.8rem; -webkit-line-clamp: 3; }
+
+/* Runde Sticker: Farbe als Kreis, weißer Rand, Zeichnung drauf */
+html.neu.garten :is(.game-icon, .mode-icon) {
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+  filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.25));
+}
+html.neu.garten .game-icon { width: 58px; height: 58px; }
+html.neu.garten .drawn-bg { display: inline; fill: var(--spot); stroke: var(--paper); stroke-width: 2.6; }
+html.neu.garten .drawn-c { transform: translate(5.3px, 5.3px) scale(0.78); }
+html.neu.garten .drawn-f > * { fill: rgb(251 243 226 / 0.85); }
+html.neu.garten .drawn-b { fill: rgb(251 243 226 / 0.85); }
+html.neu.garten .sb-neu .drawn-bg { stroke: none; }
+
+/* Knöpfe rund wie Bierdeckel-Ränder, Text dunkel auf Orange */
+html.neu.garten .btn { border-radius: 999px; font-weight: 700; }
+html.neu.garten .btn.small { padding: 10px 20px; }
+html.neu.garten .mode-tile { border-radius: 26px; }
+html.neu.garten :is(#player-input, .field input, .join-row input) { border-radius: 999px; padding-left: 20px; }
+html.neu.garten .card { border-radius: 26px; }
+html.neu.garten .rules-box { border-radius: 26px; }
+
+/* Trink-Meldung: karierte Tischdecke als Rand */
+html.neu.garten .da-box {
+  background: var(--primary);
+  border: 10px solid transparent;
+  background:
+    linear-gradient(var(--primary), var(--primary)) padding-box,
+    repeating-linear-gradient(90deg, rgb(217 72 59 / 0.85) 0 10px, transparent 10px 20px) border-box,
+    repeating-linear-gradient(0deg, rgb(217 72 59 / 0.85) 0 10px, transparent 10px 20px) border-box,
+    #f3e7cf border-box;
+  box-shadow: 0 30px 70px rgb(0 0 0 / 0.55);
+}
+html.neu.garten .da-box h2 { font-stretch: normal; font-weight: 900; font-style: italic; }
+html.neu.garten .toast { background: #12302a; border-radius: 999px; }
+html.neu.garten .pd-zone.mine { background: linear-gradient(160deg, #24503f, var(--surface)); }
+
+@media (min-aspect-ratio: 6 / 5) {
+  html.fit.neu.garten .menu-head { padding-top: 34px; }
+  html.fit.neu.garten .menu-head h1 { font-size: clamp(2rem, 10dvh, 3.2rem); }
+  html.fit.neu.garten .settings-btn { top: 26px; }
+  html.neu.garten .game-list,
+  html.fit.neu.garten .game-list { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  html.neu.garten .game-icon { width: 48px; height: 48px; }
+}

@@ -8,7 +8,7 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="design.css">
-  <script>try { if (JSON.parse(localStorage.getItem("saufspiel-settings"))?.design === "klassisch") document.documentElement.classList.remove("neu"); } catch {}</script>
+  <script>try { const d = JSON.parse(localStorage.getItem("saufspiel-settings"))?.design; if (d === "klassisch") document.documentElement.classList.remove("neu"); if (d === "garten") document.documentElement.classList.add("garten"); } catch {}</script>
 </head>
 <body>
   <!-- Impressum und Datenschutz: Alles in [eckigen Klammern] muss noch ausgefüllt werden. -->

@@ -151,6 +151,12 @@ const DRAWN_ICONS = (() => {
       f: `<path d="M10 38l3-9 19-19 6 6-19 19z"/>`,
       i: `<path d="M10 38l3-9 19-19 6 6-19 19z"/><path d="M13 29l6 6M28 14l6 6"/><path d="M8 43h14"/>`,
     },
+    // Biergarten-Design: Brezel
+    garten: {
+      f: `<path d="M24 41c-9 0-16-5-16-13 0-7 5-12 10.5-12 3.5 0 5.5 2.5 5.5 6 0-3.5 2-6 5.5-6C35 16 40 21 40 28c0 8-7 13-16 13z"/>`,
+      i: `<path d="M24 41c-9 0-16-5-16-13 0-7 5-12 10.5-12 3.5 0 5.5 2.5 5.5 6 0-3.5 2-6 5.5-6C35 16 40 21 40 28c0 8-7 13-16 13z"/>
+          <path d="M15 38l13-14M33 38L20 24"/><path d="M16 28.5v.4M32 28.5v.4M24 34.5v.4M20 20v.4M28 20v.4"/>`,
+    },
     klassisch: {
       f: `<rect x="9" y="9" width="30" height="30" rx="9"/>`,
       i: `<rect x="9" y="9" width="30" height="30" rx="9"/><circle cx="19" cy="21" r="1.6"/><circle cx="29" cy="21" r="1.6"/><path d="M18 28c3.5 3 8.5 3 12 0"/>`,
@@ -166,7 +172,7 @@ const DRAWN_ICONS = (() => {
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",
-    neu: "#e9b949", klassisch: "#8f6fd8",
+    neu: "#e9b949", garten: "#c9814a", klassisch: "#8f6fd8",
   };
 
   return { I, SPOT };
@@ -177,9 +183,10 @@ function drawnIcon(name, spot) {
   if (!ic) return "";
   const color = spot ?? DRAWN_ICONS.SPOT[name] ?? "#e9b949";
   return `<svg class="drawn" viewBox="0 0 48 48" aria-hidden="true" style="--spot:${color}">
+    <circle class="drawn-bg" cx="24" cy="24" r="24"/><g class="drawn-c">
     ${ic.b ? `<g class="drawn-b">${ic.b}</g>` : ""}
     <g class="drawn-f" transform="translate(1.6 1.4)">${ic.f}</g>
-    <g class="drawn-i">${ic.i}</g></svg>`;
+    <g class="drawn-i">${ic.i}</g></g></svg>`;
 }
 
 function hasDrawnIcon(name) {

@@ -8,6 +8,9 @@
     if (design === "klassisch") {
       document.documentElement.classList.remove("neu");
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#1b1033");
+    } else if (design === "garten") {
+      document.documentElement.classList.add("garten");
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#0f2620");
     }
   } catch {
     // ohne Speicher bleibt es beim neuen Design

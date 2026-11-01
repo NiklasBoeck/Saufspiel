@@ -52,11 +52,15 @@ const BOT_LEVELS = {
 // boot.js liest das schon vor dem ersten Bild aus und setzt <html class="neu">.
 const DESIGNS = {
   neu: { label: "Neu", emoji: "✏️", desc: "Warme Kneipenfarben, gezeichnete Icons.", swatch: ["#17130f", "#efe3c8", "#f0b429"] },
+  garten: { label: "Biergarten", emoji: "🥨", desc: "Flaschengrün, Brezel-Orange, runde Sticker und Kacheln.", swatch: ["#0f2620", "#f6a04d", "#d9483b"] },
   klassisch: { label: "Klassisch", emoji: "🟣", desc: "Das alte Lila mit Emojis.", swatch: ["#1b1033", "#7c3aed", "#f59e0b"] },
 };
+// „Biergarten“ baut auf „Neu“ auf: <html class="neu garten">
+const DESIGN_BG = { neu: "#17130f", garten: "#0f2620", klassisch: "#1b1033" };
 function applyDesign(d) {
   document.documentElement.classList.toggle("neu", d !== "klassisch");
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", d === "klassisch" ? "#1b1033" : "#17130f");
+  document.documentElement.classList.toggle("garten", d === "garten");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", DESIGN_BG[d] ?? DESIGN_BG.neu);
 }
 const SETTINGS_KEY = "saufspiel-settings";
 
