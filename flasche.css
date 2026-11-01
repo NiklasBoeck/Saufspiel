@@ -39,11 +39,20 @@ html[data-game="flasche"] #screen-game:has(.fl-view) .game-bar .btn { min-width:
 html[data-game="flasche"] #screen-game:has(.fl-view) .game-title { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.8); }
 html[data-game="flasche"] #screen-game:has(.fl-view) .conn { position: fixed; z-index: 3; bottom: calc(2px + env(safe-area-inset-bottom)); left: 0; right: 0; margin: 0; font-size: 0.7rem; pointer-events: none; color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / 0.8); }
 
-/* Quer: Tisch links (die Kamera schiebt ihn hin), Text, Aufgabe und Knöpfe rechts */
+/* Quer: Tisch groß in der Mitte, oben Runde und Ansage, unten in einer Zeile Aufgabe/Hinweis und Knöpfe */
 @media (min-aspect-ratio: 6 / 5) {
-  html[data-game="flasche"] .bf:has(.fl-view) { display: flex; padding-left: 62vw; justify-content: center; }
-  html.fit[data-game="flasche"] .bf:has(.fl-view) > * { grid-column: auto; }
-  html[data-game="flasche"] .bf:has(.fl-view)::before { inset: 0 0 0 auto; width: 42vw; height: auto; background: linear-gradient(90deg, transparent, rgb(15 10 8 / 0.6) 30%); }
-  html[data-game="flasche"] .bf:has(.fl-view) > .bf-body { flex: none; justify-content: center; }
-  html[data-game="flasche"] .fl-card { padding: 10px 14px 12px; }
+  html[data-game="flasche"] .bf:has(.fl-view) { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: end; padding-top: calc(8px + env(safe-area-inset-top)); }
+  html.fit[data-game="flasche"] .bf:has(.fl-view) > * { grid-column: 1 / -1; grid-row: auto; justify-self: center; padding: 0 56px; }
+  html.fit[data-game="flasche"] .bf:has(.fl-view) > .bf-body { grid-row: 3; height: 100%; padding: 0; justify-self: stretch; }
+  html.fit[data-game="flasche"] .bf:has(.fl-view) > .bf-body:has(+ .bf-actions:not(:empty)) { grid-column: 1; }
+  html.fit[data-game="flasche"] .bf:has(.fl-view) > .bf-actions { grid-column: 2; grid-row: 3; width: auto; max-width: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  html[data-game="flasche"] .bf:has(.fl-view) .bf-actions .btn { padding: 8px 18px; white-space: nowrap; }
+  html[data-game="flasche"] .bf:has(.fl-view)::before { height: calc(70px + env(safe-area-inset-top)); }
+  html[data-game="flasche"] #screen-game:has(.fl-view) .game-title { visibility: hidden; }
+  html[data-game="flasche"] .fl-card { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-items: center; max-width: 620px; padding: 8px 16px; text-align: left; }
+  html[data-game="flasche"] .fl-card-e { grid-row: 1 / 4; font-size: clamp(1.6rem, 9dvh, 2.4rem); }
+  html[data-game="flasche"] .fl-card-t { margin: 0; font-size: clamp(0.85rem, 3.6dvh, 1.05rem); }
+  html[data-game="flasche"] .fl-card p { margin: 2px 0 0; font-size: clamp(0.85rem, 3.8dvh, 1.05rem); }
+  html[data-game="flasche"] .fl-card small { margin-top: 2px; }
+}
 }

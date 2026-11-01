@@ -13,6 +13,8 @@ window.Flasche3D = (() => {
   const MUG_R = 1.4; // Krüge auf dem Tisch
   const TOP = 100; // hochkant: so viel Platz (px) oben für den Titel, unten für Aufgabe und Knöpfe
   const BOTTOM = 210;
+  const TOP_Q = 50; // quer: oben Runde und Ansage, unten eine Zeile mit Aufgabe und Knöpfen
+  const BOTTOM_Q = 74;
   const COLORS = ["#f43f5e", "#3b82f6", "#f59e0b", "#10b981", "#a855f7", "#ec4899", "#06b6d4", "#84cc16", "#f97316", "#6366f1", "#14b8a6", "#eab308", "#ef4444", "#8b5cf6", "#22c55e", "#0ea5e9"];
 
   let S = null;
@@ -432,8 +434,8 @@ window.Flasche3D = (() => {
       G.sizeKey = key;
       G.renderer.setSize(w, h, false);
       G.camera.aspect = w / h;
-      // Quer: Tisch links, rechts ist Platz für Text und Knöpfe. Hoch: Tisch etwas nach oben.
-      if (wide) G.camera.setViewOffset(w, h, w * 0.19, -h * 0.03, w, h);
+      // Tisch in die freie Fläche zwischen Text oben und Aufgabe/Knöpfen unten schieben.
+      if (wide) G.camera.setViewOffset(w, h, 0, (BOTTOM_Q - TOP_Q) / 2, w, h);
       else G.camera.setViewOffset(w, h, 0, (BOTTOM - TOP) / 2, w, h);
       G.camera.updateProjectionMatrix();
     }
@@ -482,9 +484,9 @@ window.Flasche3D = (() => {
       G.camera.fov = fov;
       G.camera.updateProjectionMatrix();
     }
-    // Platz für den Tisch: quer die linken 62 %, hoch ohne Titel oben und Aufgabe/Knöpfe unten
-    const freeH = wide ? h - 40 : Math.max(h * 0.5, h - TOP - BOTTOM);
-    const freeW = wide ? w * 0.62 : w;
+    // Platz für den Tisch: ohne Titel oben und Aufgabe/Knöpfe unten
+    const freeH = wide ? Math.max(h * 0.55, h - TOP_Q - BOTTOM_Q) : Math.max(h * 0.5, h - TOP - BOTTOM);
+    const freeW = w;
     const aspect = freeW / freeH;
     const vf = 2 * Math.atan(Math.tan((fov * Math.PI) / 360) * (freeH / h));
     const hf = 2 * Math.atan(Math.tan(vf / 2) * aspect);

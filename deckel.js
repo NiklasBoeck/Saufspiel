@@ -564,11 +564,7 @@ html.fit[data-game="deckel"] .bf-phase { text-align: center; text-transform: non
 html.fit[data-game="deckel"] .your-turn { display: none; }
 html.fit[data-game="deckel"] .bf-title { text-align: center; font-size: clamp(1rem, 2.6dvh, 1.35rem); }
 html.fit[data-game="deckel"] .bf-body { overflow: hidden; gap: clamp(4px, 1dvh, 12px); }
-@media (min-aspect-ratio: 6 / 5) {
-  html.fit[data-game="deckel"] .bf { grid-template-columns: minmax(0, 1fr) clamp(170px, 30vw, 320px); }
-  html.fit[data-game="deckel"] .bf-phase, html.fit[data-game="deckel"] .bf-title { text-align: left; }
-  html.fit[data-game="deckel"] .bf-title { font-size: clamp(0.95rem, 4dvh, 1.4rem); }
-}`;
+`;
   const tag = document.createElement("style");
   tag.textContent = css;
   document.head.appendChild(tag);

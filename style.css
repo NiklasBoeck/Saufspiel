@@ -761,23 +761,30 @@ html.fit .bf-hands li { padding: clamp(3px, 0.6dvh, 6px) 10px; }
 /* Dealer-Tisch darf auf großen Bildschirmen größer werden */
 .fd-table { --h: min((100cqh - 32px) / 3.38, (100cqw - 30px) * 0.2, 170px); }
 
-/* Querformat: Spielfeld links, Text und Knöpfe rechts */
+/* Querformat: oben eine schmale Zeile mit Runde, "Du bist dran" und Ansage,
+   darunter das Spiel über die ganze Breite, unten die Knöpfe in einer Reihe.
+   (Keine leere Spalte rechts mehr, Lena 2026-11-01.) */
 @media (min-aspect-ratio: 6 / 5) {
   html.fit #screen-game { gap: clamp(2px, 1dvh, 10px); }
   html.fit .game-bar { min-height: 0; }
   html.fit .game-bar .btn.small { padding: 4px 14px; }
   html.fit .bf {
     display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(220px, 1fr);
-    grid-template-rows: auto auto auto 1fr auto;
-    column-gap: clamp(14px, 3vw, 32px);
-    row-gap: 0;
+    grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: clamp(8px, 1.5vw, 16px);
+    row-gap: clamp(4px, 1.2dvh, 10px);
+    align-items: center;
   }
-  html.fit .bf > * { grid-column: 2; margin-bottom: clamp(4px, 1.2dvh, 12px); }
-  html.fit .bf > .bf-body { grid-column: 1; grid-row: 1 / -1; margin: 0; height: 100%; }
-  html.fit .bf > .bf-actions { grid-row: 5; margin: 0; align-self: end; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
-  html.fit .bf-title { font-size: clamp(1.05rem, 4.2dvh, 1.6rem); }
-  html.fit .bf-actions .btn { padding: clamp(8px, 2.6dvh, 16px); }
+  html.fit .bf > * { grid-row: 1; margin: 0; }
+  html.fit .bf > .bf-phase { grid-column: 2; white-space: nowrap; }
+  html.fit .bf > .your-turn { grid-column: 3; }
+  html.fit .bf > .bf-title { grid-column: 4; max-width: 60vw; text-align: center; }
+  html.fit .bf > .bf-body { grid-column: 1 / -1; grid-row: 2; height: 100%; align-self: stretch; }
+  html.fit .bf > .bf-actions { grid-column: 1 / -1; grid-row: 3; justify-self: center; width: min(100%, 720px); grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  html.fit .bf > .bf-actions:empty { display: none; }
+  html.fit .bf-title { font-size: clamp(0.95rem, 3.6dvh, 1.35rem); }
+  html.fit .bf-actions .btn { padding: clamp(6px, 2dvh, 14px); }
   html.fit .card-text { font-size: clamp(1.1rem, 5dvh, 2rem); }
   html.fit .pc { width: clamp(36px, min(17dvh, 9vw), 110px); font-size: clamp(0.9rem, min(5dvh, 2.6vw), 2rem); }
   html.fit .pc-small { width: clamp(28px, 8.5dvh, 54px); }
@@ -787,6 +794,17 @@ html.fit .bf-hands li { padding: clamp(3px, 0.6dvh, 6px) 10px; }
   html.fit .fd-ranks .btn { padding: clamp(2px, 1.2dvh, 10px) 2px; font-size: clamp(0.95rem, 4.4dvh, 1.45rem); }
   html.fit .fd-ranks .btn small { font-size: clamp(0.6rem, 2.4dvh, 0.8rem); }
   html.fit .bf-actions.cat-pick { grid-template-columns: 1fr 1fr; }
+  /* Breites Spielfeld nutzen: eine Kartenreihe groß, große Karte links und Text daneben, Pyramide neben den Händen */
+  html.fit .bf-body > .pc-row > .pc { width: clamp(40px, min(30dvh, 13vw), 150px); font-size: clamp(0.9rem, min(8dvh, 3.4vw), 2.6rem); }
+  html.fit .bf-body > .pc-row > .pc-big { width: auto; height: clamp(84px, 50dvh, 340px); font-size: clamp(1.6rem, 11dvh, 4.4rem); }
+  html.fit .bf-body:has(> .pc-row .pc-big) { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: repeat(3, auto); align-content: center; align-items: center; column-gap: clamp(16px, 4vw, 48px); row-gap: 0; }
+  html.fit .bf-body:has(> .pc-row .pc-big) > * { grid-column: 2; margin: clamp(3px, 1dvh, 8px) 0; }
+  html.fit .bf-body:has(> .pc-row .pc-big) > .pc-row { grid-column: 1; grid-row: 1 / -1; margin: 0; }
+  html.fit .bf-body:has(> .pc-row .pc-big) .tr-text { text-align: left; font-size: clamp(1rem, 5dvh, 1.5rem); }
+  html.fit .tr-legend { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
+  html.fit .bf-body:has(> .pyramid) { flex-direction: row; align-items: center; justify-content: center; gap: clamp(16px, 4vw, 48px); }
+  html.fit .bf-body:has(> .pyramid) > .bf-hands { flex: 0 1 340px; }
+  html.fit .pyramid .pc-small { width: clamp(28px, 10.5dvh, 60px); font-size: clamp(0.75rem, 3.2dvh, 1.2rem); }
   html.fit .fd-tally li { padding: 6px 12px; }
   /* Niedriges Querformat: Menü und Formulare kompakter */
   .menu-head { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0; }
@@ -1290,11 +1308,6 @@ html.fit[data-game="randvoll"] .bf-phase { text-align: center; text-transform: n
 html.fit[data-game="randvoll"] .your-turn { display: none; }
 html.fit[data-game="randvoll"] .bf-title { text-align: center; font-size: clamp(1rem, 2.6dvh, 1.35rem); }
 html.fit[data-game="randvoll"] .bf-body { overflow: hidden; gap: clamp(4px, 1dvh, 12px); }
-@media (min-aspect-ratio: 6 / 5) {
-  html.fit[data-game="randvoll"] .bf { grid-template-columns: minmax(0, 1fr) clamp(170px, 30vw, 320px); }
-  html.fit[data-game="randvoll"] .bf-phase, html.fit[data-game="randvoll"] .bf-title { text-align: left; }
-  html.fit[data-game="randvoll"] .bf-title { font-size: clamp(0.95rem, 4dvh, 1.4rem); }
-}
 .za-intro { margin: 0; padding: 0 0 0 1.3em; display: flex; flex-direction: column; gap: clamp(6px, 1.4dvh, 14px); line-height: 1.4; font-size: clamp(0.95rem, 2.3dvh, 1.15rem); }
 .za-intro b { color: #fcd34d; }
 .za-example { margin: 0; padding: clamp(8px, 1.6dvh, 14px) 14px; border-radius: 14px; background: var(--surface); color: var(--muted); line-height: 1.4; font-size: clamp(0.85rem, 2dvh, 1rem); }
@@ -1341,8 +1354,6 @@ html.fit[data-game="duell"] .bf-title { text-align: center; font-size: clamp(1re
 html.fit[data-game="duell"] .bf-body { overflow: hidden; gap: clamp(4px, 1dvh, 12px); }
 html[data-game="duell"] .bf-actions:empty { display: none; }
 @media (min-aspect-ratio: 6 / 5) {
-  html.fit[data-game="duell"] .bf { grid-template-columns: minmax(0, 1fr) clamp(170px, 28vw, 300px); }
-  html.fit[data-game="duell"] .bf-phase, html.fit[data-game="duell"] .bf-title { text-align: left; }
   .pd-arena.two, .pd-arena.watch, .pd-arena.over { flex-direction: row; }
   .pd-arena.two .pd-a { transform: none; }
   .pd-arena .pd-signal { min-height: 0; width: clamp(110px, 22vw, 260px); font-size: clamp(1.3rem, 7dvh, 3rem); }
