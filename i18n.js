@@ -1,0 +1,349 @@
+// Sprachen. Deutsch ist die Grundsprache: Alle Texte stehen im Code auf Deutsch,
+// t("deutscher Text") gibt die Übersetzung in der gewählten Sprache zurück (fehlt sie, bleibt es Deutsch).
+// Platzhalter in geschweiften Klammern: t("Warte auf {name}…", { name }).
+//
+// Neue Sprache: in LANGUAGES eintragen und unten in STRINGS und GAME_TEXT die Übersetzungen dazuschreiben.
+// Was schon übersetzt ist: Menü, Einstellungen, Spielauswahl, Raum, Spielnamen, Regeln, Trink-Meldung.
+// Die Texte innerhalb der einzelnen Spiele kommen nach und nach dazu.
+const LANGUAGES = {
+  de: { label: "Deutsch", emoji: "🇩🇪", desc: "Die App auf Deutsch." },
+  en: { label: "English", emoji: "🇬🇧", desc: "The app in English. Games are being translated step by step." },
+};
+
+const LANG_KEY = "saufspiel-settings";
+let LANG = (() => {
+  try {
+    const l = JSON.parse(localStorage.getItem(LANG_KEY))?.lang;
+    return LANGUAGES[l] ? l : "de";
+  } catch {
+    return "de";
+  }
+})();
+document.documentElement.lang = LANG;
+
+const STRINGS = {
+  en: {
+    // Menü
+    "Such dir ein Spiel aus": "Pick a game",
+    "Trink verantwortungsvoll. Wasser zählt auch als Getränk.": "Drink responsibly. Water counts as a drink too.",
+    Einstellungen: "Settings",
+    "Wie viel wird getrunken?": "How much do you drink?",
+    "Wie gut spielen die Bots?": "How good are the bots?",
+    "Wie soll die App aussehen?": "How should the app look?",
+    "Sprache": "Language",
+    "Gilt für jedes neue Spiel. Bei „Jeder sein Handy“ zählt die Einstellung vom Handy, das den Raum erstellt.":
+      "Applies to every new game. With “Everyone on their phone”, the phone that created the room decides.",
+    "Verantwortung, Impressum und Datenschutz": "Responsibility, legal notice and privacy",
+    Zurück: "Back",
+    Spielregeln: "Rules",
+
+    // Stufen, Bots, Designs
+    Alkoholfrei: "Alcohol-free",
+    "Limo, Wasser, was ihr wollt. Gleiche Regeln, null Promille.": "Soda, water, whatever you like. Same rules, zero alcohol.",
+    Mild: "Mild",
+    "Halb so viele Schlucke.": "Half as many sips.",
+    Normal: "Normal",
+    "So wie die Regeln es sagen.": "Just like the rules say.",
+    Hart: "Hard",
+    "Anderthalbmal so viele Schlucke. Nur mit genug Wasser daneben.": "One and a half times the sips. Only with enough water nearby.",
+    Leicht: "Easy",
+    "Die Bots patzen oft. Gut zum Reinkommen.": "The bots mess up a lot. Good for getting started.",
+    Mittel: "Medium",
+    "Meistens klug, manchmal daneben.": "Mostly smart, sometimes off.",
+    Schwer: "Hard",
+    "Die Bots treffen fast immer. Viel Glück.": "The bots almost never miss. Good luck.",
+    Neu: "New",
+    "Warme Kneipenfarben, gezeichnete Icons.": "Warm pub colours, hand-drawn icons.",
+    Biergarten: "Beer garden",
+    "Flaschengrün, Brezel-Orange, runde Sticker und Kacheln.": "Bottle green, pretzel orange, round stickers and tiles.",
+    Wiesn: "Oktoberfest",
+    "Weiß-blaue Rauten, Wimpel und ein Lebkuchenherz. O’zapft is!": "Blue and white diamonds, bunting and a gingerbread heart. O’zapft is!",
+    Klassisch: "Classic",
+    "Das alte Lila mit Emojis.": "The old purple with emojis.",
+
+    // Ein Handy / Jeder sein Handy
+    "Wie wollt ihr spielen?": "How do you want to play?",
+    "Ein Handy": "One phone",
+    "Alle spielen an diesem Handy, es geht reihum.": "Everyone plays on this phone, taking turns.",
+    "Jeder sein Handy": "Everyone on their phone",
+    "(empfohlen)": "(recommended)",
+    "Ein Handy macht einen Raum auf, alle anderen treten mit Code oder QR-Code bei.":
+      "One phone opens a room, everyone else joins with the code or QR code.",
+    "Kein Internet.": "No internet.",
+    "Ohne Netz geht nur „Ein Handy“.": "Without internet only “One phone” works.",
+
+    // Spieler
+    "Wer spielt mit?": "Who’s playing?",
+    Name: "Name",
+    Spielername: "Player name",
+    "🤖 Bot dazu": "🤖 Add bot",
+    "Bots spielen mit, damit du auch alleine spielen kannst.": "Bots join in so you can play on your own too.",
+    "Los geht’s": "Let’s go",
+    "{name} entfernen": "Remove {name}",
+
+    // Raum
+    "Dein Name": "Your name",
+    "Raum erstellen": "Create room",
+    "oder einem Raum beitreten": "or join a room",
+    Code: "Code",
+    Raumcode: "Room code",
+    Beitreten: "Join",
+    Raum: "Room",
+    "Link teilen": "Share link",
+    "Link kopiert ✓": "Link copied ✓",
+    "Link zum Beitreten:": "Link to join:",
+    "Komm in meinen {game}-Raum {code}!": "Join my {game} room {code}!",
+    "Raum verlassen": "Leave room",
+    "Raum verlassen?": "Leave the room?",
+    "Raum schließen? Das Spiel endet dann für alle.": "Close the room? The game ends for everyone.",
+    "Der Host hat den Raum geschlossen.": "The host closed the room.",
+    "Du bist jetzt Host,": "You are the host now,",
+    "{name} ist weg.": "{name} left.",
+    "der Host": "the host",
+    "Verbindung weg, verbinde neu…": "Connection lost, reconnecting…",
+    "● verbunden · Raum {code}": "● connected · room {code}",
+    "Host ist offline, warte…": "Host is offline, waiting…",
+    "Du wirst gleich hinzugefügt…": "You’ll be added in a moment…",
+    "{n} Spieler da. Alle drin? Dann los!": "{n} players here. Everyone in? Let’s go!",
+    "Warte auf Mitspieler: Code eingeben, QR-Code scannen oder einen Bot dazunehmen.":
+      "Waiting for players: enter the code, scan the QR code or add a bot.",
+    "Du bist drin! Warte, bis der Host startet.": "You’re in! Wait for the host to start.",
+    "Suche Raum…": "Looking for room…",
+    "Zurück in Raum {code}": "Back to room {code}",
+    "Gib zuerst deinen Namen ein.": "Enter your name first.",
+    "Der Raumcode hat 4 Zeichen.": "The room code has 4 characters.",
+
+    // Spiel
+    "Du bist dran!": "Your turn!",
+    "Warte auf {name}…": "Waiting for {name}…",
+    "Warte…": "Waiting…",
+    "So geht {game}": "How to play {game}",
+    "Alles klar": "Got it",
+
+    // Trinken
+    "1 Schluck": "1 sip",
+    "{n} Schlucke": "{n} sips",
+    "Du musst trinken!": "You have to drink!",
+    "Du darfst verteilen!": "You get to hand out!",
+    "Trinken!": "Drink!",
+    "Verteilen!": "Hand out!",
+    Alle: "Everyone",
+    Du: "You",
+    trinken: "drinks",
+    trinkt: "drinks",
+    trinkst: "drink",
+    verteilt: "hands out",
+    verteilst: "hand out",
+    "Limo, Wasser, was ihr wollt": "soda, water, whatever you like",
+    "Prost! 🍻": "Cheers! 🍻",
+    "Prost! 🥤": "Cheers! 🥤",
+  },
+};
+
+// Spielnamen, Beschreibungen und Regeln
+const GAME_TEXT = {
+  en: {
+    niewieder: {
+      label: "Never Have I Ever",
+      description: "If you’ve done it, you drink.",
+      rules: [
+        "The app shows a sentence starting with “Never have I ever …”.",
+        "Anyone who has done it takes a sip. Be honest!",
+        "Tell the story if you like. Then the next card.",
+      ],
+    },
+    pflicht: {
+      label: "Dare",
+      description: "Do the dare or drink.",
+      rules: [
+        "The app draws a dare for a random person.",
+        "If you manage it, all good. If not, you drink what’s written under the card.",
+        "Nobody has to do anything they don’t want to. Then just drink or skip the card.",
+      ],
+    },
+    busfahrer: {
+      label: "Ride the Bus",
+      description: "Guess, build the pyramid, and the loser rides the bus.",
+      rules: [
+        "Question round: everyone gets 4 cards in turn. Before each card you guess: red or black, higher or lower than the first, between your first two or outside, and which suit.",
+        "Right: you hand out as many sips as the question is worth (1 to 4). Wrong: you drink them yourself. Equal values count as wrong.",
+        "Pyramid: 10 cards are turned over one by one. Whoever holds the same value lays it down and hands out sips, 1 per card at the bottom, 4 at the top.",
+        "Bus ride: whoever has the most cards left at the end rides the bus. 5 cards in a row, keep guessing higher or lower. If you’re wrong, you drink as many sips as cards you’ve made it through and start over.",
+      ],
+    },
+    triade: {
+      label: "Triade",
+      description: "Draw cards in turn, every card has a task.",
+      rules: [
+        "Played with 32 cards (7 to ace). Everyone draws a card in turn, every card has its task.",
+        "Ace: waterfall. Everyone starts drinking, whoever drew starts. You may only stop once the person before you has stopped.",
+        "King: hand out 10 sips. 9: hand out 9 sips.",
+        "Queen: a new rule that applies to everyone from now on. Jack: bus ride, guess higher or lower to the end of the row.",
+        "10: category. Everyone names something in turn, whoever runs out or repeats something drinks.",
+        "8: toilet card. Only people with a toilet card may go to the loo. 7: count and say “plop” on every number with a 7, whoever slips up drinks.",
+      ],
+    },
+    dealer: {
+      label: "F*ck the Dealer",
+      description: "Guess the card or drink. Get it right and the dealer drinks.",
+      rules: [
+        "One person is the dealer and holds the deck (the app), everyone else takes turns guessing the top card (2 to ace, ace counts 14).",
+        "First guess right: the dealer drinks as many sips as the card is worth. Wrong: the dealer says “higher” or “lower”.",
+        "Second guess right: the dealer drinks the difference between your two guesses. Wrong again: you drink the difference between your guess and the card.",
+        "Once all 4 cards of a value are gone, everyone takes a sip.",
+        "If the table is wrong three times in a row, the dealer passes to the next person.",
+      ],
+    },
+    fenster: {
+      label: "Window",
+      description: "Open the window: higher, lower, in between. Wrong? Drink everything attached.",
+      rules: [
+        "21 cards (2 to ace, ace counts 14) lie face down as a window: 5 each at the top and bottom, 3 each on the left and right in between, a cross in the middle. The 4 corners are face up.",
+        "On your turn, tap a face-down card next to a face-up one and say higher, lower or equal. If there are face-up cards on both sides (straight or across the corner), it’s between, outside or equal. Equal is right if the card has the same value as the face-up card or one of the two. Any other equal value is always wrong.",
+        "Wrong: you drink as many sips as face-up cards are connected to the new card (counting itself and the corners). Those cards are turned over and reshuffled. If a corner is attached, a new card goes there face up.",
+        "After a mistake you keep playing and start again at 0. You may only pass once you’ve turned over 2 cards correctly yourself. Then you hand out as many sips as cards you got right.",
+        "If you’ve uncovered the middle and stop, you also hand out a shot. If the middle is attached to your wrong card, you drink the shot yourself.",
+        "Whoever turns over the last card closes the window and hands out their cards.",
+      ],
+    },
+    randvoll: {
+      label: "To the Brim",
+      description: "Hold the tap. Whoever makes the glass overflow drinks.",
+      rules: [
+        "A glass stands under the tap: sometimes a stein, sometimes a pilsner glass, sometimes a shot glass. Every glass has an invisible edge where it overflows. Nobody knows where it is, only the “safe” strip at the bottom shows how far nothing can happen.",
+        "Everyone pours once in turn: hold the tap and let go whenever you want. The tap sputters a bit, and some foam keeps coming after you let go. A short tap already pours a little.",
+        "If the glass overflows, you drink as many sips as were poured into this glass (yours included). With the shot glass, add a shot.",
+        "If the foam stops just under the edge, the glass is full to the brim: you hand out as many sips as were poured (plus a shot with the shot glass).",
+        "Then a new glass with a new edge comes and the next person starts.",
+      ],
+    },
+    duell: {
+      label: "Cheers Duel",
+      description: "First to tap on PROST wins. Tapped too early? Drink.",
+      rules: [
+        "Two people face off. On one phone each gets their half (the top one is upside down for the person opposite), with several phones everyone taps their own.",
+        "For a few seconds nothing happens, then 🍺 PROST! appears. First to tap wins, the other drinks 2 sips. Each phone measures the time itself, so it’s fair over the network too.",
+        "Before that, traps like “POST!” or “PROBE!” flash up. Tap too early or on a trap and you drink 3 sips right away and lose.",
+        "If you don’t tap at all, you’re out after 2.5 seconds. If both doze off, both drink 1 sip.",
+        "The winner stays, the next person challenges them. Win 3 times in a row and you’re the gunslinger, hand out 3 sips and make room for two new players.",
+      ],
+    },
+    eher: {
+      label: "Who’s Most Likely To…?",
+      description: "Everyone votes secretly for who fits best. Most votes drink.",
+      rules: [
+        "The app asks a question, e.g. “Who’s most likely to go skinny dipping?”.",
+        "Everyone votes secretly for who fits best. With several phones everyone on their own, at the same time. On one phone it goes round, the others look away. Voting for yourself is allowed.",
+        "Whoever gets the most votes drinks as many sips as votes. On a tie, everyone with the most votes drinks.",
+        "If everyone agrees (at least 3 votes), there are 2 extra sips.",
+        "Then everyone sees who voted for whom. Justifying yourself is explicitly encouraged.",
+        "Bots vote on their own, usually with the majority.",
+      ],
+    },
+    luegen: {
+      label: "Lie Detector",
+      description: "Lie or truth? Place your bets, then the machine measures your thumb.",
+      rules: [
+        "Everyone takes a turn as the candidate. The app secretly tells only them whether to lie or tell the truth (on one phone: hand it over, the others look away, press and hold).",
+        "The candidate answers the question out loud with yes or no and adds a short story so it sounds believable.",
+        "Everyone else bets: lie or truth? With several phones everyone bets on their own.",
+        "Then the candidate puts their thumb on the sensor until it’s full. The machine measures and judges. It’s usually right, but not always.",
+        "Resolved: whoever bet wrong drinks 1 sip. If the candidate lied and most noticed, they drink 2 sips. If they fooled most people, they hand out 2 sips.",
+        "If the machine is wrong, the candidate tricked it and hands out 1 more sip.",
+      ],
+    },
+    kistenturm: {
+      label: "Crate Tower",
+      description: "Stack beer crates in 3D. Whoever knocks the tower over drinks.",
+      rules: [
+        "In the beer garden a tower of beer crates is being stacked. The next crate swings back and forth above the tower, sometimes left-right, sometimes front-back, and the higher the tower, the faster.",
+        "On your turn, tap the screen. The crate drops exactly where it is.",
+        "If too much hangs over, the tower tips: if the centre of the crates above is no longer over the crate below, everything from there falls. If your crate doesn’t land on anything, it falls alone.",
+        "Whoever knocks the tower over drinks as many sips as crates fall (at most 10). Then a new tower starts.",
+        "Exactly on top of the crate below: perfect, you hand out 1 sip. Every 10 crates, everyone drinks 1 sip to the tower.",
+      ],
+    },
+    deckel: {
+      label: "Coaster Flip",
+      description: "Flip the stack of coasters up and catch it again. Drop it and you drink.",
+      rules: [
+        "A stack of beer coasters sticks out over the edge of the table. On your turn, swipe up quickly over the coasters: they fly up, spin and fall back down.",
+        "Tap the playing field when the coasters fall through the ring. Then you’ve caught them. Too early, too late or not at all: the coasters hit the floor.",
+        "Flick too softly and the stack just tips over the edge, too hard and it flies into your neighbour’s beer. Both count as dropped.",
+        "Every catch goes into your pot: as many sips as coasters flew (1 + 2 + 3 …). Then you decide: stop and hand out the pot, or add one more coaster. The more coasters, the smaller the time window.",
+        "If you drop the coasters, you drink as many sips as just flew, and your pot is gone.",
+        "Catch 4 coasters at once and you’re the Coaster King and hand out the whole pot (10 sips).",
+      ],
+    },
+    flasche: {
+      label: "Spin the Bottle",
+      description: "Swipe the bottle. Whoever it points at is up.",
+      rules: [
+        "Everyone sits around the table, a beer bottle lies in the middle. On your turn, swipe across the bottle. The faster the swipe, the longer it spins.",
+        "Whoever the neck points at gets a task: drink, hand out sips, truth, dare, make a new rule or a round for everyone.",
+        "For some tasks, whoever the bottom of the bottle points at joins in too, for example when clinking glasses or asking the question.",
+        "Didn’t do the truth or dare: 3 sips. If the bottle points at yourself, you drink 1 and spin again.",
+        "Whoever was hit spins next. With one phone, put it in the middle and sit around it in the order of the names.",
+      ],
+    },
+    hodenritter: {
+      label: "Hodenritter",
+      description: "Boules in the garden. The farthest drinks and takes a bow.",
+      rules: [
+        "Everyone sits in a row on garden chairs in front of the lawn, each with a ball. Whoever has the red ball throws it onto the lawn first.",
+        "Then the neighbour on the right throws as close as possible to the red ball without touching it, then the next. Whoever threw the red ball throws last.",
+        "Throwing: put your finger on the picture and pull down, the further, the harder. Pulling sideways steers like a slingshot: pulling right throws left. Let go to throw.",
+        "Whoever is farthest away and whoever touched the red ball stand up, step 2 metres in front of the row and drink half a beer, at most 1 minute.",
+        "The farthest then does a task as a mini-game on the phone: tap, swipe or let go at the right moment. Not done in time: another half.",
+        "Then everyone who stood up bows to everyone still sitting, starting with the neighbour on the right. Empty chairs are skipped, and people who drank together don’t bow to each other.",
+        "If someone refuses, both drink a half standing up and the bowing round starts over, without the chair of whoever refused. Refusing someone who was already refused costs more: 1 beer, the third time one and a half, and so on.",
+        "Whoever is closest to the red ball (without touching it) gets it for the next round and may put an obstacle on the lawn.",
+      ],
+    },
+    flunky: {
+      label: "Flunky Ball",
+      description: "Two teams, one bottle. Everyone plays on their own phone.",
+    },
+  },
+};
+
+function t(text, vars) {
+  let s = (LANG !== "de" && STRINGS[LANG]?.[text]) || text;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
+  return s;
+}
+
+function gameText(key, field) {
+  return GAME_TEXT[LANG]?.[key]?.[field] ?? GAMES[key]?.[field];
+}
+
+// Feste Texte im HTML übersetzen. Der deutsche Text wird beim ersten Mal gemerkt.
+const I18N_ORIG = new WeakMap();
+const I18N_ATTRS = ["placeholder", "aria-label", "title"];
+function translateDom(root = document.body) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.parentElement?.closest("#game-root, script, style")) continue;
+    if (!I18N_ORIG.has(n)) {
+      if (!n.nodeValue.trim()) continue;
+      I18N_ORIG.set(n, n.nodeValue);
+    }
+    const orig = I18N_ORIG.get(n);
+    const core = orig.trim();
+    n.nodeValue = orig.replace(core, t(core));
+  }
+  root.querySelectorAll("[placeholder], [aria-label], [title]").forEach((el) => {
+    if (el.closest("#game-root")) return;
+    for (const a of I18N_ATTRS) {
+      if (!el.hasAttribute(a)) continue;
+      const key = `data-orig-${a}`;
+      if (!el.hasAttribute(key)) el.setAttribute(key, el.getAttribute(a));
+      el.setAttribute(a, t(el.getAttribute(key)));
+    }
+  });
+}
+
+function setLang(l) {
+  LANG = LANGUAGES[l] ? l : "de";
+  document.documentElement.lang = LANG;
+}

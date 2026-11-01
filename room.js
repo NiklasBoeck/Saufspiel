@@ -112,7 +112,7 @@ const Room = (() => {
   function onHostState(next) {
     if (!session) return;
     if (!next) {
-      if (S) leaveToStart("Der Host hat den Raum geschlossen.");
+      if (S) leaveToStart(t("Der Host hat den Raum geschlossen."));
       return;
     }
     if (next.game !== session.game) session.game = next.game;
@@ -133,7 +133,7 @@ const Room = (() => {
     S.epoch = (S.epoch || 0) + 1;
     const mine = me();
     if (mine) mine.online = true;
-    showToast({ notice: { emoji: "👑", title: "Du bist jetzt Host,", text: `${old?.name ?? "der Host"} ist weg.` } });
+    showToast({ notice: { emoji: "👑", title: t("Du bist jetzt Host,"), text: t("{name} ist weg.", { name: old?.name ?? t("der Host") }) } });
     publishState();
   }
 
@@ -154,7 +154,7 @@ const Room = (() => {
     if (!session || !net) return;
     const connected = net.connected;
     const ok = connected && net.hostOnline;
-    setConn(!connected ? "Verbindung weg, verbinde neu…" : ok ? `● verbunden · Raum ${session.code}` : "Host ist offline, warte…");
+    setConn(!connected ? t("Verbindung weg, verbinde neu…") : ok ? t("● verbunden · Raum {code}", { code: session.code }) : t("Host ist offline, warte…"));
     document.querySelectorAll(".conn").forEach((el) => el.classList.toggle("bad", !ok));
   }
 
@@ -284,7 +284,7 @@ const Room = (() => {
           const remove = document.createElement("button");
           remove.textContent = "✕";
           remove.className = "remove";
-          remove.setAttribute("aria-label", `${p.name} entfernen`);
+          remove.setAttribute("aria-label", t("{name} entfernen", { name: p.name }));
           remove.onclick = () => send({ type: "bot-remove", id: p.id });
           li.appendChild(remove);
         }
@@ -298,9 +298,9 @@ const Room = (() => {
     renderBotSeg($("lobby-bot-level"), session.host && S.players.some(isBot));
     $("lobby-start").disabled = !enough;
     let hint;
-    if (!me()) hint = "Du wirst gleich hinzugefügt…";
-    else if (session.host) hint = enough ? `${S.players.length} Spieler da. Alle drin? Dann los!` : "Warte auf Mitspieler: Code eingeben, QR-Code scannen oder einen Bot dazunehmen.";
-    else hint = "Du bist drin! Warte, bis der Host startet.";
+    if (!me()) hint = t("Du wirst gleich hinzugefügt…");
+    else if (session.host) hint = enough ? t("{n} Spieler da. Alle drin? Dann los!", { n: S.players.length }) : t("Warte auf Mitspieler: Code eingeben, QR-Code scannen oder einen Bot dazunehmen.");
+    else hint = t("Du bist drin! Warte, bis der Host startet.");
     $("lobby-hint").textContent = hint;
   }
 
@@ -356,7 +356,7 @@ const Room = (() => {
       $("lobby-code").textContent = s.code;
       renderQr();
       $("lobby-players").replaceChildren();
-      $("lobby-hint").textContent = "Suche Raum…";
+      $("lobby-hint").textContent = t("Suche Raum…");
       $("lobby-start").hidden = true;
       $("lobby-bot").hidden = true;
       $("lobby-bot-level").hidden = true;
@@ -382,7 +382,7 @@ const Room = (() => {
 
   function leave() {
     const host = session?.host;
-    if (!confirm(host ? "Raum schließen? Das Spiel endet dann für alle." : "Raum verlassen?")) return;
+    if (!confirm(t(host ? "Raum schließen? Das Spiel endet dann für alle." : "Raum verlassen?"))) return;
     if (!host) send({ type: "leave" });
     disconnect(host);
     endSession();
@@ -398,14 +398,14 @@ const Room = (() => {
     const saved = parseSaved();
     const resume = saved && saved.game === gameKey;
     $("room-resume").hidden = !resume;
-    if (resume) $("room-resume").textContent = `Zurück in Raum ${saved.code}`;
+    if (resume) $("room-resume").textContent = t("Zurück in Raum {code}", { code: saved.code });
     showScreen("room");
   }
 
   function nameOrError() {
     const name = $("room-name").value.trim();
     if (!name) {
-      showStart("Gib zuerst deinen Namen ein.");
+      showStart(t("Gib zuerst deinen Namen ein."));
       $("room-name").focus();
       return null;
     }
@@ -435,7 +435,7 @@ const Room = (() => {
     const name = nameOrError();
     if (!name) return;
     const code = $("room-code").value.trim().toUpperCase();
-    if (code.length !== 4) return showStart("Der Raumcode hat 4 Zeichen.");
+    if (code.length !== 4) return showStart(t("Der Raumcode hat 4 Zeichen."));
     startSession({ code, id: myId, name, host: false, game: gameKey }, null);
   };
   $("room-code").addEventListener("keydown", (e) => e.key === "Enter" && $("room-join").click());
@@ -448,17 +448,17 @@ const Room = (() => {
 
   $("lobby-share").onclick = async () => {
     const link = joinLink();
-    const label = GAMES[session.game].label;
+    const label = gameText(session.game, "label");
     try {
-      if (navigator.share) return await navigator.share({ title: label, text: `Komm in meinen ${label}-Raum ${session.code}!`, url: link });
+      if (navigator.share) return await navigator.share({ title: label, text: t("Komm in meinen {game}-Raum {code}!", { game: label, code: session.code }), url: link });
     } catch {
       return;
     }
     try {
       await navigator.clipboard.writeText(link);
-      $("lobby-share").textContent = "Link kopiert ✓";
+      $("lobby-share").textContent = t("Link kopiert ✓");
     } catch {
-      prompt("Link zum Beitreten:", link);
+      prompt(t("Link zum Beitreten:"), link);
     }
   };
 

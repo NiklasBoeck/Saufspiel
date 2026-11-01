@@ -36,7 +36,7 @@ function showScreen(name) {
 function setGame(key) {
   currentGame = key;
   document.documentElement.dataset.game = key; // für Layouts einzelner Spiele
-  document.querySelectorAll(".game-title").forEach((el) => (el.textContent = GAMES[key].label));
+  document.querySelectorAll(".game-title").forEach((el) => (el.textContent = gameText(key, "label")));
 }
 
 function setConn(text) {
@@ -58,6 +58,7 @@ const MENU_ORDER = ["flunky", "hodenritter", "kistenturm", "flasche", "dealer", 
 
 function renderGames() {
   const list = $("game-list");
+  list.innerHTML = "";
   const rank = (key) => (MENU_ORDER.includes(key) ? MENU_ORDER.indexOf(key) : MENU_ORDER.length);
   const entries = Object.entries(GAMES).sort(([a], [b]) => rank(a) - rank(b));
   entries.forEach(([key, game], i) => {
@@ -69,8 +70,8 @@ function renderGames() {
       <span class="game-icon">${drawnIcon(key, game.spot)}</span>
       <span class="game-emoji">${game.emoji ?? "🎲"}</span>
       <span class="game-info">
-        <span class="game-name">${escapeHtml(game.label)}</span>
-        <span class="game-desc">${escapeHtml(game.description ?? "")}</span>
+        <span class="game-name">${escapeHtml(gameText(key, "label"))}</span>
+        <span class="game-desc">${escapeHtml(gameText(key, "description") ?? "")}</span>
       </span>
       <span class="game-arrow" aria-hidden="true">›</span>`;
     tile.onclick = () => openGame(key);
@@ -88,14 +89,15 @@ function openGame(key) {
 // --- Einstellungen ---
 
 function renderSettingsBtn() {
-  $("settings-btn").innerHTML = `<span class="sb-classic">${LEVELS[Settings.level].emoji} ⚙️</span><span class="sb-neu"><span class="ic">${drawnIcon(Settings.level)}</span>${LEVELS[Settings.level].label}</span>`;
-  $("settings-btn").title = `Stufe: ${LEVELS[Settings.level].label}`;
+  $("settings-btn").innerHTML = `<span class="sb-classic">${LEVELS[Settings.level].emoji} ⚙️</span><span class="sb-neu"><span class="ic">${drawnIcon(Settings.level)}</span>${t(LEVELS[Settings.level].label)}</span>`;
+  $("settings-btn").title = `${t("Einstellungen")}: ${t(LEVELS[Settings.level].label)}`;
 }
 
 function renderLevels() {
   pickList($("level-list"), LEVELS, "level");
   pickList($("bot-level-list"), BOT_LEVELS, "bots");
   pickList($("design-list"), DESIGNS, "design");
+  pickList($("lang-list"), LANGUAGES, "lang");
 }
 
 // Kacheln zum Auswählen einer Einstellung (Settings[field])
@@ -109,12 +111,13 @@ function pickList(list, options, field) {
       <span class="mode-emoji">${l.emoji}</span>
       ${hasDrawnIcon(key) ? `<span class="mode-icon">${drawnIcon(key)}</span>` : ""}
       <span class="game-info">
-        <span class="game-name">${escapeHtml(l.label)}</span>
-        <span class="game-desc">${escapeHtml(l.desc)}</span>
+        <span class="game-name">${escapeHtml(t(l.label))}</span>
+        <span class="game-desc">${escapeHtml(t(l.desc))}</span>
         ${l.swatch ? `<span class="design-preview">${l.swatch.map((c) => `<i style="background:${c}"></i>`).join("")}</span>` : ""}
       </span>`;
     tile.onclick = () => {
       Settings[field] = key;
+      if (field === "lang") applyLang();
       renderLevels();
       renderSettingsBtn();
     };
@@ -132,9 +135,9 @@ $("settings-back").onclick = () => showScreen("menu");
 
 function showRules() {
   const game = GAMES[currentGame];
-  $("rules-title").textContent = `So geht ${game.label}`;
+  $("rules-title").textContent = t("So geht {game}", { game: gameText(currentGame, "label") });
   $("rules-list").replaceChildren(
-    ...(game.rules ?? []).map((text) => {
+    ...(gameText(currentGame, "rules") ?? []).map((text) => {
       const li = document.createElement("li");
       li.textContent = text;
       return li;
@@ -150,7 +153,7 @@ document.querySelectorAll(".screen:not(#screen-settings) .game-bar").forEach((ba
   const btn = document.createElement("button");
   btn.className = "btn ghost small rules-btn";
   btn.textContent = "?";
-  btn.setAttribute("aria-label", "Spielregeln");
+  btn.setAttribute("aria-label", t("Spielregeln"));
   btn.onclick = showRules;
   bar.appendChild(btn);
 });
@@ -162,7 +165,7 @@ $("mode-one").onclick = () => {
 };
 $("mode-multi").onclick = () => {
   // Ohne Internet geht nur ein Handy, die Räume laufen über einen Server.
-  if (!navigator.onLine) return showToast({ notice: { emoji: "📵", title: "Kein Internet.", text: "Ohne Netz geht nur „Ein Handy“." } });
+  if (!navigator.onLine) return showToast({ notice: { emoji: "📵", title: t("Kein Internet."), text: t("Ohne Netz geht nur „Ein Handy“.") } });
   Room.open(currentGame);
 };
 
@@ -178,7 +181,7 @@ function renderPlayers() {
     const remove = document.createElement("button");
     remove.textContent = "✕";
     remove.className = "remove";
-    remove.setAttribute("aria-label", `${name} entfernen`);
+    remove.setAttribute("aria-label", t("{name} entfernen", { name }));
     remove.onclick = () => {
       state.players.splice(i, 1);
       save();
@@ -201,7 +204,7 @@ function renderBotSeg(el, show) {
       const b = document.createElement("button");
       b.className = key === Settings.bots ? "picked" : "";
       b.setAttribute("aria-pressed", key === Settings.bots);
-      b.textContent = `${l.emoji} ${l.label}`;
+      b.textContent = `${l.emoji} ${t(l.label)}`;
       b.onclick = () => {
         Settings.bots = key;
         renderBotSeg(el, true);
@@ -283,7 +286,7 @@ function playGame(r) {
   root.innerHTML = `
     <div class="bf">
       ${v.phase ? `<p class="bf-phase">${v.phase}</p>` : ""}
-      ${myTurn ? `<p class="your-turn">Du bist dran!</p>` : ""}
+      ${myTurn ? `<p class="your-turn">${t("Du bist dran!")}</p>` : ""}
       ${v.title ? `<h2 class="bf-title">${v.title}</h2>` : ""}
       <div class="bf-body">${v.body}</div>
       <div class="bf-actions ${v.actionsClass ?? ""}"></div>
@@ -307,7 +310,7 @@ function playGame(r) {
   if (!actions.length && (v.actions.length || (v.turn && (r.me || isBot(v.turn)))) && !myTurn) {
     const wait = document.createElement("p");
     wait.className = "wait";
-    wait.textContent = waitFor ? `Warte auf ${waitFor}…` : "Warte…";
+    wait.textContent = waitFor ? t("Warte auf {name}…", { name: waitFor }) : t("Warte…");
     box.appendChild(wait);
   }
 
@@ -395,7 +398,7 @@ function showToast(alert) {
   const n = alert.notice;
   const text = n
     ? `${n.emoji ?? ""} ${n.title} ${n.text ?? ""}`
-    : `${alert.level === "alkoholfrei" ? "🥤" : "🍺"} ` + alert.items.map((it) => `${it.who === ALL ? "Alle" : it.who} ${it.give ? "verteilt" : it.who === ALL ? "trinken" : "trinkt"}${it.n ? ` ${sips(it.n)}` : ""}`).join(", ");
+    : `${alert.level === "alkoholfrei" ? "🥤" : "🍺"} ` + alert.items.map((it) => `${it.who === ALL ? t("Alle") : it.who} ${t(it.give ? "verteilt" : it.who === ALL ? "trinken" : "trinkt")}${it.n ? ` ${sips(it.n)}` : ""}`).join(", ");
   const el = $("toast");
   el.textContent = text.trim();
   el.hidden = false;
@@ -425,20 +428,20 @@ function showDrinkAlert(items, level) {
   const count = own.length === 1 ? own[0].n : 0;
   $("da-count").textContent = count ? sips(count) : "";
   $("da-count").hidden = !count;
-  $("da-title").textContent = meDrinks
+  $("da-title").textContent = t(meDrinks
     ? "Du musst trinken!"
     : meGives
       ? "Du darfst verteilen!"
       : drinks
         ? "Trinken!"
-        : "Verteilen!";
+        : "Verteilen!");
 
   $("da-list").replaceChildren(
     ...items.map((it) => {
       const all = it.who === ALL;
       const you = mine(it) && !all;
-      const who = all ? "Alle" : you ? "Du" : it.who;
-      const verb = all ? "trinken" : it.give ? (you ? "verteilst" : "verteilt") : you ? "trinkst" : "trinkt";
+      const who = all ? t("Alle") : you ? t("Du") : it.who;
+      const verb = t(all ? "trinken" : it.give ? (you ? "verteilst" : "verteilt") : you ? "trinkst" : "trinkt");
       const li = document.createElement("li");
       li.className = `${it.give ? "give" : ""} ${mine(it) ? "me" : ""}`;
       li.innerHTML = `<span><b>${escapeHtml(who)}</b> ${verb}${it.n ? ` <b class="da-n">${sips(it.n)}</b>` : ""}</span>${
@@ -448,9 +451,9 @@ function showDrinkAlert(items, level) {
     })
   );
   // Bei einer anderen Stufe als Normal steht klein dabei, was gilt.
-  $("da-level").textContent = level === "normal" ? "" : `${LEVELS[level].emoji} ${LEVELS[level].label}${level === "alkoholfrei" ? ": Limo, Wasser, was ihr wollt" : ""}`;
+  $("da-level").textContent = level === "normal" ? "" : `${LEVELS[level].emoji} ${t(LEVELS[level].label)}${level === "alkoholfrei" ? `: ${t("Limo, Wasser, was ihr wollt")}` : ""}`;
   $("da-level").hidden = level === "normal";
-  $("da-ok").textContent = level === "alkoholfrei" ? "Prost! 🥤" : "Prost! 🍻";
+  $("da-ok").textContent = t(level === "alkoholfrei" ? "Prost! 🥤" : "Prost! 🍻");
   $("drink-alert").hidden = false;
   $("da-ok").focus();
   vibrate(meDrinks || !me ? [300, 100, 300] : 120);
@@ -491,7 +494,14 @@ screenShape = shapeOf();
 window.addEventListener("resize", onScreenSize);
 screen.orientation?.addEventListener?.("change", onScreenSize);
 
-renderGames();
+// Sprache gewechselt (oder beim Start): feste Texte und Menü neu
+function applyLang() {
+  translateDom();
+  renderGames();
+  renderSettingsBtn();
+  if (currentGame) document.querySelectorAll(".game-title").forEach((el) => (el.textContent = gameText(currentGame, "label")));
+}
+
+applyLang();
 fillDrawnIcons();
-renderSettingsBtn();
 Room.boot();

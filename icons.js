@@ -164,6 +164,15 @@ const DRAWN_ICONS = (() => {
           <path d="M24 36.5C16 31 10.5 25.5 10.5 19c0-4 2.5-6.5 5.5-6.5 3.5 0 6 2.5 8 6 2-3.5 4.5-6 8-6 3 0 5.5 2.5 5.5 6.5 0 6.5-5.5 12-13.5 17.5z" stroke-dasharray="0.1 3.2"/>
           <path d="M17 22c2 2.5 4.5 3.5 7 3.5s5-1 7-3.5"/>`,
     },
+    // Sprachen: Sprechblase mit Kürzel
+    de: {
+      f: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/>`,
+      i: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/><text x="24" y="26.5" text-anchor="middle" font-size="12" font-weight="800" font-family="system-ui, sans-serif" style="fill:var(--ink,#211910);stroke:none">DE</text>`,
+    },
+    en: {
+      f: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/>`,
+      i: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/><text x="24" y="26.5" text-anchor="middle" font-size="12" font-weight="800" font-family="system-ui, sans-serif" style="fill:var(--ink,#211910);stroke:none">EN</text>`,
+    },
     klassisch: {
       f: `<rect x="9" y="9" width="30" height="30" rx="9"/>`,
       i: `<rect x="9" y="9" width="30" height="30" rx="9"/><circle cx="19" cy="21" r="1.6"/><circle cx="29" cy="21" r="1.6"/><path d="M18 28c3.5 3 8.5 3 12 0"/>`,
@@ -179,7 +188,7 @@ const DRAWN_ICONS = (() => {
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",
-    neu: "#e9b949", garten: "#c9814a", wiesn: "#a0582c", klassisch: "#8f6fd8",
+    neu: "#e9b949", garten: "#c9814a", wiesn: "#a0582c", de: "#e9b949", en: "#6fa8d6", klassisch: "#8f6fd8",
   };
 
   return { I, SPOT };

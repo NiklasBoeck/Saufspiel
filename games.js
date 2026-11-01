@@ -95,6 +95,14 @@ const Settings = (() => {
       data.bots = v;
       save();
     },
+    get lang() {
+      return LANGUAGES[data.lang] ? data.lang : "de";
+    },
+    set lang(v) {
+      data.lang = v;
+      save();
+      setLang(v);
+    },
     get design() {
       return DESIGNS[data.design] ? data.design : "neu";
     },
@@ -181,7 +189,7 @@ function notice(s, n) {
 }
 
 function sips(n) {
-  return n === 1 ? "1 Schluck" : `${n} Schlucke`;
+  return n === 1 ? t("1 Schluck") : t("{n} Schlucke", { n });
 }
 
 // Hinweis für Trinkregeln, bei denen die App nicht weiß, wen es trifft.
