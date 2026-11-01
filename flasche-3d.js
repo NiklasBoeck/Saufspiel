@@ -392,7 +392,7 @@ window.Flasche3D = (() => {
       tag.style.setProperty("--c", col);
       tag.innerHTML = `<i></i>${escapeHtml(p)}`;
       names.appendChild(tag);
-      return { el: tag, pos: new THREE.Vector3(c * SEAT_R, 1.1, s * SEAT_R), mug: new THREE.Vector3(c * MUG_R, TABLE_Y, s * MUG_R), p, i, cls: "" };
+      return { el: tag, pos: new THREE.Vector3(c * (SEAT_R + 0.05), 0.62, s * (SEAT_R + 0.05)), mug: new THREE.Vector3(c * MUG_R, TABLE_Y, s * MUG_R), p, i, cls: "" };
     });
   }
 
@@ -504,7 +504,7 @@ window.Flasche3D = (() => {
       const half = ((t.w ||= t.el.offsetWidth || 80) / 2) * 1.15 + 6;
       const x = Math.min(w - half, Math.max(half, ((tmp.x + 1) / 2) * w));
       const y = Math.min(h - 14, Math.max(14, ((1 - tmp.y) / 2) * h));
-      t.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
+      t.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)${t.i === hitI ? " scale(1.15)" : ""}`;
       const cls = `${t.i === hitI ? " hit" : ""}${t.i === turnI ? " turn" : ""}${t.p === ME ? " me" : ""}`;
       if (cls !== t.cls) {
         t.cls = cls;
