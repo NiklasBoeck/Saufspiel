@@ -338,6 +338,18 @@ window.Hodenritter3D = (() => {
 
   const SUN_DIR = new THREE.Vector3(-0.66, 0.5, -0.56).normalize(); // tief stehende Abendsonne links über dem Rasen
 
+  // Farbstimmung wie ein Post-Processing-Profil (URP-Volume), aber ohne Extra-Durchgang, damit es auf jedem Handy flüssig bleibt:
+  // Tonemapping ACES mit etwas weniger Belichtung (mehr Kontrast, sattere Farben), Weißabgleich leicht warm,
+  // Split-Toning über das Licht (warme Spitzlichter von der Abendsonne, kühle Schatten vom Himmel),
+  // Dunst in der Horizontfarbe für Tiefe. Die Vignette macht style.css (.hr-view::after), die kostet nichts.
+  const LOOK = {
+    exposure: 0.98,
+    sun: 0xffd29a, sunI: 3.0,
+    sky: 0xc4dcff, ground: 0xa08a52, hemiI: 1.2,
+    back: 0xaecdff, backI: 0.8,
+    fog: 0xd3e3ea, fogNear: 30, fogFar: 140,
+  };
+
   function pixelRatio() {
     return Math.min(window.devicePixelRatio || 1, [1, 1.5, 2][Q]);
   }
@@ -350,10 +362,10 @@ window.Hodenritter3D = (() => {
       renderer.shadowMap.type = Q > 1 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.12;
+      renderer.toneMappingExposure = LOOK.exposure;
 
       const scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(0xc4e2ff, 45, 150);
+      scene.fog = new THREE.Fog(LOOK.fog, LOOK.fogNear, LOOK.fogFar);
       const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 320);
 
       scene.add(makeSky());
@@ -369,8 +381,8 @@ window.Hodenritter3D = (() => {
       pmrem.dispose();
 
       // Helles, freundliches Licht: blauer Himmel von oben, warmes Gras von unten, tief stehende Sonne
-      scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x9c9a62, 1.35));
-      const sun = new THREE.DirectionalLight(0xfff1d6, 2.7);
+      scene.add(new THREE.HemisphereLight(LOOK.sky, LOOK.ground, LOOK.hemiI));
+      const sun = new THREE.DirectionalLight(LOOK.sun, LOOK.sunI);
       sun.position.copy(P(0, 6.5).add(SUN_DIR.clone().multiplyScalar(30)));
       sun.target.position.copy(P(0, 6.5));
       sun.castShadow = Q > 0;
@@ -381,7 +393,7 @@ window.Hodenritter3D = (() => {
       sun.shadow.radius = 3;
       scene.add(sun, sun.target);
       // Gegenlicht vom Rasen her: helle Kanten an Figuren und Bäumen
-      const back = new THREE.DirectionalLight(0xbfe0ff, 0.9);
+      const back = new THREE.DirectionalLight(LOOK.back, LOOK.backI);
       back.position.copy(P(4, 40, 12));
       scene.add(back);
 
@@ -462,7 +474,7 @@ window.Hodenritter3D = (() => {
           float y = vDir.y;
           vec3 top = vec3(0.10, 0.38, 0.90);
           vec3 mid = vec3(0.36, 0.66, 1.0);
-          vec3 hor = vec3(0.80, 0.91, 1.0);
+          vec3 hor = vec3(0.84, 0.90, 0.93); // wie der Dunst, damit Bäume weich in den Himmel übergehen
           vec3 c = y > 0.1 ? mix(mid, top, smoothstep(0.1, 0.75, y)) : mix(hor, mid, smoothstep(-0.04, 0.1, y));
           float d = max(dot(normalize(vDir), sunDir), 0.0);
           c += vec3(1.0, 0.85, 0.55) * (pow(d, 10.0) * 0.3 + pow(d, 300.0) * 2.0);
