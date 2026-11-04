@@ -716,18 +716,22 @@
 
   // --- Anzeige ---
 
+  // Kugelfarbe je Spieler (ohne Rot: rot ist die Zielkugel). Die Namen oben tragen dieselbe Farbe.
+  const BALL_COLORS = ["#3b82f6", "#f59e0b", "#22c55e", "#a855f7", "#14b8a6", "#eab308", "#6366f1", "#84cc16", "#06b6d4", "#8b5cf6", "#10b981", "#0ea5e9", "#facc15", "#1d4ed8", "#65a30d", "#7c3aed"];
+  const ballColor = (s, n) => BALL_COLORS[Math.max(0, s.players.indexOf(n)) % BALL_COLORS.length];
+
   function chipsHtml(s) {
-    const chip = (text, cls = "") => `<li class="${cls}">${text}</li>`;
+    const chip = (text, cls = "", n = null) => `<li class="${cls}"${n ? ` style="--ball:${ballColor(s, n)}"` : ""}>${text}</li>`;
     let items = [];
     switch (s.phase) {
       case "throw":
-        items = s.order.map((n, i) => chip(`${i < s.turn ? "✓ " : ""}${escapeHtml(n)}`, i === s.turn ? "now" : i < s.turn ? "done" : ""));
+        items = s.order.map((n, i) => chip(`${i < s.turn ? "✓ " : ""}${escapeHtml(n)}`, i === s.turn ? "now" : i < s.turn ? "done" : "", n));
         break;
       case "result": {
         const { dist, far, near } = s.result;
         items = [...s.order]
           .sort((a, b) => dist[a] - dist[b])
-          .map((n) => chip(`${n === near ? "🏆 " : n === far ? "🍺 " : ""}${escapeHtml(n)} ${metres(dist[n])}${s.touched.includes(n) ? " ⚠️" : ""}`, n === far ? "bad" : n === near ? "good" : ""));
+          .map((n) => chip(`${n === near ? "🏆 " : n === far ? "🍺 " : ""}${escapeHtml(n)} ${metres(dist[n])}${s.touched.includes(n) ? " ⚠️" : ""}`, n === far ? "bad" : n === near ? "good" : "", n));
         break;
       }
       case "drink":
@@ -932,5 +936,5 @@
   });
 
   // Für hodenritter-3d.js und Tests
-  window.Hodenritter = { simulate, HOME, STEP, taskGoal, SEAT_GAP, CHAIR_Y, THROW_Y, RANGE, B_R, W_R, FIELD, TREE, KINDS, TASKS, DRINK_SECS, seatX, thrower, bowTargets, beerOf, act, setup };
+  window.Hodenritter = { BALL_COLORS, simulate, HOME, STEP, taskGoal, SEAT_GAP, CHAIR_Y, THROW_Y, RANGE, B_R, W_R, FIELD, TREE, KINDS, TASKS, DRINK_SECS, seatX, thrower, bowTargets, beerOf, act, setup };
 })();

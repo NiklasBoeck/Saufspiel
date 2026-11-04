@@ -7,6 +7,13 @@ window.Hodenritter3D = (() => {
   const H = window.Hodenritter;
   const P = (x, y, h = 0) => new THREE.Vector3(x, h, -y);
   const TAU = Math.PI * 2;
+  // Schrift der Anzeigen auf dem Spielfeld (wie die App, sonst Systemschrift)
+  const FONT = '"Bricolage", system-ui, sans-serif';
+  try {
+    document.fonts?.load(`700 13px "Bricolage"`);
+  } catch {
+    // ohne Font-API eben Systemschrift
+  }
   // Grafikstufe: 0 = sparsam (Tests ohne Grafikkarte, schwache Handys), 1 = Handy, 2 = voll.
   // ?lowgfx oder localStorage hr-lowgfx erzwingt 0, hr-q merkt sich, wenn es auf diesem Gerät zu langsam war. ?q=2 zum Testen.
   const store = (k, v) => {
@@ -2029,7 +2036,7 @@ window.Hodenritter3D = (() => {
 
   // --- Kugeln ---
 
-  const BALL_COLORS = ["#3b82f6", "#f59e0b", "#22c55e", "#a855f7", "#14b8a6", "#eab308", "#6366f1", "#84cc16", "#06b6d4", "#8b5cf6", "#10b981", "#0ea5e9", "#facc15", "#1d4ed8", "#65a30d", "#7c3aed"]; // ohne Rot: rot ist die Zielkugel
+  const BALL_COLORS = H.BALL_COLORS; // in hodenritter.js, die Namen oben tragen dieselbe Farbe
 
   function ballColor(name) {
     return BALL_COLORS[Math.max(0, S.players.indexOf(name)) % BALL_COLORS.length];
@@ -2815,7 +2822,7 @@ window.Hodenritter3D = (() => {
 
   let placed = []; // schon gezeichnete Schilder, damit sich keine überdecken
   function label(text, x, y, opt = {}) {
-    hctx.font = `700 ${opt.size ?? 13}px system-ui, sans-serif`;
+    hctx.font = `700 ${opt.size ?? 13}px ${FONT}`;
     const w = hctx.measureText(text).width + 14;
     const h = (opt.size ?? 13) + 9;
     if (opt.avoid) {
@@ -2826,18 +2833,25 @@ window.Hodenritter3D = (() => {
       }
       placed.push({ x, y, w, h });
     }
-    hctx.fillStyle = opt.bg ?? "rgba(15,12,30,0.62)";
+    // kleines Emaille-Schild: dunkle Fläche, feine helle Kante innen
+    hctx.fillStyle = opt.bg ?? "rgba(22,46,32,0.86)";
     hctx.beginPath();
     if (hctx.roundRect) hctx.roundRect(x - w / 2, y - h, w, h, h / 2);
     else hctx.rect(x - w / 2, y - h, w, h);
     hctx.fill();
+    hctx.strokeStyle = opt.rim ?? "rgba(247,240,220,0.55)";
+    hctx.lineWidth = 1.2;
+    hctx.beginPath();
+    if (hctx.roundRect) hctx.roundRect(x - w / 2 + 2, y - h + 2, w - 4, h - 4, h / 2 - 2);
+    else hctx.rect(x - w / 2 + 2, y - h + 2, w - 4, h - 4);
+    hctx.stroke();
     if (opt.dot) {
       hctx.fillStyle = opt.dot;
       hctx.beginPath();
       hctx.arc(x - w / 2 + 9, y - h / 2, 4, 0, TAU);
       hctx.fill();
     }
-    hctx.fillStyle = opt.color ?? "#fff";
+    hctx.fillStyle = opt.color ?? "#f7f0dc";
     hctx.textAlign = "center";
     hctx.textBaseline = "middle";
     hctx.fillText(text, x + (opt.dot ? 5 : 0), y - h / 2 + 0.5);
@@ -2881,19 +2895,19 @@ window.Hodenritter3D = (() => {
     const bw = w - 32;
     const by = T + 8;
     const u = spinning ? m.v / 5 : m.g === "spin" ? (m.v - 5) / (m.goal - 5) : m.v / m.goal;
-    hctx.fillStyle = "rgba(15,12,30,0.6)";
+    hctx.fillStyle = "rgba(22,46,32,0.6)";
     roundRect(bx, by, bw, 16, 8);
     hctx.fill();
     const gr = hctx.createLinearGradient(bx, 0, bx + bw, 0);
-    gr.addColorStop(0, "#facc15");
-    gr.addColorStop(1, "#22c55e");
+    gr.addColorStop(0, "#efb22f");
+    gr.addColorStop(1, "#4f9d5d");
     hctx.fillStyle = gr;
     roundRect(bx + 2, by + 2, (bw - 4) * Math.min(1, Math.max(0, u)), 12, 6);
     hctx.fill();
     const icon = { run: "🏃", beer: "🍺", spin: spinning ? "🌀" : "🏃", hop: "🦶", jacks: "🙆", squat: "🏋️" }[m.g];
     const count = spinning ? `${Math.floor(m.v)} von 5 Drehungen` : m.g === "spin" ? `${Math.floor(m.v - 5)} / ${m.goal - 5}` : `${Math.floor(m.v)} / ${m.goal}`;
     label(`${icon} ${count}`, w / 2, by + 42, { size: 14 });
-    hctx.font = "700 18px system-ui, sans-serif";
+    hctx.font = `700 18px ${FONT}`;
     hctx.textAlign = "right";
     hctx.textBaseline = "middle";
     hctx.fillText("🏁", bx + bw + 4, by + 8);
@@ -2911,16 +2925,16 @@ window.Hodenritter3D = (() => {
         const pw = w / 2 - 18;
         const next = m.side !== side;
         const hit = now - m.pads[side] < 120;
-        hctx.fillStyle = hit ? "rgba(250,204,21,0.75)" : next ? `rgba(255,255,255,${0.16 + pulse * 0.16})` : "rgba(15,12,30,0.35)";
+        hctx.fillStyle = hit ? "rgba(239,178,47,0.8)" : next ? `rgba(255,255,255,${0.16 + pulse * 0.16})` : "rgba(22,46,32,0.35)";
         roundRect(x, py, pw, ph, 22);
         hctx.fill();
         hctx.strokeStyle = next ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.25)";
         hctx.lineWidth = 2;
         hctx.stroke();
         hctx.fillStyle = "#fff";
-        hctx.font = "800 30px system-ui, sans-serif";
+        hctx.font = `800 30px ${FONT}`;
         hctx.fillText(side === "L" ? "👣" : "👣", x + pw / 2, py + ph / 2 - 10);
-        hctx.font = "800 15px system-ui, sans-serif";
+        hctx.font = `800 15px ${FONT}`;
         hctx.fillText(side === "L" ? "LINKS" : "RECHTS", x + pw / 2, py + ph / 2 + 24);
       }
       if (m.g === "beer") {
@@ -2945,10 +2959,10 @@ window.Hodenritter3D = (() => {
         hctx.fillStyle = "#fffbeb";
         hctx.fillRect(gx - gw / 2, top - Math.abs(wob) - 7, gw, 8);
         hctx.restore();
-        hctx.strokeStyle = m.slosh > 0.65 ? "#ef4444" : "rgba(255,255,255,0.9)";
+        hctx.strokeStyle = m.slosh > 0.65 ? "#d63a2f" : "rgba(255,255,255,0.9)";
         hctx.lineWidth = 3;
         hctx.strokeRect(gx - gw / 2, gy, gw, gh);
-        if (m.slosh > 0.6) label("Ruhig!", gx, gy + gh + 22, { size: 12, bg: "rgba(185,28,28,0.9)" });
+        if (m.slosh > 0.6) label("Ruhig!", gx, gy + gh + 22, { size: 12, bg: "rgba(214,58,47,0.95)" });
       }
     } else if (spinning) {
       const r = Math.min(w, hh) * 0.26;
@@ -2958,7 +2972,7 @@ window.Hodenritter3D = (() => {
       hctx.beginPath();
       hctx.arc(cx, h2, r, 0, TAU);
       hctx.stroke();
-      hctx.strokeStyle = "#facc15";
+      hctx.strokeStyle = "#efb22f";
       hctx.beginPath();
       hctx.arc(cx, h2, r, -Math.PI / 2, -Math.PI / 2 + (m.v % 1) * TAU * Math.sign(m.acc || 1), m.acc < 0);
       hctx.stroke();
@@ -2967,12 +2981,12 @@ window.Hodenritter3D = (() => {
       hctx.beginPath();
       hctx.arc(cx + Math.cos(a) * r, h2 + Math.sin(a) * r, 12, 0, TAU);
       hctx.fill();
-      hctx.font = "800 15px system-ui, sans-serif";
+      hctx.font = `800 15px ${FONT}`;
       hctx.fillText("Kreise ziehen", cx, h2);
     } else if (m.g === "hop") {
       const y0 = T + hh * 0.3;
       const y1 = T + hh * 0.8;
-      hctx.fillStyle = "rgba(15,12,30,0.45)";
+      hctx.fillStyle = "rgba(22,46,32,0.45)";
       roundRect(cx - 26, y0 - 24, 52, y1 - y0 + 48, 26);
       hctx.fill();
       hctx.fillStyle = "rgba(34,197,94,0.75)";
@@ -2983,12 +2997,12 @@ window.Hodenritter3D = (() => {
       hctx.beginPath();
       hctx.arc(cx, by2, 18, 0, TAU);
       hctx.fill();
-      hctx.font = "800 15px system-ui, sans-serif";
+      hctx.font = `800 15px ${FONT}`;
       hctx.fillStyle = "#fff";
       hctx.fillText("Tippen, wenn er unten ist!", cx, y0 - 40);
     } else if (m.g === "jacks") {
       const dy = (m.up ? 1 : -1) * (6 + pulse * 10);
-      hctx.font = "800 64px system-ui, sans-serif";
+      hctx.font = `800 64px ${FONT}`;
       hctx.fillStyle = "#fff";
       hctx.fillText(m.up ? "⬇️" : "⬆️", cx, cy + dy);
       label(m.up ? "Jetzt runter wischen" : "Hoch wischen", cx, cy + 70, { size: 15 });
@@ -2996,7 +3010,7 @@ window.Hodenritter3D = (() => {
       const y0 = T + hh * 0.25;
       const y1 = T + hh * 0.82;
       const sc = (v) => y0 + ((y1 - y0) * v) / 1.4;
-      hctx.fillStyle = "rgba(15,12,30,0.5)";
+      hctx.fillStyle = "rgba(22,46,32,0.5)";
       roundRect(cx - 22, y0, 44, y1 - y0, 14);
       hctx.fill();
       hctx.fillStyle = "rgba(34,197,94,0.8)";
@@ -3012,9 +3026,9 @@ window.Hodenritter3D = (() => {
     const age = now - m.msgAt;
     if (m.msg && age < 900) {
       hctx.globalAlpha = 1 - age / 900;
-      hctx.font = `900 ${28 + (1 - age / 900) * 8}px system-ui, sans-serif`;
+      hctx.font = `900 ${28 + (1 - age / 900) * 8}px ${FONT}`;
       hctx.lineWidth = 6;
-      hctx.strokeStyle = "rgba(15,12,30,0.75)";
+      hctx.strokeStyle = "rgba(22,46,32,0.75)";
       hctx.strokeText(m.msg, cx, T + hh * 0.35 - age / 30);
       hctx.fillStyle = m.msgGood ? "#bbf7d0" : "#fecaca";
       hctx.fillText(m.msg, cx, T + hh * 0.35 - age / 30);
@@ -3039,7 +3053,7 @@ window.Hodenritter3D = (() => {
         const actor = name === H.thrower(S) || (S.phase === "bow" && name === S.bow.queue[0]) || (S.phase === "task" && name === S.task.who);
         const dist = G.camera.position.distanceTo(head);
         if (!actor && dist > 9) continue;
-        label(shortName(name), s.x, s.y - 4, { avoid: true, size: actor ? 14 : 11, bg: actor ? "rgba(250,204,21,0.92)" : undefined, color: actor ? "#1b1033" : "#fff", dot: S.phase === "throw" || S.phase === "white" ? ballColor(name) : null });
+        label(shortName(name), s.x, s.y - 4, { avoid: true, size: actor ? 14 : 11, bg: actor ? "rgba(239,178,47,0.96)" : undefined, color: actor ? "#1d3a2a" : "#fff", dot: S.phase === "throw" || S.phase === "white" ? ballColor(name) : null });
       }
     }
 
@@ -3070,7 +3084,7 @@ window.Hodenritter3D = (() => {
         const touched = S.touched.includes(id);
         const far = id === S.result.far;
         const near = id === S.result.near;
-        label(`${shortName(id)} ${d.toFixed(2).replace(".", ",")} m${touched ? " ⚠️" : ""}`, s.x, s.y, { avoid: true, size: 12, dot: ballColor(id), bg: far ? "rgba(185,28,28,0.9)" : near ? "rgba(21,128,61,0.92)" : undefined });
+        label(`${shortName(id)} ${d.toFixed(2).replace(".", ",")} m${touched ? " ⚠️" : ""}`, s.x, s.y, { avoid: true, size: 12, dot: ballColor(id), bg: far ? "rgba(214,58,47,0.95)" : near ? "rgba(47,125,70,0.95)" : undefined });
       }
     } else if (S.phase === "throw" || S.phase === "white") {
       for (const [id, b] of balls) {
@@ -3136,13 +3150,20 @@ window.Hodenritter3D = (() => {
       const bw = 22;
       const bx = w - 30;
       const by = (T + B) / 2 + bh / 2;
-      hctx.fillStyle = "rgba(15,12,30,0.6)";
-      roundRect(bx - bw / 2 - 5, by - bh - 5, bw + 10, bh + 10, 10);
+      // Rahmen wie ein Emaille-Schild: creme, dunkelgrüne Linie, innen dunkel
+      hctx.fillStyle = "#f7f0dc";
+      roundRect(bx - bw / 2 - 7, by - bh - 7, bw + 14, bh + 14, 12);
+      hctx.fill();
+      hctx.fillStyle = "#1d3a2a";
+      roundRect(bx - bw / 2 - 4, by - bh - 4, bw + 8, bh + 8, 9);
+      hctx.fill();
+      hctx.fillStyle = "rgba(247,240,220,0.14)";
+      roundRect(bx - bw / 2, by - bh, bw, bh, 6);
       hctx.fill();
       const grad = hctx.createLinearGradient(0, by, 0, by - bh);
-      grad.addColorStop(0, "#22c55e");
-      grad.addColorStop(0.55, "#facc15");
-      grad.addColorStop(1, "#ef4444");
+      grad.addColorStop(0, "#6cc070");
+      grad.addColorStop(0.55, "#efb22f");
+      grad.addColorStop(1, "#d63a2f");
       hctx.fillStyle = grad;
       roundRect(bx - bw / 2, by - bh * aimPull.power, bw, bh * aimPull.power, 6);
       hctx.fill();
@@ -3166,7 +3187,7 @@ window.Hodenritter3D = (() => {
         hctx.stroke();
         hctx.setLineDash([]);
         hctx.fillStyle = "#fff";
-        hctx.font = "600 10px system-ui, sans-serif";
+        hctx.font = `600 10px ${FONT}`;
         hctx.textAlign = "right";
         hctx.textBaseline = "middle";
         hctx.fillText("letzter", bx - bw / 2 - 10, ly);
@@ -3179,10 +3200,7 @@ window.Hodenritter3D = (() => {
       hctx.lineTo(bx - bw / 2 - 12, py - 7);
       hctx.lineTo(bx - bw / 2 - 12, py + 7);
       hctx.fill();
-      hctx.font = "800 13px system-ui, sans-serif";
-      hctx.textAlign = "center";
-      hctx.textBaseline = "alphabetic";
-      hctx.fillText("Kraft", bx, by + 22);
+      label("Kraft", bx, by + 30, { size: 12 });
     } else if (canThrow() && !playing && !mini) {
       // Hinweis zum Werfen
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
@@ -3203,13 +3221,13 @@ window.Hodenritter3D = (() => {
         const head = p.root.position.clone();
         head.y += (p.look.height / 1.78) * (p.J.hipY + 1.05);
         const s = project(head);
-        if (s && d.done) label("✓ leer", s.x, s.y - 22, { size: 12, bg: "rgba(21,128,61,0.92)" });
+        if (s && d.done) label("✓ leer", s.x, s.y - 22, { size: 12, bg: "rgba(47,125,70,0.95)" });
       }
     } else if (S.phase === "task" && S.task.stage === "run") {
       const left = H.TASKS[S.task.i].s - t;
       clock = left > 0 ? `⏱ ${fmtClock(left)}` : "⏱ Zeit um!";
     }
-    if (clock) label(clock, w - 52, insets(now).top + (mini ? 70 : 34), { size: 20, bg: clock.includes("um") ? "rgba(185,28,28,0.9)" : "rgba(15,12,30,0.7)" });
+    if (clock) label(clock, w - 52, insets(now).top + (mini ? 70 : 34), { size: 20, bg: clock.includes("um") ? "rgba(214,58,47,0.95)" : "rgba(22,46,32,0.7)" });
 
     if (S.phase === "place" && canPlace() && !ghostAt) {
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
@@ -3244,7 +3262,7 @@ window.Hodenritter3D = (() => {
     if (!G || lost) {
       hctx.clearRect(0, 0, w, h);
       hctx.fillStyle = "#fff";
-      hctx.font = "600 15px system-ui, sans-serif";
+      hctx.font = `600 15px ${FONT}`;
       hctx.textAlign = "center";
       const msg = failed ? ["3D geht auf diesem Gerät leider nicht.", "Seite neu laden hilft manchmal."] : lost ? ["Grafik startet neu…"] : ["Lädt…"];
       msg.forEach((m, i) => hctx.fillText(m, w / 2, h / 2 + i * 22));
