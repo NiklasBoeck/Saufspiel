@@ -1434,3 +1434,17 @@ html[data-game="kistenturm"] #screen-game:has(.kt-view) .conn { position: fixed;
 .ww-cat-e { font-size: 1.6rem; }
 .ww-cat small { display: block; color: var(--muted); font-size: 0.78rem; }
 
+
+/* Trink-Meldung im flachen Querformat: kompakter, damit „Prost!“ immer zu sehen ist (auch mit mehreren Zeilen) */
+.da-box { max-height: 100%; overflow-y: auto; scrollbar-width: none; }
+@media (max-height: 520px) {
+  .drink-alert { padding: calc(8px + env(safe-area-inset-top)) 16px calc(8px + env(safe-area-inset-bottom)); }
+  .da-box { max-width: min(560px, 100%); gap: 8px; padding: 12px 18px; }
+  .da-emoji, .cheers { font-size: 2.4rem; }
+  .da-box h2, html.neu .da-box h2 { font-size: 1.5rem; }
+  .da-count { font-size: 1.8rem; }
+  #da-list { gap: 6px; }
+  #da-list li { padding: 6px 12px; font-size: 1.05rem; }
+  #da-list small { font-size: 0.8rem; }
+  .da-box .btn { padding: 10px; }
+}

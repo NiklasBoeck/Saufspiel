@@ -54,7 +54,7 @@ function vibrate(pattern) {
 // --- Menü ---
 
 // Reihenfolge im Menü. Spiele, die hier fehlen, kommen danach.
-const MENU_ORDER = ["flunky", "hodenritter", "kistenturm", "flasche", "dealer", "fenster", "randvoll", "duell", "eher", "busfahrer", "niewieder", "triade"];
+const MENU_ORDER = ["flunky", "hodenritter", "kistenturm", "flasche", "dealer", "fenster", "randvoll", "duell", "eher", "schiffe", "busfahrer", "niewieder", "triade"];
 
 function renderGames() {
   const list = $("game-list");

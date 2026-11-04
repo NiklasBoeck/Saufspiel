@@ -106,6 +106,13 @@ const DRAWN_ICONS = (() => {
           <path d="M4 28h9M6 34h11M10 22h4"/><path d="M15 41c3-1.5 6-1.5 9 0"/>`,
     },
 
+    // Schiffe versenken: Schiff auf den Wellen, daneben ein Einschlag
+    schiffe: {
+      f: `<path d="M5 29h30l-4.5 8h-21z"/>`,
+      i: `<path d="M5 29h30l-4.5 8h-21z"/><path d="M12 29v-6h12v6"/><path d="M16 23v-5h4v5"/><path d="M27 29v-4h5"/>
+          <path d="M3 42c3-2 5-2 8 0s5 2 8 0 5-2 8 0 5 2 8 0"/><circle cx="40" cy="15" r="3"/><path d="M40 6v3m0 12v3m-9-9h3m12 0h3m-14.5-6.5l2 2m9 9l2 2m0-13l-2 2m-9 9l-2 2"/>`,
+    },
+
     // --- Knöpfe und Einstellungen ---
     phone: {
       f: `<rect x="17" y="10" width="14" height="22" rx="1"/>`,
@@ -184,7 +191,7 @@ const DRAWN_ICONS = (() => {
     flunky: "#e4572e", hodenritter: "#5b9e6d", kistenturm: "#e9a23b", flasche: "#4f8fbf",
     dealer: "#d94a3d", fenster: "#e9b949", randvoll: "#efb030", duell: "#c9573c",
     eher: "#8f7ac8", busfahrer: "#e9b949", niewieder: "#e57a8f", pflicht: "#d94a3d",
-    triade: "#5b9e6d", luegen: "#4fa3a5", deckel: "#c9814a",
+    triade: "#5b9e6d", luegen: "#4fa3a5", deckel: "#c9814a", schiffe: "#4f8fbf",
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",

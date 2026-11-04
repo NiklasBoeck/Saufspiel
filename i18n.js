@@ -368,6 +368,19 @@ const GAME_TEXT = {
         "Bots vote on their own, usually with the majority.",
       ],
     },
+    schiffe: {
+      label: "Battleships",
+      description: "Hide your fleet, take turns firing. Hit = hand out a sip, sunk = a shot.",
+      rules: [
+        "Everyone secretly places 5 ships on their 8 × 8 sea. Ships may not touch, not even diagonally. If you can’t be bothered, roll the dice.",
+        "On one phone everyone places in turn while the others look away. While firing you only see hits and water, press and hold to see your own fleet. With several phones everyone places at the same time and sees their own fleet below.",
+        "Take turns firing: tap a square. With more than two players, tap at the top who you want to fire at.",
+        "Hit: you hand out 1 sip and fire again.",
+        "Ship sunk: you also hand out a shot 🥃. The squares around it turn light, no ship can be there.",
+        "Water: next player. Whoever’s fleet is completely sunk is out. Whoever still has a ship at the end wins.",
+        "Bots place their fleet themselves and fire smartly: after a hit they search out the ship.",
+      ],
+    },
     luegen: {
       label: "Lie Detector",
       description: "Lie or truth? Place your bets, then the machine measures your thumb.",
