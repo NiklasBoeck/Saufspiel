@@ -997,7 +997,7 @@ html[data-game="hodenritter"] {
 }
 html[data-game="hodenritter"] .hr-view { position: fixed; inset: 0; z-index: 0; min-height: 0; border-radius: 0; box-shadow: none; pointer-events: auto; }
 /* Vignette: Ränder leicht dunkler, der Blick geht zur Mitte vom Rasen */
-html[data-game="hodenritter"] .hr-view::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 55%, transparent 52%, rgb(16 34 22 / 0.36) 100%); }
+html[data-game="hodenritter"] .hr-view::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 55%, transparent 50%, rgb(70 30 12 / 0.38) 100%); }
 html[data-game="hodenritter"] .game-bar { position: fixed; z-index: 3; top: calc(6px + env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); pointer-events: none; }
 html[data-game="hodenritter"] .game-bar > * { pointer-events: auto; }
 html[data-game="hodenritter"] #screen-game .game-bar .btn {

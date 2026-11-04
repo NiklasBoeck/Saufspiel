@@ -171,7 +171,7 @@ window.Hodenritter3D = (() => {
   const RIM = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace(
       "#include <opaque_fragment>",
-      "outgoingLight += vec3(1.0, 0.95, 0.88) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * 0.3;\n#include <opaque_fragment>"
+      `outgoingLight += vec3(${LOOK.rim}) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * 0.3;\n#include <opaque_fragment>`
     );
   };
   function rim(m) {
@@ -336,18 +336,22 @@ window.Hodenritter3D = (() => {
 
   // --- Szene ---
 
-  const SUN_DIR = new THREE.Vector3(-0.66, 0.5, -0.56).normalize(); // tief stehende Abendsonne links über dem Rasen
+  const SUN_DIR = new THREE.Vector3(-0.66, 0.3, -0.56).normalize(); // tief stehende Abendsonne links über dem Rasen
 
   // Farbstimmung wie ein Post-Processing-Profil (URP-Volume), aber ohne Extra-Durchgang, damit es auf jedem Handy flüssig bleibt:
   // Tonemapping ACES mit etwas weniger Belichtung (mehr Kontrast, sattere Farben), Weißabgleich leicht warm,
   // Split-Toning über das Licht (warme Spitzlichter von der Abendsonne, kühle Schatten vom Himmel),
   // Dunst in der Horizontfarbe für Tiefe. Die Vignette macht style.css (.hr-view::after), die kostet nichts.
+  // Goldene Abendstunde: tiefe orange Sonne, rosa-goldener Himmel, kühles Blau von oben in den Schatten.
   const LOOK = {
-    exposure: 0.98,
-    sun: 0xffd29a, sunI: 3.0,
-    sky: 0xc4dcff, ground: 0xa08a52, hemiI: 1.2,
-    back: 0xaecdff, backI: 0.8,
-    fog: 0xd3e3ea, fogNear: 30, fogFar: 140,
+    exposure: 1.0,
+    sun: 0xffa45c, sunI: 3.3,
+    sky: 0xf2c4a4, ground: 0x8c7a3e, hemiI: 1.2,
+    back: 0x9fb4ff, backI: 0.75,
+    fog: 0xf0c49a, fogNear: 18, fogFar: 110,
+    skyTop: "0.16, 0.22, 0.52", skyMid: "0.93, 0.58, 0.52", skyHor: "1.0, 0.78, 0.50",
+    cloudLow: "#eab3ad", cloudHigh: "#fff1da",
+    rim: "1.0, 0.78, 0.55",
   };
 
   function pixelRatio() {
@@ -472,12 +476,12 @@ window.Hodenritter3D = (() => {
       fragmentShader: `varying vec3 vDir; uniform vec3 sunDir;
         void main(){
           float y = vDir.y;
-          vec3 top = vec3(0.10, 0.38, 0.90);
-          vec3 mid = vec3(0.36, 0.66, 1.0);
-          vec3 hor = vec3(0.84, 0.90, 0.93); // wie der Dunst, damit Bäume weich in den Himmel übergehen
+          vec3 top = vec3(${LOOK.skyTop});
+          vec3 mid = vec3(${LOOK.skyMid});
+          vec3 hor = vec3(${LOOK.skyHor}); // wie der Dunst, damit Bäume weich in den Himmel übergehen
           vec3 c = y > 0.1 ? mix(mid, top, smoothstep(0.1, 0.75, y)) : mix(hor, mid, smoothstep(-0.04, 0.1, y));
           float d = max(dot(normalize(vDir), sunDir), 0.0);
-          c += vec3(1.0, 0.85, 0.55) * (pow(d, 10.0) * 0.3 + pow(d, 300.0) * 2.0);
+          c += vec3(1.0, 0.72, 0.40) * (pow(d, 6.0) * 0.45 + pow(d, 300.0) * 2.5);
           gl_FragColor = vec4(c, 1.0);
           #include <colorspace_fragment>
         }`,
@@ -969,7 +973,7 @@ window.Hodenritter3D = (() => {
     scene.add(woodMesh);
 
     // Wolken: unten leicht bläulich, oben strahlend weiß
-    const cloudShade = (p, n) => new THREE.Color("#c8d9f2").lerp(new THREE.Color("#ffffff"), Math.min(1, Math.max(0, n.y * 0.7 + 0.5)));
+    const cloudShade = (p, n) => new THREE.Color(LOOK.cloudLow).lerp(new THREE.Color(LOOK.cloudHigh), Math.min(1, Math.max(0, n.y * 0.7 + 0.5)));
     const puffs = [];
     const cloudBlob = blobGeo(2);
     for (let c = 0; c < 12; c++) {
