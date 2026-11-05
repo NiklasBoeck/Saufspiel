@@ -58,7 +58,13 @@ window.Hodenritter3D = (() => {
     gl = document.createElement("canvas");
     hud = document.createElement("canvas");
     hud.className = "hr-hud";
-    el.append(gl, hud);
+    lookBtn = document.createElement("button");
+    lookBtn.type = "button";
+    lookBtn.className = "hr-look";
+    lookBtn.title = "Look wechseln: Comic oder wie früher";
+    lookBtn.onclick = () => setLook(LOOK.comic ? "alt" : "comic");
+    lookBtnText();
+    el.append(gl, hud, lookBtn);
     hctx = hud.getContext("2d");
     watchContext();
     hud.addEventListener("pointerdown", onDown);
@@ -168,9 +174,24 @@ window.Hodenritter3D = (() => {
   }
 
   // Comic-Look: helle Kante am Rand jeder Figur (wie Gegenlicht)
+  // Comic: Licht in drei Stufen (Schatten, Mitte, hell) mit weichen Kanten, die Farbe vom Licht bleibt erhalten
+  const TOON = `{
+      vec3 tb = max(diffuseColor.rgb, vec3(0.03));
+      float lf = dot(outgoingLight / tb, vec3(0.299, 0.587, 0.114));
+      float tt = mix(0.55, 0.88, smoothstep(0.40, 0.47, lf));
+      tt = mix(tt, 1.12, smoothstep(0.92, 0.99, lf));
+      outgoingLight *= tt / max(lf, 0.001);
+    }
+`;
+  // Comic-Schattierung gilt für alle festen Materialien (auch Hügel, Wald, Rasen), daher im gemeinsamen Shader-Stück
+  const OPAQUE = THREE.ShaderChunk.opaque_fragment;
+  function applyToon() {
+    THREE.ShaderChunk.opaque_fragment = LOOK.comic ? `#ifdef STANDARD\n${TOON}#endif\n${OPAQUE}` : OPAQUE;
+  }
   const RIM = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace(
       "#include <opaque_fragment>",
+
       `outgoingLight += vec3(${LOOK.rim}) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * 0.3;\n#include <opaque_fragment>`
     );
   };
@@ -336,29 +357,122 @@ window.Hodenritter3D = (() => {
 
   // --- Szene ---
 
-  const SUN_DIR = new THREE.Vector3(-0.66, 0.3, -0.56).normalize(); // tief stehende Abendsonne links über dem Rasen
-
-  // Farbstimmung wie ein Post-Processing-Profil (URP-Volume), aber ohne Extra-Durchgang, damit es auf jedem Handy flüssig bleibt:
-  // Tonemapping ACES mit etwas weniger Belichtung (mehr Kontrast, sattere Farben), Weißabgleich leicht warm,
-  // Split-Toning über das Licht (warme Spitzlichter von der Abendsonne, kühle Schatten vom Himmel),
-  // Dunst in der Horizontfarbe für Tiefe. Die Vignette macht style.css (.hr-view::after), die kostet nichts.
-  // Goldene Abendstunde: tiefe orange Sonne, rosa-goldener Himmel, kühles Blau von oben in den Schatten.
-  const LOOK = {
-    exposure: 1.0,
-    sun: 0xffa45c, sunI: 3.3,
-    sky: 0xf2c4a4, ground: 0x8c7a3e, hemiI: 1.2,
-    back: 0x9fb4ff, backI: 0.75,
-    fog: 0xf0c49a, fogNear: 18, fogFar: 110,
-    skyTop: "0.16, 0.22, 0.52", skyMid: "0.93, 0.58, 0.52", skyHor: "1.0, 0.78, 0.50",
-    cloudLow: "#eab3ad", cloudHigh: "#fff1da",
-    rim: "1.0, 0.78, 0.55",
+  // Zwei Looks zum Umschalten (Knopf oben rechts im Spiel, gemerkt in localStorage "hr-look"):
+  // "comic": goldene Abendstunde, flächige Cartoon-Schattierung und dunkle Umrisse
+  // "alt":   der Look bis 4.11.2026 (heller Tag, weiches Licht, keine Umrisse)
+  // Die Farbstimmung ist wie ein Post-Processing-Profil (URP-Volume) gebaut, aber ohne Extra-Durchgang,
+  // damit es auf jedem Handy flüssig bleibt: Tonemapping-Belichtung, Weißabgleich über das Licht,
+  // Split-Toning (warme Sonne, kühle Schatten vom Himmel), Dunst in der Horizontfarbe, Vignette per CSS.
+  const LOOKS = {
+    comic: {
+      comic: true,
+      sunDir: [-0.66, 0.3, -0.56],
+      exposure: 1.0,
+      sun: 0xffa45c, sunI: 3.3,
+      sky: 0xf2c4a4, ground: 0x8c7a3e, hemiI: 1.2,
+      back: 0x9fb4ff, backI: 0.75,
+      fog: 0xf0c49a, fogNear: 18, fogFar: 110,
+      skyTop: "0.16, 0.22, 0.52", skyMid: "0.93, 0.58, 0.52", skyHor: "1.0, 0.78, 0.50",
+      sunGlow: "vec3(1.0, 0.72, 0.40) * (pow(d, 6.0) * 0.45 + pow(d, 300.0) * 2.5)",
+      cloudLow: "#eab3ad", cloudHigh: "#fff1da",
+      rim: "1.0, 0.78, 0.55",
+    },
+    alt: {
+      comic: false,
+      sunDir: [-0.66, 0.5, -0.56],
+      exposure: 1.12,
+      sun: 0xfff1d6, sunI: 2.7,
+      sky: 0xcfe8ff, ground: 0x9c9a62, hemiI: 1.35,
+      back: 0xbfe0ff, backI: 0.9,
+      fog: 0xc4e2ff, fogNear: 45, fogFar: 150,
+      skyTop: "0.10, 0.38, 0.90", skyMid: "0.36, 0.66, 1.0", skyHor: "0.80, 0.91, 1.0",
+      sunGlow: "vec3(1.0, 0.85, 0.55) * (pow(d, 10.0) * 0.3 + pow(d, 300.0) * 2.0)",
+      cloudLow: "#c8d9f2", cloudHigh: "#ffffff",
+      rim: "1.0, 0.95, 0.88",
+    },
   };
+  let lookName = LOOKS[store("hr-look")] ? store("hr-look") : "comic";
+  let LOOK = LOOKS[lookName];
+  const SUN_DIR = new THREE.Vector3(...LOOK.sunDir).normalize(); // tief stehende Sonne links über dem Rasen
+  document.documentElement.classList.toggle("hr-comic", LOOK.comic);
+
+  // Comic-Umrisse: von jedem festen Körper eine dunkle Rückseite, im Bild ein paar Pixel nach außen geschoben
+  // (klassischer Handy-Trick statt Kantenfilter über das ganze Bild). Neue Figuren/Hindernisse bekommen sie im Lauf.
+  let outlineMat = null;
+  function outlineMaterial() {
+    if (outlineMat) return outlineMat;
+    outlineMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: { color: { value: new THREE.Color(0x2b1a12) }, width: { value: 1.6 }, res: { value: new THREE.Vector2(1, 1) } },
+      vertexShader: `uniform float width; uniform vec2 res;
+        void main(){
+          mat4 m = modelMatrix;
+          #ifdef USE_INSTANCING
+            m = m * instanceMatrix;
+          #endif
+          vec4 c = projectionMatrix * viewMatrix * m * vec4(position, 1.0);
+          vec3 vn = mat3(viewMatrix) * mat3(m) * normal;
+          vec2 d = (projectionMatrix * vec4(vn, 0.0)).xy;
+          float len = length(d);
+          if (len > 1e-5) c.xy += d / len * width * c.w * 2.0 / res;
+          gl_Position = c;
+        }`,
+      fragmentShader: "uniform vec3 color; void main(){ gl_FragColor = vec4(color, 1.0); }",
+    });
+    return outlineMat;
+  }
+  function addOutlines(root) {
+    const todo = [];
+    root.traverse((o) => {
+      if (!o.isMesh || o.userData.ol || o.userData.isOutline) return;
+      o.userData.ol = true;
+      const m = o.material;
+      if (Array.isArray(m) || !m || !m.isMeshStandardMaterial || m.transparent || m.side !== THREE.FrontSide || !o.geometry?.attributes?.normal) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      const bb = o.geometry.boundingBox;
+      const ext = [bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z];
+      if (Math.min(...ext) < 0.4 && Math.max(...ext) > 3) return; // Rasen, Terrasse: flach, keine Umrisse
+      if (bb.max.x - bb.min.x > 160) return; // Hügel ganz hinten
+      todo.push(o);
+    });
+    for (const o of todo) {
+      const om = o.isInstancedMesh ? new THREE.InstancedMesh(o.geometry, outlineMaterial(), o.count) : new THREE.Mesh(o.geometry, outlineMaterial());
+      if (o.isInstancedMesh) {
+        om.instanceMatrix = o.instanceMatrix;
+        om.onBeforeRender = () => (om.count = o.count);
+        om.frustumCulled = false;
+      }
+      om.userData.isOutline = true;
+      om.castShadow = om.receiveShadow = false;
+      om.raycast = () => {};
+      o.add(om);
+    }
+  }
+
+  // Look umschalten: Szene neu aufbauen (Licht, Himmel und Schattierung werden beim Bauen festgelegt)
+  function setLook(name) {
+    if (!LOOKS[name] || name === lookName) return;
+    lookName = name;
+    LOOK = LOOKS[name];
+    store("hr-look", name);
+    SUN_DIR.set(...LOOK.sunDir).normalize();
+    document.documentElement.classList.toggle("hr-comic", LOOK.comic);
+    outlineMat = null;
+    matCache.clear();
+    rebuild(true);
+    lookBtnText();
+  }
+  let lookBtn = null;
+  function lookBtnText() {
+    if (lookBtn) lookBtn.innerHTML = `<span aria-hidden="true">🎨</span> ${LOOK.comic ? "Comic" : "Alt"}`;
+  }
 
   function pixelRatio() {
     return Math.min(window.devicePixelRatio || 1, [1, 1.5, 2][Q]);
   }
 
   function init() {
+    applyToon();
     try {
       const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: Q > 0, powerPreference: Q > 1 ? "high-performance" : "default" });
       renderer.setPixelRatio(pixelRatio());
@@ -442,7 +556,7 @@ window.Hodenritter3D = (() => {
   }
 
   // Grafik abgestürzt (passiert auf iPhones, wenn der Speicher knapp wird): alles neu aufbauen, eine Stufe sparsamer
-  function rebuild() {
+  function rebuild(keepQuality = false) {
     try {
       G?.renderer.dispose();
     } catch {}
@@ -452,8 +566,10 @@ window.Hodenritter3D = (() => {
     gl = fresh;
     watchContext();
     lost = 0;
-    Q = Math.max(0, Q - 1);
-    store("hr-q", String(Q));
+    if (!keepQuality) {
+      Q = Math.max(0, Q - 1);
+      store("hr-q", String(Q));
+    }
     init();
   }
 
@@ -481,7 +597,7 @@ window.Hodenritter3D = (() => {
           vec3 hor = vec3(${LOOK.skyHor}); // wie der Dunst, damit Bäume weich in den Himmel übergehen
           vec3 c = y > 0.1 ? mix(mid, top, smoothstep(0.1, 0.75, y)) : mix(hor, mid, smoothstep(-0.04, 0.1, y));
           float d = max(dot(normalize(vDir), sunDir), 0.0);
-          c += vec3(1.0, 0.72, 0.40) * (pow(d, 6.0) * 0.45 + pow(d, 300.0) * 2.5);
+          c += ${LOOK.sunGlow};
           gl_FragColor = vec4(c, 1.0);
           #include <colorspace_fragment>
         }`,
@@ -3336,6 +3452,14 @@ window.Hodenritter3D = (() => {
     G.camera.position.copy(G.cam);
     G.camera.lookAt(G.look);
 
+    if (LOOK.comic && Q > 0) {
+      if (!G.olAt || now - G.olAt > 600) {
+        G.olAt = now;
+        addOutlines(G.scene);
+      }
+      outlineMaterial().uniforms.res.value.set(w, h);
+      outlineMaterial().uniforms.width.value = Math.min(w, h) > 600 ? 2 : 1.5;
+    }
     G.renderer.render(G.scene, G.camera);
     drawHud(now, balls);
   }

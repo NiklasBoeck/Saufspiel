@@ -997,7 +997,7 @@ html[data-game="hodenritter"] {
 }
 html[data-game="hodenritter"] .hr-view { position: fixed; inset: 0; z-index: 0; min-height: 0; border-radius: 0; box-shadow: none; pointer-events: auto; }
 /* Vignette: Ränder leicht dunkler, der Blick geht zur Mitte vom Rasen */
-html[data-game="hodenritter"] .hr-view::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 55%, transparent 50%, rgb(70 30 12 / 0.38) 100%); }
+html.hr-comic[data-game="hodenritter"] .hr-view::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 55%, transparent 50%, rgb(70 30 12 / 0.38) 100%); }
 html[data-game="hodenritter"] .game-bar { position: fixed; z-index: 3; top: calc(6px + env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); pointer-events: none; }
 html[data-game="hodenritter"] .game-bar > * { pointer-events: auto; }
 html[data-game="hodenritter"] #screen-game .game-bar .btn {
@@ -1074,6 +1074,15 @@ html[data-game="hodenritter"] #game-root .bf-actions .btn:active:not(:disabled) 
 html[data-game="hodenritter"] #game-root .bf-actions .btn:focus-visible { outline: 3px solid var(--hr-cream); outline-offset: 2px; }
 html[data-game="hodenritter"] .bf-actions .wait { color: var(--hr-cream); text-shadow: 0 1px 3px rgb(0 0 0 / 0.75); }
 html[data-game="hodenritter"] .hr-kinds .btn { padding: 4px 2px; font-size: 1.25rem; }
+/* Look-Schalter (Comic / Alt) am linken Rand: oben ist kein Platz neben Titel und Namen */
+html[data-game="hodenritter"] .hr-look {
+  position: absolute; z-index: 3; top: 58%; left: max(8px, env(safe-area-inset-left));
+  height: 30px; padding: 0 11px; border: none; border-radius: 999px; cursor: pointer;
+  background: var(--hr-cream); color: var(--hr-ink); box-shadow: var(--hr-rim), var(--hr-lift);
+  font-family: var(--hr-font); font-size: 0.72rem; font-weight: 800;
+}
+html[data-game="hodenritter"] .hr-look:active { transform: translateY(1px); }
+html[data-game="hodenritter"] .hr-look:focus-visible { outline: 3px solid var(--hr-gold); outline-offset: 2px; }
 /* Hindernis-Auswahl: alle gleich wichtig, also alle creme statt gold */
 html[data-game="hodenritter"] #game-root .bf-actions.hr-kinds .btn { background: var(--hr-cream); box-shadow: var(--hr-rim), 0 3px 0 var(--hr-ink); }
 html[data-game="hodenritter"] #game-root .hr-kinds .btn small { font-size: 0.6rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
