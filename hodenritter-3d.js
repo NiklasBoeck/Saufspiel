@@ -61,8 +61,7 @@ window.Hodenritter3D = (() => {
     lookBtn = document.createElement("button");
     lookBtn.type = "button";
     lookBtn.className = "hr-look";
-    lookBtn.title = "Look wechseln: Comic oder wie früher";
-    lookBtn.onclick = () => setLook(LOOK.comic ? "alt" : "comic");
+    lookBtn.onclick = () => setLook(LOOK_ORDER[(LOOK_ORDER.indexOf(lookName) + 1) % LOOK_ORDER.length]);
     lookBtnText();
     el.append(gl, hud, lookBtn);
     hctx = hud.getContext("2d");
@@ -377,6 +376,23 @@ window.Hodenritter3D = (() => {
       cloudLow: "#eab3ad", cloudHigh: "#fff1da",
       rim: "1.0, 0.78, 0.55",
     },
+    // Nacht-Party: dunkelblauer Himmel mit Sternen und Mond, kühles Mondlicht, warmes Licht von den Lichterketten an der Terrasse
+    nacht: {
+      comic: false,
+      stars: true,
+      sunDir: [-0.45, 0.62, -0.64],
+      exposure: 1.1,
+      sun: 0xa9bfff, sunI: 1.35,
+      sky: 0x41538f, ground: 0x2e2a1c, hemiI: 0.8,
+      back: 0xffae62, backI: 0.95, backPos: [0, -22, 5],
+      fog: 0x18203c, fogNear: 14, fogFar: 85,
+      skyTop: "0.015, 0.025, 0.09", skyMid: "0.04, 0.07, 0.20", skyHor: "0.10, 0.13, 0.26",
+      sunGlow: "vec3(0.80, 0.86, 1.0) * (pow(d, 40.0) * 0.25 + smoothstep(0.9993, 0.9996, d) * 1.6)",
+      cloudLow: "#222a48", cloudHigh: "#56628f",
+      rim: "1.0, 0.72, 0.42",
+      glow: 1.6,
+      envGround: 0x0c160b,
+    },
     alt: {
       comic: false,
       sunDir: [-0.66, 0.5, -0.56],
@@ -391,10 +407,16 @@ window.Hodenritter3D = (() => {
       rim: "1.0, 0.95, 0.88",
     },
   };
+  const LOOK_ORDER = ["comic", "nacht", "alt"];
+  const LOOK_LABEL = { comic: "Comic", nacht: "Nacht", alt: "Alt" };
+  const LOOK_ICON = { comic: "🖍️", nacht: "🌙", alt: "☀️" };
   let lookName = LOOKS[store("hr-look")] ? store("hr-look") : "comic";
   let LOOK = LOOKS[lookName];
   const SUN_DIR = new THREE.Vector3(...LOOK.sunDir).normalize(); // tief stehende Sonne links über dem Rasen
-  document.documentElement.classList.toggle("hr-comic", LOOK.comic);
+  const lookClass = () => {
+    for (const n of LOOK_ORDER) document.documentElement.classList.toggle(`hr-look-${n}`, n === lookName);
+  };
+  lookClass();
 
   // Comic-Umrisse: von jedem festen Körper eine dunkle Rückseite, im Bild ein paar Pixel nach außen geschoben
   // (klassischer Handy-Trick statt Kantenfilter über das ganze Bild). Neue Figuren/Hindernisse bekommen sie im Lauf.
@@ -456,15 +478,20 @@ window.Hodenritter3D = (() => {
     LOOK = LOOKS[name];
     store("hr-look", name);
     SUN_DIR.set(...LOOK.sunDir).normalize();
-    document.documentElement.classList.toggle("hr-comic", LOOK.comic);
+    lookClass();
+    lookShownAt = performance.now();
     outlineMat = null;
     matCache.clear();
     rebuild(true);
     lookBtnText();
   }
   let lookBtn = null;
+  let lookShownAt = 0; // nach dem Umschalten kurz den Namen vom Look zeigen
   function lookBtnText() {
-    if (lookBtn) lookBtn.innerHTML = `<span aria-hidden="true">🎨</span> ${LOOK.comic ? "Comic" : "Alt"}`;
+    if (!lookBtn) return;
+    lookBtn.textContent = LOOK_ICON[lookName];
+    const next = LOOK_ORDER[(LOOK_ORDER.indexOf(lookName) + 1) % LOOK_ORDER.length];
+    lookBtn.title = lookBtn.ariaLabel = `Look: ${LOOK_LABEL[lookName]}. Tippen für ${LOOK_LABEL[next]}`;
   }
 
   function pixelRatio() {
@@ -490,7 +517,7 @@ window.Hodenritter3D = (() => {
       // Umgebung für Spiegelungen auf den Stahlkugeln
       const envScene = new THREE.Scene();
       envScene.add(makeSky());
-      const envGround = new THREE.Mesh(new THREE.CircleGeometry(150, 32), new THREE.MeshBasicMaterial({ color: 0x4f9a33 }));
+      const envGround = new THREE.Mesh(new THREE.CircleGeometry(150, 32), new THREE.MeshBasicMaterial({ color: LOOK.envGround ?? 0x4f9a33 }));
       envGround.rotation.x = -Math.PI / 2;
       envGround.position.y = -1;
       envScene.add(envGround);
@@ -512,7 +539,7 @@ window.Hodenritter3D = (() => {
       scene.add(sun, sun.target);
       // Gegenlicht vom Rasen her: helle Kanten an Figuren und Bäumen
       const back = new THREE.DirectionalLight(LOOK.back, LOOK.backI);
-      back.position.copy(P(4, 40, 12));
+      back.position.copy(P(...(LOOK.backPos ?? [4, 40, 12])));
       scene.add(back);
 
       const rnd = seeded(7);
@@ -598,6 +625,9 @@ window.Hodenritter3D = (() => {
           vec3 c = y > 0.1 ? mix(mid, top, smoothstep(0.1, 0.75, y)) : mix(hor, mid, smoothstep(-0.04, 0.1, y));
           float d = max(dot(normalize(vDir), sunDir), 0.0);
           c += ${LOOK.sunGlow};
+          ${LOOK.stars ? `vec3 sg = floor(normalize(vDir) * 260.0);
+          float sh = fract(sin(dot(sg, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          c += step(0.9965, sh) * smoothstep(0.04, 0.35, y) * (0.55 + 0.45 * fract(sh * 91.0)) * vec3(0.95, 0.95, 1.0);` : ""}
           gl_FragColor = vec4(c, 1.0);
           #include <colorspace_fragment>
         }`,
@@ -843,7 +873,8 @@ window.Hodenritter3D = (() => {
     const glowGeo = new THREE.BufferGeometry();
     glowGeo.setAttribute("position", new THREE.BufferAttribute(glowPos, 3));
     glowGeo.setAttribute("color", new THREE.BufferAttribute(glowCol, 3));
-    const glow = new THREE.Points(glowGeo, new THREE.PointsMaterial({ size: 0.26, map: glowTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.75 }));
+    const glow = new THREE.Points(glowGeo, new THREE.PointsMaterial({ size: 0.26, map: glowTex(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: Math.min(1, 0.75 * (LOOK.glow ?? 1)) }));
+    if (LOOK.glow) glow.material.size *= LOOK.glow;
     scene.add(glow);
 
     // Hecke hinten: ein runder Wulst mit Blätterkugeln obendrauf
@@ -3338,6 +3369,11 @@ window.Hodenritter3D = (() => {
       const pulse = 0.6 + 0.4 * Math.sin(now / 350);
       hctx.globalAlpha = pulse;
       label(w < 420 ? "👆 runterziehen, lenken, loslassen" : "👆 nach unten ziehen, zur Seite lenken, loslassen", w / 2, insets(now).bottom - 8, { size: 13 });
+      hctx.globalAlpha = 1;
+    }
+    if (now - lookShownAt < 1600) {
+      hctx.globalAlpha = Math.min(1, (1600 - (now - lookShownAt)) / 300);
+      label(`Look: ${LOOK_LABEL[lookName]}`, w / 2, insets(now).top + 64, { size: 16 });
       hctx.globalAlpha = 1;
     }
     if (mini) drawMini(now);
