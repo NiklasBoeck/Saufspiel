@@ -180,6 +180,13 @@ const DRAWN_ICONS = (() => {
       f: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/>`,
       i: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/><text x="24" y="26.5" text-anchor="middle" font-size="12" font-weight="800" font-family="system-ui, sans-serif" style="fill:var(--ink,#211910);stroke:none">EN</text>`,
     },
+    // Promille-Rechner: Messuhr mit Zeiger, darunter ‰
+    promille: {
+      f: `<path d="M6 32a18 18 0 0 1 36 0z"/>`,
+      i: `<path d="M6 32a18 18 0 0 1 36 0"/><path d="M4 32h40"/><path d="M24 32l9-11"/><circle cx="24" cy="32" r="2.3"/>
+          <path d="M10.5 22.5l2.6 1.6M24 14v3M37.5 22.5l-2.6 1.6M15.5 16.5l1.7 2.3M32.5 16.5l-1.7 2.3"/>
+          <text x="24" y="45" text-anchor="middle" font-size="10" font-weight="800" font-family="system-ui, sans-serif" style="fill:var(--ink,#211910);stroke:none">‰</text>`,
+    },
     klassisch: {
       f: `<rect x="9" y="9" width="30" height="30" rx="9"/>`,
       i: `<rect x="9" y="9" width="30" height="30" rx="9"/><circle cx="19" cy="21" r="1.6"/><circle cx="29" cy="21" r="1.6"/><path d="M18 28c3.5 3 8.5 3 12 0"/>`,
@@ -191,7 +198,7 @@ const DRAWN_ICONS = (() => {
     flunky: "#e4572e", hodenritter: "#5b9e6d", kistenturm: "#e9a23b", flasche: "#4f8fbf",
     dealer: "#d94a3d", fenster: "#e9b949", randvoll: "#efb030", duell: "#c9573c",
     eher: "#8f7ac8", busfahrer: "#e9b949", niewieder: "#e57a8f", pflicht: "#d94a3d",
-    triade: "#5b9e6d", luegen: "#4fa3a5", deckel: "#c9814a", schiffe: "#4f8fbf",
+    triade: "#5b9e6d", promille: "#4fa3a5", luegen: "#4fa3a5", deckel: "#c9814a", schiffe: "#4f8fbf",
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",
