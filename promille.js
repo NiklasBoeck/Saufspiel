@@ -12,17 +12,18 @@ const Promille = (() => {
   const KEEP = 48 * HOUR; // ältere Einträge fliegen raus
   const STEP = MIN;
 
-  // Getränke zum Antippen: ml und Volumenprozent
+  // Getränke zum Antippen: ml, Volumenprozent und wie lange man ungefähr dran trinkt (Minuten).
+  // Die eingetragene Zeit ist, wann das Glas leer war; getrunken wurde in den dur Minuten davor.
   const PRESETS = [
-    { id: "bier5", name: "Bier 0,5 l", emoji: "🍺", ml: 500, pct: 5 },
-    { id: "bier33", name: "Bier 0,33 l", emoji: "🍺", ml: 330, pct: 5 },
-    { id: "mass", name: "Maß 1 l", emoji: "🍻", ml: 1000, pct: 5.8 },
-    { id: "radler", name: "Radler 0,5 l", emoji: "🍋", ml: 500, pct: 2.5 },
-    { id: "wein", name: "Wein 0,2 l", emoji: "🍷", ml: 200, pct: 12 },
-    { id: "sekt", name: "Sekt 0,1 l", emoji: "🥂", ml: 100, pct: 11 },
-    { id: "schnaps", name: "Schnaps 2 cl", emoji: "🥃", ml: 20, pct: 40 },
-    { id: "longdrink", name: "Longdrink (4 cl)", emoji: "🧉", ml: 300, pct: 5.3 },
-    { id: "cocktail", name: "Cocktail", emoji: "🍹", ml: 300, pct: 10 },
+    { id: "bier5", name: "Bier 0,5 l", emoji: "🍺", ml: 500, pct: 5, dur: 15 },
+    { id: "bier33", name: "Bier 0,33 l", emoji: "🍺", ml: 330, pct: 5, dur: 10 },
+    { id: "mass", name: "Maß 1 l", emoji: "🍻", ml: 1000, pct: 5.8, dur: 30 },
+    { id: "radler", name: "Radler 0,5 l", emoji: "🍋", ml: 500, pct: 2.5, dur: 15 },
+    { id: "wein", name: "Wein 0,2 l", emoji: "🍷", ml: 200, pct: 12, dur: 20 },
+    { id: "sekt", name: "Sekt 0,1 l", emoji: "🥂", ml: 100, pct: 11, dur: 10 },
+    { id: "schnaps", name: "Schnaps 2 cl", emoji: "🥃", ml: 20, pct: 40, dur: 0 },
+    { id: "longdrink", name: "Longdrink (4 cl)", emoji: "🧉", ml: 300, pct: 5.3, dur: 15 },
+    { id: "cocktail", name: "Cocktail", emoji: "🍹", ml: 300, pct: 10, dur: 15 },
   ];
 
   const $ = (id) => document.getElementById(id);
@@ -35,15 +36,22 @@ const Promille = (() => {
   let editing = null; // id des Eintrags, dessen Uhrzeit gerade geändert wird
   let editProfile = false;
   let timer = null;
+  let openNight = null; // aufgeklappter Abend im Archiv
 
   function load() {
     try {
       const d = JSON.parse(localStorage.getItem(KEY));
-      if (d && typeof d === "object") return { profile: d.profile || null, drinks: Array.isArray(d.drinks) ? d.drinks : [], mine: Array.isArray(d.mine) ? d.mine : [] };
+      if (d && typeof d === "object")
+        return {
+          profile: d.profile || null,
+          drinks: Array.isArray(d.drinks) ? d.drinks : [],
+          mine: Array.isArray(d.mine) ? d.mine : [],
+          nights: Array.isArray(d.nights) ? d.nights : [],
+        };
     } catch {
       // kaputt oder nicht erlaubt, dann leer
     }
-    return { profile: null, drinks: [], mine: [] };
+    return { profile: null, drinks: [], mine: [], nights: [] };
   }
   function save() {
     try {
@@ -60,27 +68,40 @@ const Promille = (() => {
     if (p.sex === "w") return -2.097 + 0.1069 * p.height + 0.2466 * p.weight;
     return 2.447 - 0.09516 * p.age + 0.1074 * p.height + 0.3362 * p.weight;
   }
+  // Trinkdauer schätzen, wenn keine da ist: Shots sofort, sonst etwa 15 Minuten pro halben Liter
+  const durFor = (ml) => (ml <= 50 ? 0 : Math.max(5, Math.min(45, Math.round((ml / 500) * 15))));
+  const durOf = (d) => (Number.isFinite(d.dur) ? d.dur : durFor(d.ml));
   const grams = (d) => d.ml * (d.pct / 100) * 0.789;
   // So viel ‰ bringt ein Getränk, wenn es ganz im Blut ist
   const peakOf = (d, tbw) => (grams(d) * (1 - DEFICIT) * 0.8) / (1.055 * tbw);
 
   // Verlauf von der ersten Getränkezeit bis wieder 0 (oder mindestens bis jetzt)
-  function simulate(now) {
-    const p = data.profile;
-    const drinks = data.drinks.slice().sort((a, b) => a.t - b.t);
+  function simulate(now, list = data.drinks, p = data.profile) {
+    const drinks = list.slice().sort((a, b) => a.t - b.t);
     if (!p || !drinks.length) return null;
     const tbw = Math.max(bodyWater(p), 10);
     const peaks = drinks.map((d) => peakOf(d, tbw));
-    const start = Math.floor(drinks[0].t / STEP) * STEP;
-    const lastIn = drinks[drinks.length - 1].t + ABSORB;
+    // Jedes Getränk in Minuten-Schlucke über die Trinkdauer aufteilen
+    const sips = drinks.map((d) => {
+      const n = Math.max(1, Math.round(durOf(d)));
+      const from = d.t - durOf(d) * MIN;
+      return durOf(d) > 0 ? Array.from({ length: n }, (_, k) => from + ((k + 0.5) / n) * (d.t - from)) : [d.t];
+    });
+    const first = Math.min(...sips.map((x) => x[0]));
+    const start = Math.floor(first / STEP) * STEP;
+    const lastIn = Math.max(...drinks.map((d) => d.t)) + ABSORB;
     const pts = [];
     let bac = 0;
     let before = 0;
     for (let t = start; ; t += STEP) {
       let absorbed = 0;
       for (let i = 0; i < drinks.length; i++) {
-        const f = (t - drinks[i].t) / ABSORB;
-        if (f > 0) absorbed += peaks[i] * Math.min(1, f);
+        let sum = 0;
+        for (const at of sips[i]) {
+          const f = (t - at) / ABSORB;
+          if (f > 0) sum += Math.min(1, f);
+        }
+        absorbed += (peaks[i] * sum) / sips[i].length;
       }
       bac = Math.max(0, bac + absorbed - before - ELIM * STEP);
       before = absorbed;
@@ -187,10 +208,78 @@ const Promille = (() => {
     timer = null;
   }
 
+  // --- Vergangene Abende ---
+
+  // Zusammenfassung eines Abends, wird mit den Getränken gespeichert
+  function makeNight(drinks) {
+    const list = drinks.slice().sort((a, b) => a.t - b.t);
+    const sim = simulate(0, list);
+    let peak = 0;
+    let peakAt = list[0].t;
+    for (const [tm, v] of sim ? sim.pts : []) if (v > peak) [peak, peakAt] = [v, tm];
+    const pts = sim ? sim.pts : [];
+    return {
+      id: `n${list[0].t.toString(36)}`,
+      start: pts.length ? pts[0][0] : list[0].t,
+      end: pts.length ? pts[pts.length - 1][0] : list[list.length - 1].t,
+      peak,
+      peakAt,
+      grams: list.reduce((g, d) => g + grams(d), 0),
+      profile: { ...data.profile },
+      drinks: list,
+    };
+  }
+
+  function archive(drinks, name = "") {
+    if (!drinks.length || !data.profile) return;
+    const ids = new Set(drinks.map((d) => d.id));
+    data.drinks = data.drinks.filter((d) => !ids.has(d.id));
+    const n = { ...makeNight(drinks), name };
+    data.nights = [n, ...data.nights.filter((x) => x.id !== n.id)].sort((a, b) => b.start - a.start).slice(0, 300);
+  }
+
+  // Abende, die vorbei sind (seit über 3 Stunden wieder 0 ‰), landen von selbst im Archiv
+  function autoArchive() {
+    const now = Date.now();
+    const sim = simulate(now);
+    if (!sim) return;
+    const pts = sim.pts;
+    const drinks = data.drinks.slice().sort((a, b) => a.t - b.t);
+    const zeros = [];
+    for (let i = 1; i < pts.length; i++) if (pts[i - 1][1] > 0 && pts[i][1] <= 0) zeros.push(pts[i][0]);
+    const startOf = (d) => d.t - durOf(d) * MIN;
+    let group = [];
+    let changed = false;
+    const close = (end) => {
+      if (group.length && end < now - 3 * HOUR) {
+        archive(group);
+        changed = true;
+      }
+      group = [];
+    };
+    for (const d of drinks) {
+      const last = group[group.length - 1];
+      if (last) {
+        const z = zeros.find((x) => x > last.t);
+        if (z && z <= startOf(d) - 3 * HOUR) close(z);
+        else if (z && z <= startOf(d)) {
+          // kurz bei 0, dann weiter: gehört noch zum selben Abend
+        }
+      }
+      group.push(d);
+    }
+    const last = group[group.length - 1];
+    const z = last && zeros.find((x) => x > last.t);
+    if (z) close(z);
+    if (changed) save();
+  }
+
   function prune() {
+    autoArchive();
+    // Sicherung: was ohne Profil liegen bleibt, fliegt nach 48 Stunden raus
     const now = Date.now();
     const before = data.drinks.length;
-    data.drinks = data.drinks.filter((d) => now - d.t < KEEP);
+    data.drinks = data.drinks.filter((d) => now - d.t < KEEP || data.profile);
     if (data.drinks.length !== before) save();
   }
 
@@ -268,7 +357,7 @@ const Promille = (() => {
     };
   }
 
-  function chartSvg(pts, now) {
+  function chartSvg(pts, now, drinks = data.drinks, showNow = true) {
     const W = 340;
     const H = 150;
     const L = 30;
@@ -304,8 +393,8 @@ const Promille = (() => {
       <polygon class="pm-area" points="${x(t0)},${y(0)} ${line.join(" ")} ${x(pts[pts.length - 1][0])},${y(0)}"/>
       <polyline class="pm-future" points="${line.join(" ")}"/>
       ${pastLine.length > 1 ? `<polyline class="pm-line" points="${pastLine.join(" ")}"/>` : ""}
-      ${data.drinks.filter((d) => d.t >= t0).map((d) => `<circle class="pm-dot" cx="${x(d.t)}" cy="${H - B}" r="3"/>`).join("")}
-      ${now <= t1 ? `<line class="pm-now" x1="${x(now)}" x2="${x(now)}" y1="${T}" y2="${H - B}"/><circle class="pm-nowdot" cx="${x(now)}" cy="${y(nowV)}" r="4.5"/>` : ""}
+      ${drinks.filter((d) => d.t >= t0).map((d) => `<circle class="pm-dot" cx="${x(d.t)}" cy="${H - B}" r="3"/>`).join("")}
+      ${showNow && now <= t1 ? `<line class="pm-now" x1="${x(now)}" x2="${x(now)}" y1="${T}" y2="${H - B}"/><circle class="pm-nowdot" cx="${x(now)}" cy="${y(nowV)}" r="4.5"/>` : ""}
     </svg>`;
   }
 
@@ -316,7 +405,7 @@ const Promille = (() => {
       all
         .map(
           (d) => `<button type="button" class="pm-drink ${pick === d.id ? "picked" : ""}" data-pick="${esc(d.id)}" aria-pressed="${pick === d.id}">
-            <span class="pm-de">${d.emoji}</span><span class="pm-dn">${esc(PRESETS.includes(d) ? t(d.name) : d.name)}</span><small>${esc(fmt(d.ml >= 1000 ? d.ml / 1000 : d.ml, d.ml >= 1000 ? 1 : 0))} ${d.ml >= 1000 ? "l" : "ml"} · ${esc(fmt(d.pct, d.pct % 1 ? 1 : 0))} %</small>
+            <span class="pm-de">${d.emoji}</span><span class="pm-dn">${esc(PRESETS.includes(d) ? t(d.name) : d.name)}</span><small>${esc(fmt(d.ml >= 1000 ? d.ml / 1000 : d.ml, d.ml >= 1000 ? 1 : 0))} ${d.ml >= 1000 ? "l" : "ml"} · ${esc(fmt(d.pct, d.pct % 1 ? 1 : 0))} %</small><small class="pm-ddur">${esc(durOf(d) ? t("ca. {m} Min", { m: durOf(d) }) : t("auf ex"))}</small>
           </button>`,
         )
         .join("") +
@@ -358,10 +447,12 @@ const Promille = (() => {
             <label class="pm-field"><span>${esc(t("Menge"))}</span><span class="pm-unit"><input id="pm-cml" type="number" inputmode="numeric" min="1" max="3000" placeholder="200"><i>ml</i></span></label>
             <label class="pm-field"><span>${esc(t("Alkohol"))}</span><span class="pm-unit"><input id="pm-cpct" type="text" inputmode="decimal" placeholder="8"><i>%</i></span></label>
           </div>
+          <label class="pm-field"><span>${esc(t("Wie lange hast du daran getrunken?"))}</span><span class="pm-unit"><input id="pm-cdur" type="number" inputmode="numeric" min="0" max="180" placeholder="${esc(t("automatisch"))}"><i>Min</i></span></label>
         </div>
-        <h3 class="pm-h3">${esc(t("Wann?"))}</h3>
+        <h3 class="pm-h3">${esc(t("Wann war das Glas leer?"))}</h3>
+        <p class="pm-muted small-text">${esc(t("Wie lange du daran getrunken hast, rechnet die App mit (zum Beispiel ein Bier 0,5 l ca. 15 Minuten)."))}</p>
         <div class="pm-when">
-          ${whenBtn(0, "Gerade eben")}${whenBtn(15, "vor 15 Min")}${whenBtn(30, "vor 30 Min")}${whenBtn(60, "vor 1 Std")}
+          ${whenBtn(0, "Gerade ausgetrunken")}${whenBtn(15, "vor 15 Min")}${whenBtn(30, "vor 30 Min")}${whenBtn(60, "vor 1 Std")}
           <label class="pm-chip pm-timechip ${when === null ? "picked" : ""}"><span>${esc(t("Uhrzeit"))}</span><input id="pm-time" type="time" value="${esc(customTime || hhmmOf(now))}"></label>
         </div>
         <p id="pm-err" class="error" hidden></p>
@@ -374,16 +465,78 @@ const Promille = (() => {
         <h2 class="pm-h">${esc(t("Getrunken"))} <small>${shown.length}</small></h2>
         <ul class="pm-list">${shown.map((d) => entryHtml(d)).join("")}</ul>
         ${older > 0 ? `<p class="pm-muted small-text">${esc(older === 1 ? t("Dazu ein älterer Eintrag, der nicht mehr zählt.") : t("Dazu {n} ältere Einträge, die nicht mehr zählen.", { n: older }))}</p>` : ""}
-        <button id="pm-clear" class="btn ghost small">${esc(t("Neuer Abend: Liste leeren"))}</button>
+        <button id="pm-clear" class="btn ghost small">💾 ${esc(t("Abend speichern und neu anfangen"))}</button>
       </div>`
           : ""
       }
+
+      ${nightsHtml()}
 
       <div class="pm-card pm-me">
         <span>${esc(`${fmt(p.weight, p.weight % 1 ? 1 : 0)} kg · ${p.height} cm · ${p.age} ${t("Jahre")} · ${t(p.sex === "w" ? "weiblich" : "männlich")}`)}</span>
         <button id="pm-editp" class="btn ghost small">${esc(t("Ändern"))}</button>
       </div>
       ${disclaimer()}`;
+  }
+
+  const dateLabel = (ms) => new Date(ms).toLocaleDateString(locale(), { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+
+  function nightsHtml() {
+    if (!data.nights.length) return "";
+    const row = (n) => {
+      const isOpen = openNight === n.id;
+      const head = `<button class="pm-night-head" data-night="${esc(n.id)}" aria-expanded="${isOpen}">
+          <span class="pm-en"><b>${esc(n.name || dateLabel(n.start))}</b><small>${esc(`${n.name ? `${dateLabel(n.start)} · ` : ""}${t("{n} Getränke", { n: n.drinks.length })}`)}</small></span>
+          <span class="pm-night-peak">${esc(fmt(n.peak))} ‰</span><span class="pm-night-arrow" aria-hidden="true">${isOpen ? "▾" : "▸"}</span>
+        </button>`;
+      if (!isOpen) return `<li class="pm-night">${head}</li>`;
+      const sim = simulate(0, n.drinks, n.profile);
+      const rows = n.drinks
+        .slice()
+        .sort((a, b) => a.t - b.t)
+        .map(
+          (d) => `<tr><td>${esc(clock(d.t))}</td><td>${esc(d.name)}</td><td>${esc(fmt(d.ml, 0))} ml</td><td>${esc(fmt(d.pct, d.pct % 1 ? 1 : 0))} %</td><td>${esc(fmt(grams(d), 0))} g</td></tr>`,
+        )
+        .join("");
+      return `<li class="pm-night open">${head}
+        <div class="pm-night-body">
+          ${sim && sim.pts.length > 1 ? chartSvg(sim.pts, sim.pts[sim.pts.length - 1][0], n.drinks, false) : ""}
+          <div class="pm-counts">${counts(n.drinks)}</div>
+          <div class="pm-facts">
+            <p><span>${esc(t("Getränke"))}</span><b>${n.drinks.length}</b></p>
+            <p><span>${esc(t("Zeit"))}</span><b>${esc(`${clock(n.start)} – ${timeLabelFrom(n.end, n.start)}`)}</b></p>
+            <p><span>${esc(t("Höchster Wert"))}</span><b>${esc(fmt(n.peak))} ‰ ${esc(t("um {time}", { time: clock(n.peakAt) }))}</b></p>
+            <p><span>${esc(t("Alkohol gesamt"))}</span><b>${esc(fmt(n.grams, 0))} g</b></p>
+          </div>
+          <div class="pm-table-wrap"><table class="pm-table">
+            <thead><tr><th>${esc(t("Leer um"))}</th><th>${esc(t("Getränk"))}</th><th>${esc(t("Menge"))}</th><th>%</th><th>${esc(t("Alkohol"))}</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>
+          <div class="pm-night-btns">
+            <button class="btn ghost small" data-rename="${esc(n.id)}">✏️ ${esc(t("Umbenennen"))}</button>
+            <button class="btn ghost small pm-night-del" data-del="${esc(n.id)}">${esc(t("Abend löschen"))}</button>
+          </div>
+        </div>
+      </li>`;
+    };
+    const total = data.nights.length;
+    return `<div class="pm-card pm-nights">
+        <h2 class="pm-h">${esc(t("Vergangene Abende"))} <small>${total}</small></h2>
+        <ul class="pm-night-list">${data.nights.map(row).join("")}</ul>
+      </div>`;
+  }
+
+  // „3× Bier 0,5 l“ usw.
+  function counts(drinks) {
+    const m = new Map();
+    for (const d of drinks) m.set(d.name, (m.get(d.name) || 0) + 1);
+    return [...m].sort((a, b) => b[1] - a[1]).map(([name, c]) => `<span class="pm-count"><b>${c}×</b> ${esc(name)}</span>`).join("");
+  }
+
+  // Uhrzeit, mit „nächster Tag“, wenn der Abend über Mitternacht ging
+  function timeLabelFrom(ms, from) {
+    const next = new Date(ms).toDateString() !== new Date(from).toDateString();
+    return next ? `${clock(ms)} (${t("am nächsten Tag")})` : clock(ms);
   }
 
   function entryHtml(d) {
@@ -396,7 +549,7 @@ const Promille = (() => {
       </li>`;
     return `<li class="pm-entry" data-id="${esc(d.id)}">
       <button class="pm-etime-btn" title="${esc(t("Uhrzeit ändern"))}">${esc(timeLabel(d.t))}</button>
-      <span class="pm-en"><b>${esc(d.name)}</b><small>${esc(fmt(g, 0))} g ${esc(t("Alkohol"))}</small></span>
+      <span class="pm-en"><b>${esc(d.name)}</b><small>${esc(fmt(g, 0))} g ${esc(t("Alkohol"))}${durOf(d) ? ` · ${esc(t("{m} Min getrunken", { m: durOf(d) }))}` : ""}</small></span>
       <button class="pm-del" aria-label="${esc(t("Löschen"))}">×</button>
     </li>`;
   }
@@ -431,14 +584,50 @@ const Promille = (() => {
     timeIn.onchange = useTime;
 
     root.querySelector("#pm-add").onclick = () => addDrink(root);
+    root.querySelectorAll("[data-night]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          openNight = openNight === b.dataset.night ? null : b.dataset.night;
+          render();
+        }),
+    );
+    root.querySelectorAll("[data-rename]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          const n = data.nights.find((x) => x.id === b.dataset.rename);
+          const name = n && prompt(t("Neuer Name für den Abend:"), n.name || "");
+          if (name === null || !n) return;
+          n.name = name.trim().slice(0, 40);
+          save();
+          render();
+        }),
+    );
+    root.querySelectorAll("[data-del]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          if (!confirm(t("Diesen Abend wirklich löschen?"))) return;
+          data.nights = data.nights.filter((n) => n.id !== b.dataset.del);
+          save();
+          render();
+        }),
+    );
     root.querySelector("#pm-editp").onclick = () => ((editProfile = true), render());
     const clear = root.querySelector("#pm-clear");
     if (clear)
       clear.onclick = () => {
-        if (!confirm(t("Alle Einträge löschen und neu anfangen?"))) return;
-        data.drinks = [];
+        const name = prompt(t("Wie soll der Abend heißen? (z. B. Kneipentour mit Tim)"), "");
+        if (name === null) return;
+        const now = Date.now();
+        const sim = simulate(now);
+        const from = sim ? episode(sim)[0][0] - MIN : 0;
+        archive(
+          data.drinks.filter((d) => d.t >= from),
+          name.trim().slice(0, 40),
+        );
+        openNight = data.nights[0]?.id ?? null;
         save();
         render();
+        $("pm-root").querySelector(".pm-nights")?.scrollIntoView({ behavior: "smooth", block: "start" });
       };
 
     root.querySelectorAll(".pm-entry").forEach((li) => {
@@ -479,15 +668,18 @@ const Promille = (() => {
       const pct = parseFloat(String(root.querySelector("#pm-cpct").value).replace(",", "."));
       if (!(ml > 0 && ml <= 3000)) return fail(t("Bitte die Menge in ml eintragen."));
       if (!(pct >= 0 && pct <= 96)) return fail(t("Bitte den Alkoholgehalt in % eintragen."));
-      drink = { name, ml, pct };
+      const durIn = String(root.querySelector("#pm-cdur").value).trim();
+      const dur = durIn === "" ? durFor(ml) : Math.round(parseFloat(durIn.replace(",", ".")));
+      if (!(dur >= 0 && dur <= 180)) return fail(t("Bitte die Trinkdauer in Minuten eintragen (0 bis 180)."));
+      drink = { name, ml, pct, dur };
       // Eigene Getränke merken (die letzten sechs)
       const id = `mine-${name.toLowerCase()}-${ml}-${pct}`;
-      data.mine = [{ id, name, ml, pct }, ...data.mine.filter((m) => m.id !== id)].slice(0, 6);
+      data.mine = [{ id, name, ml, pct, dur }, ...data.mine.filter((m) => m.id !== id)].slice(0, 6);
       pick = id;
     } else {
       const pr = PRESETS.find((d) => d.id === pick) || data.mine.find((d) => d.id === pick);
       if (!pr) return fail(t("Bitte ein Getränk wählen."));
-      drink = { name: PRESETS.includes(pr) ? t(pr.name) : pr.name, ml: pr.ml, pct: pr.pct };
+      drink = { name: PRESETS.includes(pr) ? t(pr.name) : pr.name, ml: pr.ml, pct: pr.pct, dur: durOf(pr) };
     }
     const now = Date.now();
     const tm = Math.min(now, timeFromInput(when, customTime, now));
@@ -511,8 +703,9 @@ registerGame("promille", {
   color: "#4fa3a5",
   rules: [
     "Trag einmal Gewicht, Größe, Alter und Körperbau ein. Das bleibt nur auf diesem Handy.",
-    "Tipp direkt nach jedem Getränk auf „Eintragen“. Vergessen? Dann „vor 30 Min“ oder die Uhrzeit wählen. Die Uhrzeit in der Liste lässt sich auch später noch antippen und ändern.",
+    "Tipp auf „Eintragen“, wenn das Glas leer ist. Wie lange du daran getrunken hast, rechnet die App mit (Bier 0,5 l ca. 15 Min). Vergessen? Dann „vor 30 Min“ oder die Uhrzeit wählen. Die Uhrzeit in der Liste lässt sich auch später noch antippen und ändern.",
     "Gerechnet wird mit der Widmark-Formel und dem Körperwasser nach Watson. Jedes Getränk braucht etwa 30 Minuten, bis es im Blut ist, abgebaut werden ungefähr 0,15 ‰ pro Stunde.",
+    "Am Ende vom Abend auf „Abend speichern“ tippen und einen Namen geben. Vergessene Abende landen von selbst unter „Vergangene Abende“, mit Tabelle aller Getränke.",
     "Das ist nur eine Schätzung. Essen, Medikamente, Müdigkeit und dein Körper können den echten Wert stark verändern. Entscheide danach nie, ob du Auto fährst.",
   ],
   open() {
