@@ -93,11 +93,14 @@ const DRAWN_ICONS = (() => {
       i: `<rect x="17" y="6" width="14" height="19" rx="2"/>
           <path d="M24 12l2.8 3.5L24 19l-2.8-3.5z"/>`,
     },
-    // Lügendetektor: Papierstreifen mit Ausschlag, Nadel
-    luegen: {
-      f: `<rect x="7" y="18" width="34" height="14" rx="1"/>`,
-      i: `<rect x="7" y="13" width="34" height="24" rx="2"/><path d="M7 26h6l2.5-5 3 12 3.5-17 3 14 2.5-6 2 2h11"/>
-          <path d="M32 6l-5.5 13"/><circle cx="32.5" cy="5.5" r="1.5"/><path d="M12 41h24"/>`,
+    // Kartenstapel: verdeckter Stapel, oberste Karte halb aufgedeckt
+    stapel: {
+      b: `<rect x="9" y="15" width="20" height="28" rx="2.5"/>`,
+      f: `<rect x="21" y="7" width="19" height="27" rx="2.5" transform="rotate(12 30.5 20.5)"/>`,
+      i: `<rect x="9" y="15" width="20" height="28" rx="2.5"/><path d="M11.5 43.8h16M12.5 46h14"/>
+          <rect x="21" y="7" width="19" height="27" rx="2.5" transform="rotate(12 30.5 20.5)"/>
+          <path d="M31 15.5c-1.6-2.6-5.4-.6-3.6 2.2l3.1 4.2 4.2-3.1c2.6-2-.2-5.4-2.5-3.5z" transform="rotate(12 30.5 20.5)"/>
+          <path d="M14 19.5l10 15M24 19.5l-10 15"/>`,
     },
     // Bierdeckel-Schnippen: Deckel fliegt, Schwung-Linien
     deckel: {
@@ -198,7 +201,7 @@ const DRAWN_ICONS = (() => {
     flunky: "#e4572e", hodenritter: "#5b9e6d", kistenturm: "#e9a23b", flasche: "#4f8fbf",
     dealer: "#d94a3d", fenster: "#e9b949", randvoll: "#efb030", duell: "#c9573c",
     eher: "#8f7ac8", busfahrer: "#e9b949", niewieder: "#e57a8f", pflicht: "#d94a3d",
-    triade: "#5b9e6d", promille: "#4fa3a5", luegen: "#4fa3a5", deckel: "#c9814a", schiffe: "#4f8fbf",
+    triade: "#5b9e6d", promille: "#4fa3a5", stapel: "#d94a3d", deckel: "#c9814a", schiffe: "#4f8fbf",
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",

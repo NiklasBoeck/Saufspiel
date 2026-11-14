@@ -475,16 +475,14 @@ const GAME_TEXT = {
         "Bots place their fleet themselves and fire smartly: after a hit they search out the ship.",
       ],
     },
-    luegen: {
-      label: "Lie Detector",
-      description: "Lie or truth? Place your bets, then the machine measures your thumb.",
+    stapel: {
+      label: "Card Stack",
+      description: "A shuffled deck, turn over the top card. You make up the rules.",
       rules: [
-        "Everyone takes a turn as the candidate. The app secretly tells only them whether to lie or tell the truth (on one phone: hand it over, the others look away, press and hold).",
-        "The candidate answers the question out loud with yes or no and adds a short story so it sounds believable.",
-        "Everyone else bets: lie or truth? With several phones everyone bets on their own.",
-        "Then the candidate puts their thumb on the sensor until it’s full. The machine measures and judges. It’s usually right, but not always.",
-        "Resolved: whoever bet wrong drinks 1 sip. If the candidate lied and most noticed, they drink 2 sips. If they fooled most people, they hand out 2 sips.",
-        "If the machine is wrong, the candidate tricked it and hands out 1 more sip.",
+        "A shuffled deck: 2 to ace, every card 4 times (52 cards). In the settings you can also pick the short deck 7 to ace (32 cards).",
+        "Tap the stack and the top card is turned over. One after another until the stack is empty.",
+        "There are no rules. You decide what each card means, e.g. red drinks, black hands out.",
+        "When the stack is empty, shuffle again or switch to the other deck.",
       ],
     },
     kistenturm: {
