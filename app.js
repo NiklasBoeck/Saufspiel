@@ -197,7 +197,8 @@ $("mode-multi").onclick = () => {
 function renderPlayers() {
   const list = $("player-list");
   list.innerHTML = "";
-  state.players.forEach((name, i) => {
+  const players = localPlayers();
+  players.forEach((name) => {
     const li = document.createElement("li");
     li.innerHTML = `${Figur.avatar(name)}<span>${escapeHtml(name)}</span>`;
     li.classList.toggle("bot", isBot(name));
@@ -206,7 +207,7 @@ function renderPlayers() {
     remove.className = "remove";
     remove.setAttribute("aria-label", t("{name} entfernen", { name }));
     remove.onclick = () => {
-      state.players.splice(i, 1);
+      state.players.splice(state.players.indexOf(name), 1);
       save();
       renderPlayers();
     };
@@ -218,12 +219,19 @@ function renderPlayers() {
   const meBtn = $("me-btn");
   meBtn.hidden = !own || state.players.some((n) => n.toLowerCase() === own.toLowerCase());
   if (!meBtn.hidden) meBtn.innerHTML = `${Figur.avatar(own)} ${escapeHtml(t("{name} dazu", { name: own }))}`;
-  $("start-btn").disabled = state.players.length < 2;
-  $("bot-btn").disabled = state.players.length >= maxPlayers();
-  const tooMany = state.players.length > maxPlayers();
-  $("start-btn").disabled = state.players.length < 2 || tooMany;
+  // Manche Spiele brauchen auf einem Handy keine Bots (noBotsOnePhone), da spielen alle am selben Handy.
+  const bots = !GAMES[currentGame]?.noBotsOnePhone;
+  $("bot-btn").hidden = !bots;
+  $("bot-btn").disabled = players.length >= maxPlayers();
+  const tooMany = players.length > maxPlayers();
+  $("start-btn").disabled = players.length < 2 || tooMany;
   $("start-btn").textContent = tooMany ? t("Höchstens {n} Spieler", { n: maxPlayers() }) : t("Los geht’s");
-  renderBotSeg($("bot-level"), state.players.some(isBot));
+  renderBotSeg($("bot-level"), bots && players.some(isBot));
+}
+
+// Spieler für „Ein Handy“. Bei Spielen ohne Bots bleiben die Bots aus anderen Spielen gespeichert, spielen hier aber nicht mit.
+function localPlayers() {
+  return GAMES[currentGame]?.noBotsOnePhone ? state.players.filter((n) => !isBot(n)) : state.players;
 }
 
 // Manche Spiele haben weniger Plätze (maxPlayers), sonst 16
@@ -252,12 +260,13 @@ function renderBotSeg(el, show) {
 
 $("me-btn").onclick = () => {
   const own = Figur.mine?.name;
-  if (own && !state.players.includes(own) && state.players.length < maxPlayers()) state.players.unshift(own);
+  if (own && !state.players.includes(own) && localPlayers().length < maxPlayers()) state.players.unshift(own);
   save();
   renderPlayers();
 };
 
 $("bot-btn").onclick = () => {
+  if (GAMES[currentGame]?.noBotsOnePhone) return;
   state.players.push(newBotName(state.players));
   save();
   renderPlayers();
@@ -282,7 +291,7 @@ $("start-btn").onclick = () => {
   const key = currentGame;
   const local = {
     key,
-    s: newGame(key, [...state.players]),
+    s: newGame(key, [...localPlayers()]),
     me: null,
     send(action) {
       local.s = applyAction(key, local.s, action, null);

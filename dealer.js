@@ -713,6 +713,7 @@
     color: "#dc2626",
     fit: true,
     privateAlerts: true,
+    noBotsOnePhone: true, // auf einem Handy spielen alle am selben Gerät, Bots nur bei „Jeder sein Handy“
     rules: [
       "Einer ist Dealer und hält den Stapel (die App), alle anderen raten reihum die oberste Karte (2 bis Ass, Ass zählt 14).",
       "Erster Tipp richtig: Der Dealer trinkt so viele Schlucke, wie die Karte wert ist. Daneben: Der Dealer sagt „höher“ oder „niedriger“.",
