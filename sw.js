@@ -1,6 +1,6 @@
 // Offline-Modus: Erst das Netz fragen (damit Updates sofort da sind), ohne Netz kommt die gespeicherte Version.
 // Neue Dateien unten in FILES eintragen, damit sie auch ohne Internet da sind.
-const CACHE = "saufomat-v49";
+const CACHE = "saufomat-v50";
 const FILES = [
   "./",
   "index.html",
@@ -13,6 +13,7 @@ const FILES = [
   "figur-3d.js",
   "icons.js",
   "i18n.js",
+  "trinkgif.js",
   "vendor/fonts/bricolage-grotesque.woff2",
   "vendor/fonts/fraunces.woff2",
   "vendor/fonts/pacifico.woff2",

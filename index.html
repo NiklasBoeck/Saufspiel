@@ -66,6 +66,16 @@
       <p class="hint">Beim Öffnen der App</p>
       <div id="intro-list" class="level-list intro-list"></div>
       <button id="intro-replay" class="btn ghost small intro-replay" type="button">Startanimation ansehen</button>
+      <p class="hint">Eigenes Trink-GIF</p>
+      <div class="tg-set">
+        <img id="tg-preview" class="tg-preview" alt="" hidden>
+        <div class="tg-btns">
+          <button id="tg-pick" class="btn ghost small" type="button">GIF auswählen</button>
+          <button id="tg-clear" class="btn ghost small" type="button" hidden>Entfernen</button>
+        </div>
+        <input id="tg-file" type="file" accept="image/gif,image/*" hidden>
+      </div>
+      <p class="hint small-text">Erscheint in jeder Trink-Meldung, in allen Spielen. Das GIF bleibt nur auf diesem Handy: Es wird nie hochgeladen und nicht an die anderen Handys geschickt.</p>
       <p class="hint small-text">Gilt für jedes neue Spiel. Bei „Jeder sein Handy“ zählt die Einstellung vom Handy, das den Raum erstellt.</p>
       <a class="btn ghost info-link" href="info.html">Verantwortung, Impressum und Datenschutz</a>
     </section>
@@ -183,6 +193,7 @@
   <!-- Trink-Meldung -->
   <div id="drink-alert" class="drink-alert" hidden>
     <div class="da-box" role="alertdialog" aria-labelledby="da-title">
+      <img id="da-gif" class="da-gif" alt="" hidden>
       <div id="da-emoji" class="da-emoji"></div>
       <div id="da-count" class="da-count" hidden></div>
       <h2 id="da-title"></h2>
@@ -196,6 +207,7 @@
   <script src="vendor/qrcode.js"></script>
   <script src="icons.js"></script>
   <script src="i18n.js"></script>
+  <script src="trinkgif.js"></script>
   <script src="games.js"></script>
   <script src="figur-3d.js"></script>
   <script src="figur.js"></script>

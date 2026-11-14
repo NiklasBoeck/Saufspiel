@@ -251,3 +251,8 @@ html { background: var(--bg); font-size: clamp(16px, calc(9px + 1.05vmin), 21px)
   .fb-foot { height: clamp(70px, 26dvh, 150px); width: clamp(100px, 18vw, 150px); }
   .fb-qr img, .fb-qr svg { width: clamp(110px, 30dvh, 160px); height: clamp(110px, 30dvh, 160px); }
 }
+
+/* Eigenes Trink-GIF (nur auf dem Handy gespeichert, siehe trinkgif.js) */
+.fb-drink-gif { max-width: min(80vw, 320px); max-height: 34dvh; border-radius: 18px; object-fit: contain; box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
+.fb-drink-gif[hidden] { display: none; }
+@media (max-height: 520px) { .fb-drink-gif { max-height: 28dvh; } }

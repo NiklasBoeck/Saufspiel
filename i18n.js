@@ -196,6 +196,12 @@ const STRINGS = {
     Aus: "Off",
     "Die App startet sofort im Menü.": "The app opens straight to the menu.",
     "Startanimation ansehen": "Watch the intro",
+    "Eigenes Trink-GIF": "Your own drinking GIF",
+    "GIF auswählen": "Choose GIF",
+    "Anderes GIF": "Other GIF",
+    "Entfernen": "Remove",
+    "Erscheint in jeder Trink-Meldung, in allen Spielen. Das GIF bleibt nur auf diesem Handy: Es wird nie hochgeladen und nicht an die anderen Handys geschickt.": "Shows up in every drink alert, in all games. The GIF stays on this phone only: it is never uploaded and never sent to other phones.",
+    "Das Bild konnte nicht gespeichert werden.": "The picture couldn't be saved.",
 
     // Ein Handy / Jeder sein Handy
     "Wie wollt ihr spielen?": "How do you want to play?",

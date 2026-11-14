@@ -717,6 +717,8 @@
 
     const drinker = m && S.phase === "drink" && m.team === S.drinkTeam && !m.done;
     const runner = S.phase === "drink" && S.runnerId === session.id;
+    // Eigenes Trink-GIF (nur auf diesem Handy gespeichert) startet bei jedem neuen Trinken von vorn
+    if (drinker && $("fb-drink").hidden) TrinkGif.show($("fb-drink-gif"));
     $("fb-drink").hidden = !drinker;
     if (drinker) {
       $("fb-drink-task").textContent = drinkTask;

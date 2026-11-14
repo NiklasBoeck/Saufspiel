@@ -128,10 +128,31 @@ function pickList(list, options, field) {
 
 $("settings-btn").onclick = () => {
   renderLevels();
+  renderTrinkGif();
   showScreen("settings");
 };
 $("settings-back").onclick = () => showScreen("menu");
 $("intro-replay").onclick = () => Intro.play(true);
+
+// Eigenes Trink-GIF: bleibt nur auf diesem Handy (siehe trinkgif.js)
+function renderTrinkGif() {
+  TrinkGif.show($("tg-preview"));
+  $("tg-clear").hidden = !TrinkGif.url();
+  $("tg-pick").textContent = t(TrinkGif.url() ? "Anderes GIF" : "GIF auswählen");
+}
+document.addEventListener("trinkgif", renderTrinkGif);
+$("tg-pick").onclick = () => $("tg-file").click();
+$("tg-file").onchange = async () => {
+  const file = $("tg-file").files[0];
+  $("tg-file").value = "";
+  if (!file) return;
+  try {
+    await TrinkGif.set(file);
+  } catch {
+    alert(t("Das Bild konnte nicht gespeichert werden."));
+  }
+};
+$("tg-clear").onclick = () => TrinkGif.clear();
 
 // --- Spielregeln: „?“ oben rechts in jedem Spiel ---
 
@@ -477,6 +498,8 @@ function showDrinkAlert(items, level) {
   $("da-level").textContent = level === "normal" ? "" : `${LEVELS[level].emoji} ${t(LEVELS[level].label)}${level === "alkoholfrei" ? `: ${t("Limo, Wasser, was ihr wollt")}` : ""}`;
   $("da-level").hidden = level === "normal";
   $("da-ok").textContent = t(level === "alkoholfrei" ? "Prost! 🥤" : "Prost! 🍻");
+  TrinkGif.show($("da-gif"));
+  $("da-gif").closest(".da-box").classList.toggle("has-gif", !!TrinkGif.url());
   $("drink-alert").hidden = false;
   $("da-ok").focus();
   vibrate(meDrinks || !me ? [300, 100, 300] : 120);
