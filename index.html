@@ -21,6 +21,8 @@
   <link rel="stylesheet" href="promille.css">
 </head>
 <body>
+  <script src="boot.js"></script>
+  <script src="intro.js"></script>
   <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
   <main id="app">
     <!-- Menü: Spiel auswählen -->
@@ -61,6 +63,9 @@
       <div id="bot-level-list" class="level-list bot-levels"></div>
       <p class="hint">Wie soll die App aussehen?</p>
       <div id="design-list" class="level-list design-list"></div>
+      <p class="hint">Beim Öffnen der App</p>
+      <div id="intro-list" class="level-list intro-list"></div>
+      <button id="intro-replay" class="btn ghost small intro-replay" type="button">Startanimation ansehen</button>
       <p class="hint small-text">Gilt für jedes neue Spiel. Bei „Jeder sein Handy“ zählt die Einstellung vom Handy, das den Raum erstellt.</p>
       <a class="btn ghost info-link" href="info.html">Verantwortung, Impressum und Datenschutz</a>
     </section>
@@ -187,7 +192,6 @@
     </div>
   </div>
 
-  <script src="boot.js"></script>
   <script src="vendor/mqtt.min.js"></script>
   <script src="vendor/qrcode.js"></script>
   <script src="icons.js"></script>

@@ -97,6 +97,7 @@ function renderLevels() {
   pickList($("level-list"), LEVELS, "level");
   pickList($("bot-level-list"), BOT_LEVELS, "bots");
   pickList($("design-list"), DESIGNS, "design");
+  pickList($("intro-list"), INTRO_OPTS, "intro");
   pickList($("lang-list"), LANGUAGES, "lang");
 }
 
@@ -130,6 +131,7 @@ $("settings-btn").onclick = () => {
   showScreen("settings");
 };
 $("settings-back").onclick = () => showScreen("menu");
+$("intro-replay").onclick = () => Intro.play(true);
 
 // --- Spielregeln: „?“ oben rechts in jedem Spiel ---
 

@@ -197,6 +197,19 @@ const DRAWN_ICONS = (() => {
           <path d="M10.5 22.5l2.6 1.6M24 14v3M37.5 22.5l-2.6 1.6M15.5 16.5l1.7 2.3M32.5 16.5l-1.7 2.3"/>
           <text x="24" y="45" text-anchor="middle" font-size="10" font-weight="800" font-family="system-ui, sans-serif" style="fill:var(--ink,#211910);stroke:none">‰</text>`,
     },
+    // Startanimation: Trompete, Lautsprecher durchgestrichen, Vorspulen
+    ton: {
+      f: `<path d="M30 14l12-6v32l-12-6z"/>`,
+      i: `<path d="M30 14l12-6v32l-12-6z"/><path d="M6 21h24v6H6z"/><path d="M12 21v-4h4v4M18 21v-4h4v4"/><path d="M5 19v10"/><path d="M14 27v6c0 2 2 3 4 3h6"/>`,
+    },
+    still: {
+      f: `<path d="M8 18h8l10-8v28l-10-8H8z"/>`,
+      i: `<path d="M8 18h8l10-8v28l-10-8H8z"/><path d="M32 19l9 10M41 19l-9 10"/>`,
+    },
+    aus: {
+      f: `<path d="M8 12l14 12-14 12z"/><path d="M22 12l14 12-14 12z"/>`,
+      i: `<path d="M8 12l14 12-14 12z"/><path d="M22 12l14 12-14 12z"/><path d="M40 12v24"/>`,
+    },
     klassisch: {
       f: `<rect x="9" y="9" width="30" height="30" rx="9"/>`,
       i: `<rect x="9" y="9" width="30" height="30" rx="9"/><circle cx="19" cy="21" r="1.6"/><circle cx="29" cy="21" r="1.6"/><path d="M18 28c3.5 3 8.5 3 12 0"/>`,
@@ -213,6 +226,7 @@ const DRAWN_ICONS = (() => {
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",
     neu: "#e9b949", garten: "#c9814a", wiesn: "#a0582c", de: "#e9b949", en: "#6fa8d6", klassisch: "#8f6fd8",
+    ton: "#efb030", still: "#6fa8d6", aus: "#9cc27a",
   };
 
   return { I, SPOT };

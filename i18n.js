@@ -188,6 +188,14 @@ const STRINGS = {
     "Weiß-blaue Rauten, Wimpel und ein Lebkuchenherz. O’zapft is!": "Blue and white diamonds, bunting and a gingerbread heart. O’zapft is!",
     Klassisch: "Classic",
     "Das alte Lila mit Emojis.": "The old purple with emojis.",
+    "Beim Öffnen der App": "When the app opens",
+    "Mit Melodie": "With tune",
+    "Der Krug wird gezapft, dazu spielt die Blaskapelle.": "A stein gets poured while the brass band plays.",
+    "Ohne Ton": "No sound",
+    "Nur die Animation, ganz leise.": "Just the animation, nice and quiet.",
+    Aus: "Off",
+    "Die App startet sofort im Menü.": "The app opens straight to the menu.",
+    "Startanimation ansehen": "Watch the intro",
 
     // Ein Handy / Jeder sein Handy
     "Wie wollt ihr spielen?": "How do you want to play?",

@@ -64,6 +64,12 @@ function applyDesign(d) {
   document.documentElement.classList.toggle("wiesn", d === "wiesn");
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", DESIGN_BG[d] ?? DESIGN_BG.neu);
 }
+// --- Startanimation beim Öffnen (intro.js) ---
+const INTRO_OPTS = {
+  ton: { label: "Mit Melodie", emoji: "🎺", desc: "Der Krug wird gezapft, dazu spielt die Blaskapelle." },
+  still: { label: "Ohne Ton", emoji: "🔇", desc: "Nur die Animation, ganz leise." },
+  aus: { label: "Aus", emoji: "⏭️", desc: "Die App startet sofort im Menü." },
+};
 const SETTINGS_KEY = "saufspiel-settings";
 
 const Settings = (() => {
@@ -110,6 +116,13 @@ const Settings = (() => {
       data.design = v;
       save();
       applyDesign(v);
+    },
+    get intro() {
+      return INTRO_OPTS[data.intro] ? data.intro : "ton";
+    },
+    set intro(v) {
+      data.intro = v;
+      save();
     },
   };
 })();

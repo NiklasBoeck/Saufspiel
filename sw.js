@@ -18,6 +18,7 @@ const FILES = [
   "vendor/fonts/pacifico.woff2",
   "flunky.css",
   "boot.js",
+  "intro.js",
   "games.js",
   "cards.js",
   "busfahrer.js",
