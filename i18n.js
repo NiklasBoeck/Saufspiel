@@ -207,6 +207,7 @@ const STRINGS = {
     "🤖 Bot dazu": "🤖 Add bot",
     "Bots spielen mit, damit du auch alleine spielen kannst.": "Bots join in so you can play on your own too.",
     "Los geht’s": "Let’s go",
+    "Höchstens {n} Spieler": "At most {n} players",
     "{name} entfernen": "Remove {name}",
 
     // Raum
@@ -473,6 +474,19 @@ const GAME_TEXT = {
         "Ship sunk: you also hand out a shot 🥃. The squares around it turn light, no ship can be there.",
         "Water: next player. Whoever’s fleet is completely sunk is out. Whoever still has a ship at the end wins.",
         "Bots place their fleet themselves and fire smartly: after a hit they search out the ship.",
+      ],
+    },
+    fussball: {
+      label: "Football Quiz",
+      description: "Bundesliga, World Cup, Champions League: wrong answer? Drink!",
+      rules: [
+        "For 2 to 8 people. First pick the category (Bundesliga, World Cup & Euros, Champions League, stars & legends, rules & records or everything), the difficulty (easy, medium, hard or mixed), the question type (multiple choice, open or both) and how many rounds.",
+        "Everyone gets a question in turn. With multiple choice you tap the answer. With open questions you say the answer out loud, reveal it and say honestly whether you were right.",
+        "Right: 1 point. Wrong: drink, 3 sips for easy questions, 2 for medium, 1 for hard.",
+        "After a wrong answer the others get a go. Whoever answers correctly first gets the point and hands out 1 sip. Whoever answers wrong drinks just the same. No idea? Abstain and drink nothing.",
+        "With several phones the others tap at the same time on their own phone, the fastest wins. On one phone or with open questions you shout it out, then tap who was right first and who was wrong.",
+        "After the last round, whoever has the fewest points drinks 5 sips. Whoever has the most hands out 3.",
+        "Bots play along: the harder the question, the more often they’re wrong. When shouting they sometimes abstain or guess.",
       ],
     },
     stapel: {

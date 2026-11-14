@@ -54,7 +54,7 @@ function vibrate(pattern) {
 // --- Menü ---
 
 // Reihenfolge im Menü. Spiele, die hier fehlen, kommen danach.
-const MENU_ORDER = ["flunky", "hodenritter", "kistenturm", "flasche", "dealer", "fenster", "randvoll", "duell", "eher", "schiffe", "busfahrer", "niewieder", "triade"];
+const MENU_ORDER = ["flunky", "hodenritter", "kistenturm", "flasche", "dealer", "fenster", "randvoll", "duell", "eher", "fussball", "schiffe", "busfahrer", "niewieder", "triade"];
 
 function renderGames() {
   const list = $("game-list");
@@ -196,8 +196,16 @@ function renderPlayers() {
   meBtn.hidden = !own || state.players.some((n) => n.toLowerCase() === own.toLowerCase());
   if (!meBtn.hidden) meBtn.innerHTML = `${Figur.avatar(own)} ${escapeHtml(t("{name} dazu", { name: own }))}`;
   $("start-btn").disabled = state.players.length < 2;
-  $("bot-btn").disabled = state.players.length >= 16;
+  $("bot-btn").disabled = state.players.length >= maxPlayers();
+  const tooMany = state.players.length > maxPlayers();
+  $("start-btn").disabled = state.players.length < 2 || tooMany;
+  $("start-btn").textContent = tooMany ? t("Höchstens {n} Spieler", { n: maxPlayers() }) : t("Los geht’s");
   renderBotSeg($("bot-level"), state.players.some(isBot));
+}
+
+// Manche Spiele haben weniger Plätze (maxPlayers), sonst 16
+function maxPlayers(key = currentGame) {
+  return GAMES[key]?.maxPlayers ?? 16;
 }
 
 // Schalter Leicht / Mittel / Schwer, sobald Bots mitspielen
@@ -221,7 +229,7 @@ function renderBotSeg(el, show) {
 
 $("me-btn").onclick = () => {
   const own = Figur.mine?.name;
-  if (own && !state.players.includes(own) && state.players.length < 16) state.players.unshift(own);
+  if (own && !state.players.includes(own) && state.players.length < maxPlayers()) state.players.unshift(own);
   save();
   renderPlayers();
 };

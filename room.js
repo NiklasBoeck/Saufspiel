@@ -12,6 +12,7 @@ const Room = (() => {
   const MAX_PLAYERS = 16;
 
   const $ = (id) => document.getElementById(id);
+  const maxFor = () => GAMES[S?.game]?.maxPlayers ?? MAX_PLAYERS;
 
   const myId = loadId();
   let gameKey = null;
@@ -199,7 +200,7 @@ const Room = (() => {
           p.online = true;
           if (S.phase === "lobby") p.name = uniqueName(cleanName(a.name), p.id);
           if (a.fig) p.fig = a.fig;
-        } else if (S.players.length < MAX_PLAYERS) {
+        } else if (S.players.length < maxFor()) {
           S.players.push({ id: a.from, name: uniqueName(cleanName(a.name), a.from), online: true, fig: a.fig || undefined });
         } else return;
         break;
@@ -217,7 +218,7 @@ const Room = (() => {
         p.online = true;
         break;
       case "bot-add":
-        if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length >= MAX_PLAYERS) return;
+        if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length >= maxFor()) return;
         S.players.push({ id: `bot-${randomString("abcdefghijkmnopqrstuvwxyz23456789", 8)}`, name: newBotName(S.players.map((x) => x.name)), online: true, bot: true });
         break;
       case "bot-remove":
@@ -225,7 +226,7 @@ const Room = (() => {
         S.players = S.players.filter((x) => !(x.bot && x.id === a.id));
         break;
       case "start":
-        if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length < MIN_PLAYERS) return;
+        if (a.from !== S.hostId || S.phase !== "lobby" || S.players.length < MIN_PLAYERS || S.players.length > maxFor()) return;
         S.phase = "play";
         S.g = newGame(S.game, S.players.map((x) => x.name));
         S.gseq++;
@@ -310,9 +311,9 @@ const Room = (() => {
     const enough = S.players.length >= MIN_PLAYERS;
     $("lobby-start").hidden = !session.host;
     $("lobby-bot").hidden = !session.host;
-    $("lobby-bot").disabled = S.players.length >= MAX_PLAYERS;
+    $("lobby-bot").disabled = S.players.length >= maxFor();
     renderBotSeg($("lobby-bot-level"), session.host && S.players.some(isBot));
-    $("lobby-start").disabled = !enough;
+    $("lobby-start").disabled = !enough || S.players.length > maxFor();
     let hint;
     if (!me()) hint = t("Du wirst gleich hinzugefügt…");
     else if (session.host) hint = enough ? t("{n} Spieler da. Alle drin? Dann los!", { n: S.players.length }) : t("Warte auf Mitspieler: Code eingeben, QR-Code scannen oder einen Bot dazunehmen.");

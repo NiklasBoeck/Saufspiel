@@ -67,6 +67,13 @@ const DRAWN_ICONS = (() => {
           <circle cx="9.5" cy="32.5" r="3.5"/><path d="M3.5 44c0-4 2.8-6.5 6-6.5 1.5 0 2.8.4 3.8 1.2"/>
           <circle cx="38.5" cy="32.5" r="3.5"/><path d="M44.5 44c0-4-2.8-6.5-6-6.5-1.5 0-2.8.4-3.8 1.2"/>`,
     },
+    // Fußball-Quiz: Ball mit Fragezeichen daneben
+    fussball: {
+      f: `<circle cx="20" cy="28" r="14"/>`,
+      i: `<circle cx="20" cy="28" r="14"/><path d="M20 22.5l5 3.6-1.9 5.9h-6.2L15 26.1z"/>
+          <path d="M20 22.5V15M25 26.1l7.5-2.4M23.1 32l4.4 6.2M16.9 32l-4.4 6.2M15 26.1l-7.5-2.4"/>
+          <path d="M33 7.5a4.5 4.5 0 1 1 6.6 4c-1.3.7-2.1 1.5-2.1 3.1"/><path d="M37.5 19v.4"/>`,
+    },
     // Busfahrer: Bus von vorne
     busfahrer: {
       f: `<rect x="14" y="12" width="20" height="12" rx="1.5"/><circle cx="16.5" cy="31" r="2.2"/><circle cx="31.5" cy="31" r="2.2"/>`,
@@ -200,7 +207,7 @@ const DRAWN_ICONS = (() => {
   const SPOT = {
     flunky: "#e4572e", hodenritter: "#5b9e6d", kistenturm: "#e9a23b", flasche: "#4f8fbf",
     dealer: "#d94a3d", fenster: "#e9b949", randvoll: "#efb030", duell: "#c9573c",
-    eher: "#8f7ac8", busfahrer: "#e9b949", niewieder: "#e57a8f", pflicht: "#d94a3d",
+    eher: "#8f7ac8", fussball: "#5b9e6d", busfahrer: "#e9b949", niewieder: "#e57a8f", pflicht: "#d94a3d",
     triade: "#5b9e6d", promille: "#4fa3a5", stapel: "#d94a3d", deckel: "#c9814a", schiffe: "#4f8fbf",
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
