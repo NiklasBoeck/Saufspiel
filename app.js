@@ -224,9 +224,18 @@ function renderPlayers() {
   $("bot-btn").hidden = !bots;
   $("bot-btn").disabled = players.length >= maxPlayers();
   const tooMany = players.length > maxPlayers();
-  $("start-btn").disabled = players.length < 2 || tooMany;
-  $("start-btn").textContent = tooMany ? t("Höchstens {n} Spieler", { n: maxPlayers() }) : t("Los geht’s");
+  // Ohne Bot-Knopf darf man trotzdem alleine spielen: dann kommt beim Start ein Bot als Gegner dazu.
+  const solo = !bots && players.length === 1;
+  $("start-btn").disabled = players.length < (bots ? 2 : 1) || tooMany;
+  $("start-btn").textContent = tooMany ? t("Höchstens {n} Spieler", { n: maxPlayers() }) : solo ? t("Alleine gegen einen Bot") : t("Los geht’s");
   renderBotSeg($("bot-level"), bots && players.some(isBot));
+}
+
+// Wer alleine ein Spiel ohne Bot-Knopf startet, bekommt einen Bot als Gegner.
+function startPlayers() {
+  const players = [...localPlayers()];
+  if (GAMES[currentGame]?.noBotsOnePhone && players.length === 1) players.push(newBotName(players));
+  return players;
 }
 
 // Spieler für „Ein Handy“. Bei Spielen ohne Bots bleiben die Bots aus anderen Spielen gespeichert, spielen hier aber nicht mit.
@@ -291,7 +300,7 @@ $("start-btn").onclick = () => {
   const key = currentGame;
   const local = {
     key,
-    s: newGame(key, [...localPlayers()]),
+    s: newGame(key, startPlayers()),
     me: null,
     send(action) {
       local.s = applyAction(key, local.s, action, null);

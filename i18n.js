@@ -221,6 +221,7 @@ const STRINGS = {
     "🤖 Bot dazu": "🤖 Add bot",
     "Bots spielen mit, damit du auch alleine spielen kannst.": "Bots join in so you can play on your own too.",
     "Los geht’s": "Let’s go",
+    "Alleine gegen einen Bot": "Solo against a bot",
     "Höchstens {n} Spieler": "At most {n} players",
     "{name} entfernen": "Remove {name}",
 
