@@ -155,6 +155,27 @@ window.Kistenturm3D = (() => {
     });
   }
 
+  // --- Echte Materialien (EchtTex: Holz, Kies, Blätter, gemalt im Handy) ---
+
+  const TS = LOW ? 256 : MOBILE ? 512 : 1024;
+  const E = () => window.EchtTex;
+  function maps(gen, repeat, strength = 5) {
+    const aniso = LOW ? 1 : 4;
+    return {
+      map: E().texture(gen.color, { repeat, aniso }),
+      normalMap: E().texture(E().normalFrom(gen.height, gen.w, gen.h, strength), { color: false, repeat, aniso }),
+    };
+  }
+  let blobMat = null;
+  function contactShadow(w, d, opacity = 0.5) {
+    if (!blobMat) blobMat = new THREE.MeshBasicMaterial({ map: E().texture(E().blobCanvas(64)), color: 0x000000, transparent: true, depthWrite: false });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), blobMat.clone());
+    m.material.opacity = opacity;
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.006;
+    return m;
+  }
+
   // --- Szene ---
 
   function init() {
@@ -165,11 +186,17 @@ window.Kistenturm3D = (() => {
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.15;
       const scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(0x2a2050, 18, 48);
+      scene.fog = new THREE.Fog(0x6a4c58, 16, 62); // Dunst in der Farbe vom Horizont
       const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 120);
 
       scene.add(sky());
-      scene.add(new THREE.HemisphereLight(0xffd9a8, 0x2d3b22, 1.6));
+      // Spiegelungen auf Kisten und Krügen: der Abendhimmel selbst
+      const envScene = new THREE.Scene();
+      envScene.add(sky());
+      const pm = new THREE.PMREMGenerator(renderer);
+      scene.environment = pm.fromScene(envScene, 0.04).texture;
+      pm.dispose();
+      scene.add(new THREE.HemisphereLight(0xffd9a8, 0x2d3b22, 1.0));
       const sun = new THREE.DirectionalLight(0xffc98a, 1.8);
       sun.position.set(-6, 9, 7);
       scene.add(sun);
@@ -181,10 +208,12 @@ window.Kistenturm3D = (() => {
 
       const box = new THREE.BoxGeometry(W, H, D);
       const mats = PALETTE.map((p) => {
-        const long = new THREE.MeshLambertMaterial({ map: sideLong(p) });
-        const short = new THREE.MeshLambertMaterial({ map: sideShort(p) });
-        const up = new THREE.MeshLambertMaterial({ map: top(p) });
-        const down = new THREE.MeshLambertMaterial({ color: p.dark });
+        // Kunststoff-Kisten: leicht glänzend, spiegeln den Abendhimmel
+        const plastic = (o) => new THREE.MeshStandardMaterial({ roughness: 0.42, metalness: 0, envMapIntensity: 0.8, ...o });
+        const long = plastic({ map: sideLong(p) });
+        const short = plastic({ map: sideShort(p) });
+        const up = plastic({ map: top(p) });
+        const down = plastic({ color: p.dark });
         return [short, short, up, down, long, long]; // +x, -x, +y, -y, +z, -z
       });
 
@@ -215,52 +244,56 @@ window.Kistenturm3D = (() => {
     }
   }
 
+  // Abendhimmel nach Sonnenuntergang: oben tiefblau, am Horizont orange glühend, ein paar Wolken von unten angestrahlt
+  let cloudTex = null;
   function sky() {
+    if (!cloudTex) {
+      const r = E().seeded(31);
+      const f = E().fbm(256, 256, 5, 5, 6, r);
+      cloudTex = E().texture(E().paintPx(256, 256, (x, y, i) => [f[i] * 255, f[i] * 255, f[i] * 255]), { color: false, aniso: 1 });
+    }
     const m = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
       fog: false,
+      uniforms: { clouds: { value: cloudTex } },
       vertexShader: "varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-      fragmentShader: `varying vec3 vDir;
+      fragmentShader: `varying vec3 vDir; uniform sampler2D clouds;
         void main(){
-          float y = vDir.y;
-          vec3 top = vec3(0.10, 0.08, 0.30);
-          vec3 mid = vec3(0.45, 0.22, 0.45);
-          vec3 hor = vec3(1.0, 0.55, 0.30);
-          vec3 c = y > 0.12 ? mix(mid, top, smoothstep(0.12, 0.7, y)) : mix(hor, mid, smoothstep(-0.05, 0.12, y));
+          vec3 d = normalize(vDir);
+          float y = d.y;
+          vec3 sun = normalize(vec3(-0.6, -0.04, 0.8));
+          float s = max(dot(normalize(vec3(d.x, 0.0, d.z)), normalize(vec3(sun.x, 0.0, sun.z))), 0.0);
+          vec3 top = vec3(0.025, 0.04, 0.13);
+          vec3 mid = vec3(0.16, 0.13, 0.32);
+          vec3 hor = mix(vec3(0.55, 0.25, 0.22), vec3(1.0, 0.45, 0.12), pow(s, 3.0));
+          vec3 c = mix(hor, mid, smoothstep(0.0, 0.22, y));
+          c = mix(c, top, smoothstep(0.2, 0.85, y));
+          c += vec3(1.0, 0.5, 0.15) * pow(s, 8.0) * exp(-max(y, 0.0) * 9.0) * 0.6;
+          if (y < 0.0) c = mix(hor * 0.6, vec3(0.08, 0.07, 0.08), smoothstep(0.0, -0.2, y));
+          if (y > 0.0) {
+            vec2 uv = d.xz / (y + 0.1) * 0.1;
+            float n = texture2D(clouds, uv).r * 0.75 + texture2D(clouds, uv * 3.0 + 0.4).r * 0.25;
+            float cov = smoothstep(0.55, 0.75, n) * smoothstep(0.02, 0.2, y) * 0.85;
+            vec3 cc = mix(vec3(0.20, 0.15, 0.28), vec3(1.0, 0.55, 0.32), pow(s, 2.0) * (1.0 - smoothstep(0.0, 0.5, y)) * 0.8 + 0.1);
+            c = mix(c, cc, cov);
+          }
           gl_FragColor = vec4(c, 1.0);
           #include <colorspace_fragment>
         }`,
     });
-    return new THREE.Mesh(new THREE.SphereGeometry(100, 24, 12), m);
+    return new THREE.Mesh(new THREE.SphereGeometry(100, 32, 16), m);
   }
 
   function addGarden(scene) {
-    // Kies-Boden
-    const ground = new THREE.Mesh(
-      new THREE.CircleGeometry(60, 40),
-      new THREE.MeshLambertMaterial({
-        map: (() => {
-          const t = tex(256, 256, (g, w, h) => {
-            g.fillStyle = "#7f7462";
-            g.fillRect(0, 0, w, h);
-            for (let i = 0; i < 2600; i++) {
-              const v = 112 + Math.floor(Math.random() * 40);
-              g.fillStyle = `rgb(${v + 12},${v + 4},${v - 14})`;
-              g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1 + Math.random() * 2);
-            }
-          });
-          t.wrapS = t.wrapT = THREE.RepeatWrapping;
-          t.repeat.set(70, 70);
-          return t;
-        })(),
-      })
-    );
+    // Kies-Boden: einzelne Steinchen mit Relief
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 48), new THREE.MeshStandardMaterial({ ...maps(E().gravel({ size: TS, base: [136, 130, 120] }), [80, 80], 6), roughness: 0.95 }));
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    const wood = new THREE.MeshLambertMaterial({ color: 0x9a6b3c });
-    const woodDark = new THREE.MeshLambertMaterial({ color: 0x6b4423 });
+    // Bierzeltgarnitur: helle Fichtenbretter, Klappbeine aus Metall
+    const wood = new THREE.MeshStandardMaterial({ ...maps(E().wood({ w: TS / 2, h: TS / 4, rows: 3, tones: [[150, 108, 66], [190, 146, 96]], seed: 4 }), [1, 1]), roughness: 0.75 });
+    const woodDark = new THREE.MeshStandardMaterial({ color: 0x3a3b3f, roughness: 0.45, metalness: 0.8 });
     // Bierbänke und Tische im Kreis
     const set = (x, z, ry) => {
       const g = new THREE.Group();
@@ -271,6 +304,9 @@ window.Kistenturm3D = (() => {
         const bench = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.05, 0.28), wood);
         bench.position.set(0, 0.46, s);
         g.add(bench);
+        const bs = contactShadow(2.5, 0.55, 0.4);
+        bs.position.z = s;
+        g.add(bs);
         for (const lx of [-0.9, 0.9]) {
           const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.46, 0.24), woodDark);
           leg.position.set(lx, 0.23, s);
@@ -283,12 +319,18 @@ window.Kistenturm3D = (() => {
         g.add(leg);
       }
       // Maßkrüge auf dem Tisch
-      const glass = new THREE.MeshLambertMaterial({ color: 0xf2b233, emissive: 0x5a3a00, emissiveIntensity: 0.4 });
+      const glass = new THREE.MeshPhysicalMaterial({ color: 0xf2a823, emissive: 0x4a2a00, emissiveIntensity: 0.5, roughness: 0.06, clearcoat: 1, transparent: true, opacity: 0.9 });
+      const foam = new THREE.MeshStandardMaterial({ color: 0xfff6e6, roughness: 0.95 });
       for (const mx of [-0.6, 0.1, 0.7]) {
-        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.18, 10), glass);
-        m.position.set(mx, 0.88, (mx * 7) % 2 > 1 ? 0.15 : -0.12);
+        const z = (mx * 7) % 2 > 1 ? 0.15 : -0.12;
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.18, 16), glass);
+        m.position.set(mx, 0.88, z);
         g.add(m);
+        const f = new THREE.Mesh(new THREE.CylinderGeometry(0.061, 0.061, 0.03, 16), foam);
+        f.position.set(mx, 0.985, z);
+        g.add(f);
       }
+      g.add(contactShadow(2.6, 1.0, 0.45));
       g.position.set(x, 0, z);
       g.rotation.y = ry;
       scene.add(g);
@@ -299,24 +341,38 @@ window.Kistenturm3D = (() => {
       set(Math.cos(a) * r, Math.sin(a) * r, -a + Math.PI / 2);
     }
 
-    // Kastanienbäume
-    const trunk = new THREE.MeshLambertMaterial({ color: 0x4a3222 });
-    const leaves = new THREE.MeshLambertMaterial({ color: 0x2f6b2a });
-    const crown = new THREE.IcosahedronGeometry(1.8, 1);
+    // Kastanienbäume: Rinde mit Furchen, Kronen aus einzelnen Blättern
+    const rnd = E().seeded(5);
+    const bark = E().wood({ w: 128, h: 256, rows: 1, tones: [[54, 42, 34], [96, 82, 70]], seed: 8, joints: false, gap: -9 });
+    const barkMaps = maps(bark, [1, 2], 6);
+    for (const t of Object.values(barkMaps)) t.rotation = Math.PI / 2; // Furchen senkrecht am Stamm
+    const trunk = new THREE.MeshStandardMaterial({ ...barkMaps, roughness: 0.95 });
+    const cards = [];
+    const ks = LOW ? 0.4 : MOBILE ? 0.7 : 1;
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2;
       const r = 17 + (i % 3) * 2.5;
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, 3, 7), trunk);
-      t.position.set(Math.cos(a) * r, 1.5, Math.sin(a) * r);
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 3.2, 10), trunk);
+      t.position.set(x, 1.6, z);
       scene.add(t);
-      const c = new THREE.Mesh(crown, leaves);
-      c.position.set(Math.cos(a) * r, 3.8, Math.sin(a) * r);
-      c.scale.set(1.2, 1, 1.2);
-      scene.add(c);
+      const tint = new THREE.Color().setHSL(0.26, 0.4, 0.6 + rnd() * 0.08);
+      for (let k = 0; k < 5; k++) {
+        const c = new THREE.Vector3(x + (rnd() - 0.5) * 2, 3.6 + rnd() * 1.4, z + (rnd() - 0.5) * 2);
+        E().clumpCards(cards, rnd, c, [1.5, 1.2, 1.5], Math.round(34 * ks), 1.3, tint);
+      }
+      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1), new THREE.MeshStandardMaterial({ color: 0x1d3016, roughness: 1 }));
+      core.position.set(x, 4.1, z);
+      core.scale.set(1.3, 1, 1.3);
+      scene.add(core);
     }
+    const leafMap = E().texture(E().leafAtlas(LOW ? 128 : 256), { aniso: 1 });
+    leafMap.wrapS = leafMap.wrapT = THREE.ClampToEdgeWrapping;
+    scene.add(new THREE.Mesh(E().foliageGeo(cards, rnd), E().foliageMaterial(leafMap, new THREE.Vector3(-0.6, -0.04, 0.8))));
 
     // Lichterketten zwischen Masten
-    const pole = new THREE.MeshLambertMaterial({ color: 0x3f3f46 });
+    const pole = new THREE.MeshStandardMaterial({ color: 0x3f3f46, roughness: 0.5, metalness: 0.7 });
     const bulbGeo = new THREE.SphereGeometry(0.06, 8, 6);
     const bulbs = [];
     const posts = [];

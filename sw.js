@@ -41,6 +41,7 @@ const FILES = [
   "flasche.css",
   "hodenritter.js",
   "hodenritter-3d.js",
+  "echt-tex.js",
   "flunky.js",
   "promille.js",
   "promille.css",

@@ -92,33 +92,6 @@ window.Flasche3D = (() => {
     return t;
   }
 
-  // Holzbretter mit Maserung
-  function planks(w, h, n, base, seed) {
-    return tex(w, h, (g) => {
-      let r = seed;
-      const rnd = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
-      const bh = h / n;
-      for (let i = 0; i < n; i++) {
-        const l = 0.85 + rnd() * 0.3;
-        g.fillStyle = `rgb(${base[0] * l | 0},${base[1] * l | 0},${base[2] * l | 0})`;
-        g.fillRect(0, i * bh, w, bh);
-        g.strokeStyle = "rgba(40,20,5,0.18)";
-        g.lineWidth = 1.2;
-        for (let k = 0; k < 7; k++) {
-          const y = i * bh + rnd() * bh;
-          const amp = 1 + rnd() * 3;
-          const f = 0.01 + rnd() * 0.02;
-          const ph = rnd() * 10;
-          g.beginPath();
-          for (let x = 0; x <= w; x += 8) g.lineTo(x, y + Math.sin(x * f + ph) * amp);
-          g.stroke();
-        }
-        g.fillStyle = "rgba(20,10,0,0.45)";
-        g.fillRect(0, i * bh, w, 2);
-      }
-    });
-  }
-
   function labelTex() {
     return tex(512, 128, (g, w, h) => {
       g.fillStyle = "#f6ecd2";
@@ -154,6 +127,56 @@ window.Flasche3D = (() => {
     });
   }
 
+  // --- Echte Materialien (EchtTex: Holz mit Relief, gemalt im Handy) ---
+
+  const TS = LOW ? 256 : MOBILE ? 512 : 1024;
+  function woodMaps(opts, repeat) {
+    const E = window.EchtTex;
+    const w = E.wood({ w: TS, h: TS / 2, ...opts });
+    const aniso = LOW ? 1 : 4;
+    return {
+      map: E.texture(w.color, { repeat, aniso }),
+      normalMap: E.texture(E.normalFrom(w.height, w.w, w.h, 5), { color: false, repeat, aniso }),
+    };
+  }
+
+  // Spiegelungen: eine dunkle Kneipe mit warmen Lampen und einem hellen Fenster, einmal vorberechnet
+  function pubEnvironment(renderer) {
+    const env = new THREE.Scene();
+    env.background = new THREE.Color(0x1a0f08);
+    const room = new THREE.Mesh(new THREE.BoxGeometry(14, 6, 14), new THREE.MeshBasicMaterial({ color: 0x2a170b, side: THREE.BackSide }));
+    room.position.y = 2.5;
+    env.add(room);
+    const glow = (w, h, x, y, z, c, ry = 0) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }));
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+      env.add(m);
+    };
+    const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24), new THREE.MeshBasicMaterial({ color: 0xffd9a0, side: THREE.DoubleSide }));
+    lamp.rotation.x = Math.PI / 2;
+    lamp.position.y = 3.2;
+    env.add(lamp);
+    glow(2.2, 1.6, -6.9, 2.4, 1, 0xbfd6ff, Math.PI / 2); // Fenster
+    glow(0.6, 0.6, 6.9, 2.2, -2, 0xffb060, -Math.PI / 2); // Wandlampen
+    glow(0.6, 0.6, 2, 2.2, 6.9, 0xffb060, Math.PI);
+    glow(0.6, 0.6, -2, 2.2, -6.9, 0xffb060);
+    const pm = new THREE.PMREMGenerator(renderer);
+    const t = pm.fromScene(env, 0.03).texture;
+    pm.dispose();
+    return t;
+  }
+
+  let blobMatSmall = null;
+  function contactShadow(rx, ry, y, opacity = 0.55) {
+    if (!blobMatSmall) blobMatSmall = new THREE.MeshBasicMaterial({ map: window.EchtTex.texture(window.EchtTex.blobCanvas(64)), color: 0x000000, transparent: true, depthWrite: false });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(rx * 2, ry * 2), blobMatSmall.clone());
+    m.material.opacity = opacity;
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = y;
+    return m;
+  }
+
   // --- Szene ---
 
   function init() {
@@ -168,29 +191,30 @@ window.Flasche3D = (() => {
       scene.fog = new THREE.Fog(0x140c08, 9, 22);
       const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 60);
 
-      scene.add(new THREE.HemisphereLight(0xffe0b0, 0x2a1508, 1.1));
-      const lamp = new THREE.PointLight(0xffc27a, 26, 0, 1.6);
+      scene.add(new THREE.HemisphereLight(0xffe0b0, 0x2a1508, 0.4));
+      const lamp = new THREE.PointLight(0xffc27a, 40, 0, 2);
       lamp.position.set(0, 3.2, 0);
       scene.add(lamp);
       const key = new THREE.DirectionalLight(0xfff1dc, 1.3);
       key.position.set(-3, 6, 4);
       scene.add(key);
 
-      // Boden
-      const ft = planks(512, 512, 8, [92, 58, 34], 7);
-      ft.wrapS = ft.wrapT = THREE.RepeatWrapping;
-      ft.repeat.set(6, 6);
-      const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({ map: ft }));
+      scene.environment = pubEnvironment(renderer);
+
+      // Boden: alte Eichendielen, matt
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ ...woodMaps({ rows: 6, tones: [[70, 42, 24], [112, 72, 42]], seed: 7 }, [10, 20]), roughness: 0.8, envMapIntensity: 0.12 }));
       floor.rotation.x = -Math.PI / 2;
       scene.add(floor);
 
-      // Tisch: Platte, Rand, Fuß
-      const top = planks(512, 512, 7, [176, 118, 66], 3);
-      const side = new THREE.MeshLambertMaterial({ color: 0x6b3f1f });
-      const table = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_R, TABLE_R, 0.08, 64), [side, new THREE.MeshLambertMaterial({ map: top }), side]);
+      // Tisch: lackierte Platte (Klarlack spiegelt die Lampe), Rand, Fuß
+      const topMaps = woodMaps({ rows: 7, tones: [[122, 74, 38], [164, 108, 60]], seed: 3, gap: 0.9 }, [1, 1.6]);
+      topMaps.map.center.set(0.5, 0.5);
+      const side = new THREE.MeshStandardMaterial({ ...woodMaps({ rows: 3, tones: [[86, 50, 26], [110, 66, 34]], seed: 5, joints: false }, [6, 0.4]), roughness: 0.55 });
+      const topMat = new THREE.MeshPhysicalMaterial({ ...topMaps, roughness: 0.55, clearcoat: 0.35, clearcoatRoughness: 0.32, envMapIntensity: 0.45, normalScale: new THREE.Vector2(0.6, 0.6) });
+      const table = new THREE.Mesh(new THREE.CylinderGeometry(TABLE_R, TABLE_R, 0.08, 64), [side, topMat, side]);
       table.position.y = TABLE_Y - 0.04;
       scene.add(table);
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(TABLE_R, 0.045, 8, 64), new THREE.MeshLambertMaterial({ color: 0x5a3317 }));
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(TABLE_R, 0.045, 12, 96), new THREE.MeshPhysicalMaterial({ color: 0x5a3317, roughness: 0.4, clearcoat: 0.6, clearcoatRoughness: 0.2 }));
       rim.rotation.x = Math.PI / 2;
       rim.position.y = TABLE_Y - 0.02;
       scene.add(rim);
@@ -262,6 +286,7 @@ window.Flasche3D = (() => {
         mugGeo: makeMugGeo(),
         chairGeo: makeChairGeo(),
         coasterGeo: new THREE.CircleGeometry(0.19, 28),
+        chairWood: new THREE.MeshStandardMaterial({ ...woodMaps({ rows: 4, tones: [[88, 54, 30], [120, 76, 42]], seed: 9, joints: false }, [0.5, 0.5]), roughness: 0.6 }),
       };
       scene.add(G.seats);
     } catch (err) {
@@ -289,13 +314,14 @@ window.Flasche3D = (() => {
       [0, 0.965],
     ].map(([r, y]) => new THREE.Vector2(r, y));
     const geo = new THREE.LatheGeometry(prof, 28);
-    const glass = new THREE.MeshPhongMaterial({ color: 0x17602c, specular: 0xffffff, shininess: 140, emissive: 0x062b10, transparent: true, opacity: 0.9 });
+    // grünes Flaschenglas: dünn, glatt, spiegelt Lampe und Fenster
+    const glass = new THREE.MeshPhysicalMaterial({ color: 0x1b6a32, roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6, emissive: 0x041a0a, transparent: true, opacity: 0.88 });
     const body = new THREE.Mesh(geo, glass);
-    const label = new THREE.Mesh(new THREE.CylinderGeometry(0.1335, 0.1335, 0.26, 28, 1, true), new THREE.MeshLambertMaterial({ map: labelTex() }));
+    const label = new THREE.Mesh(new THREE.CylinderGeometry(0.1335, 0.1335, 0.26, 28, 1, true), new THREE.MeshStandardMaterial({ map: labelTex(), roughness: 0.75 }));
     label.position.y = 0.3;
-    const neckLabel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.07, 24, 1, true), new THREE.MeshLambertMaterial({ color: 0xd4a017 }));
+    const neckLabel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.07, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.35, metalness: 0.7 }));
     neckLabel.position.y = 0.665;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.058, 0.035, 18), new THREE.MeshPhongMaterial({ color: 0xc9a227, specular: 0xffffff, shininess: 80 }));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.058, 0.035, 18), new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.3, metalness: 0.9 }));
     cap.position.y = 0.965;
     // Stehend gebaut (Hals nach oben), dann hingelegt: Hals zeigt nach +x
     const inner = new THREE.Group();
@@ -323,8 +349,8 @@ window.Flasche3D = (() => {
       glass: new THREE.CylinderGeometry(0.085, 0.078, 0.2, 18),
       foam: new THREE.CylinderGeometry(0.088, 0.088, 0.035, 18),
       handle: new THREE.TorusGeometry(0.05, 0.015, 6, 12, Math.PI),
-      glassMat: new THREE.MeshPhongMaterial({ color: 0xe8a21c, emissive: 0x4a2a00, specular: 0xffffff, shininess: 90, transparent: true, opacity: 0.92 }),
-      foamMat: new THREE.MeshLambertMaterial({ color: 0xfffaf0 }),
+      glassMat: new THREE.MeshPhysicalMaterial({ color: 0xe39a17, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.4, emissive: 0x3a1f00, transparent: true, opacity: 0.9 }),
+      foamMat: new THREE.MeshStandardMaterial({ color: 0xfff8ea, roughness: 0.95 }),
     };
   }
 
@@ -352,16 +378,17 @@ window.Flasche3D = (() => {
       const c = Math.cos(a);
       const s = Math.sin(a);
       const col = COLORS[i % COLORS.length];
-      const mat = new THREE.MeshLambertMaterial({ color: col });
-      // Stuhl: Lehne außen
+      const mat = new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.9, sheen: 0.8, sheenRoughness: 0.6, sheenColor: new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.4) }); // Sitzpolster aus Stoff in Spielerfarbe
+      // Stuhl: Holz, Lehne außen
       const chair = new THREE.Group();
       const seat = new THREE.Mesh(cg.seat, mat);
       seat.position.y = 0.48;
       chair.add(seat);
-      const back = new THREE.Mesh(cg.back, mat);
+      const back = new THREE.Mesh(cg.back, G.chairWood);
       back.position.set(0, 0.76, 0.23);
       chair.add(back);
-      const legMat = new THREE.MeshLambertMaterial({ color: 0x2b1a10 });
+      chair.add(contactShadow(0.36, 0.34, 0.006, 0.5));
+      const legMat = G.chairWood;
       for (const [lx, lz] of [[-0.21, -0.2], [0.21, -0.2], [-0.21, 0.2], [0.21, 0.2]]) {
         const l = new THREE.Mesh(cg.leg, legMat);
         l.position.set(lx, 0.23, lz);
@@ -371,7 +398,7 @@ window.Flasche3D = (() => {
       chair.rotation.y = -a + Math.PI / 2;
       G.seats.add(chair);
       // Bierdeckel und Krug vor dem Platz
-      const coaster = new THREE.Mesh(G.coasterGeo, new THREE.MeshLambertMaterial({ map: coasterTex(col) }));
+      const coaster = new THREE.Mesh(G.coasterGeo, new THREE.MeshStandardMaterial({ map: coasterTex(col), roughness: 0.9 }));
       coaster.rotation.x = -Math.PI / 2;
       coaster.position.set(c * MUG_R, TABLE_Y + 0.004, s * MUG_R);
       G.seats.add(coaster);
@@ -383,7 +410,7 @@ window.Flasche3D = (() => {
       const h = new THREE.Mesh(mg.handle, mg.glassMat);
       h.position.set(0.085, 0.1, 0);
       h.rotation.z = -Math.PI / 2;
-      mug.add(gl, fo, h);
+      mug.add(gl, fo, h, contactShadow(0.13, 0.13, 0.003, 0.45));
       const off = 0.11; // Krug etwas neben dem Deckel-Mittelpunkt, damit die Farbe zu sehen ist
       mug.position.set(c * (MUG_R + 0.02) - s * off, TABLE_Y + 0.006, s * (MUG_R + 0.02) + c * off);
       mug.rotation.y = -a;
