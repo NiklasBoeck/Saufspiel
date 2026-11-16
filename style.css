@@ -246,6 +246,7 @@ h1 { margin: 16px 0 0; font-size: 2.4rem; text-align: center; }
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
 }
 .pc-red { color: #dc2626; }
+.pc-face { display: none; } /* Kartenbilder gibt es nur im neuen Design (design.css) */
 .pc-back { background: repeating-linear-gradient(45deg, #7c3aed 0 6px, #5b21b6 6px 12px); border: 3px solid #fff; }
 .pc-new { outline: 3px solid var(--primary); outline-offset: 2px; }
 .pc-small { width: 44px; height: 62px; font-size: 1rem; }

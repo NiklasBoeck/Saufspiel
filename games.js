@@ -237,8 +237,29 @@ const SUITS = [
   { symbol: "♣", name: "Kreuz", red: false },
 ];
 
+// Bilder in der Kartenmitte wie auf einer echten Karte (x, y in %), untere Hälfte steht auf dem Kopf
+const PIPS = {
+  2: [[50, 12], [50, 88]],
+  3: [[50, 12], [50, 50], [50, 88]],
+  4: [[25, 12], [75, 12], [25, 88], [75, 88]],
+  5: [[25, 12], [75, 12], [50, 50], [25, 88], [75, 88]],
+  6: [[25, 12], [75, 12], [25, 50], [75, 50], [25, 88], [75, 88]],
+  7: [[25, 12], [75, 12], [50, 31], [25, 50], [75, 50], [25, 88], [75, 88]],
+  8: [[25, 12], [75, 12], [50, 31], [25, 50], [75, 50], [50, 69], [25, 88], [75, 88]],
+  9: [[25, 12], [75, 12], [25, 37], [75, 37], [50, 50], [25, 63], [75, 63], [25, 88], [75, 88]],
+  10: [[25, 12], [75, 12], [50, 25], [25, 37], [75, 37], [25, 63], [75, 63], [50, 75], [25, 88], [75, 88]],
+};
+
+// Spielkarte. Im neuen Design sieht sie aus wie eine echte (Eckzeichen, Bilder in der Mitte, Papier), im klassischen wie bisher.
 function playingCardHtml(card, size = "") {
   if (!card) return `<div class="pc pc-back ${size}"></div>`;
   const color = card.suit.red ? "pc-red" : "";
-  return `<div class="pc ${color} ${size}"><span>${card.rank}</span><span>${card.suit.symbol}</span></div>`;
+  const sym = card.suit.symbol;
+  const pips = PIPS[card.rank];
+  const face = pips
+    ? pips.map(([x, y]) => `<i style="left:${x}%;top:${y}%"${y > 50 ? ' class="u"' : ""}>${sym}</i>`).join("")
+    : card.rank === "A"
+      ? `<i class="ace">${sym}</i>`
+      : `<i class="court">${card.rank}<small>${sym}</small></i>`;
+  return `<div class="pc ${color} ${size}" data-r="${card.rank}" data-s="${sym}"><span>${card.rank}</span><span>${sym}</span><b class="pc-face" aria-hidden="true">${face}</b></div>`;
 }
