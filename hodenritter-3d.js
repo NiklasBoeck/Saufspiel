@@ -191,7 +191,7 @@ window.Hodenritter3D = (() => {
     sh.fragmentShader = sh.fragmentShader.replace(
       "#include <opaque_fragment>",
 
-      `outgoingLight += vec3(${LOOK.rim}) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * 0.3;\n#include <opaque_fragment>`
+      `outgoingLight += vec3(${LOOK.rim}) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 3.0) * ${LOOK.rimK ?? 0.3};\n#include <opaque_fragment>`
     );
   };
   function rim(m) {
@@ -354,6 +354,445 @@ window.Hodenritter3D = (() => {
     return g;
   }
 
+  // --- Echt-Look: Texturen und Laub, alles zur Laufzeit gemalt (keine Bilddateien, nichts zu laden) ---
+  // Rauschen (fBm) für Farbe und Höhe, aus der Höhe eine Normal-Map: so bekommen Rasen, Holz, Rinde und Putz Struktur.
+  const texSize = () => [256, 512, 1024][Q];
+
+  // kachelbares Wertrauschen, Werte 0..1. cx/cy: Zellen in x/y bei der gröbsten Stufe
+  function fbm(w, h, cx, cy, oct, rnd) {
+    const out = new Float32Array(w * h);
+    let amp = 1;
+    let tot = 0;
+    for (let o = 0; o < oct; o++) {
+      const nx = Math.max(1, Math.round(cx * 2 ** o));
+      const ny = Math.max(1, Math.round(cy * 2 ** o));
+      const grid = new Float32Array(nx * ny);
+      for (let i = 0; i < grid.length; i++) grid[i] = rnd();
+      for (let y = 0; y < h; y++) {
+        const fy = (y / h) * ny;
+        const y0 = Math.floor(fy);
+        let ty = fy - y0;
+        ty = ty * ty * (3 - 2 * ty);
+        const r0 = (y0 % ny) * nx;
+        const r1 = ((y0 + 1) % ny) * nx;
+        for (let x = 0; x < w; x++) {
+          const fx = (x / w) * nx;
+          const x0 = Math.floor(fx);
+          let tx = fx - x0;
+          tx = tx * tx * (3 - 2 * tx);
+          const x1 = (x0 + 1) % nx;
+          const a = grid[r0 + x0] + (grid[r0 + x1] - grid[r0 + x0]) * tx;
+          const b = grid[r1 + x0] + (grid[r1 + x1] - grid[r1 + x0]) * tx;
+          out[y * w + x] += (a + (b - a) * ty) * amp;
+        }
+      }
+      tot += amp;
+      amp *= 0.5;
+    }
+    for (let i = 0; i < out.length; i++) out[i] /= tot;
+    return out;
+  }
+
+  function texFrom(c, color, repeat) {
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    if (repeat) t.repeat.set(repeat[0], repeat[1]);
+    if (G?.renderer || anisoMax) t.anisotropy = Math.min(Q > 1 ? 8 : 4, anisoMax || 1);
+    return t;
+  }
+  let anisoMax = 0;
+
+  // Bild aus einer Funktion je Pixel: px(x, y, i) → [r, g, b] (0..255)
+  function paintPx(w, h, px) {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d");
+    const img = g.createImageData(w, h);
+    const d = img.data;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        const [r, gg, b] = px(x, y, i);
+        d[i * 4] = r;
+        d[i * 4 + 1] = gg;
+        d[i * 4 + 2] = b;
+        d[i * 4 + 3] = 255;
+      }
+    }
+    g.putImageData(img, 0, 0);
+    return c;
+  }
+
+  // Normal-Map aus einer Höhe (Float32Array 0..1, kachelbar)
+  function normalFrom(hgt, w, h, strength) {
+    return paintPx(w, h, (x, y, i) => {
+      const l = hgt[y * w + ((x - 1 + w) % w)];
+      const r = hgt[y * w + ((x + 1) % w)];
+      const u = hgt[((y - 1 + h) % h) * w + x];
+      const dn = hgt[((y + 1) % h) * w + x];
+      const nx = (l - r) * strength;
+      const ny = (dn - u) * strength;
+      const len = Math.hypot(nx, ny, 1);
+      return [(nx / len) * 127.5 + 127.5, (ny / len) * 127.5 + 127.5, (1 / len) * 127.5 + 127.5];
+    });
+  }
+
+  const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const sstep = (a, b, x) => {
+    const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
+
+  // Rasen: Farbflecken in mehreren Größen, darüber Zehntausende kurze Halme in vielen Grüntönen, ein paar trockene Stellen.
+  // Die Halme werden direkt in Pixel-Puffer gezeichnet (Canvas-Linien wären auf dem Handy viel zu langsam).
+  function lawnTextures(rnd) {
+    const S = texSize();
+    const base = fbm(S, S, 4, 4, 5, rnd);
+    const dry = fbm(S, S, 3, 3, 4, rnd);
+    const k = S / 512;
+    const col = new Float32Array(S * S * 3);
+    const hgt = new Float32Array(S * S);
+    for (let i = 0; i < S * S; i++) {
+      let c = mixc([46, 74, 26], [92, 124, 44], base[i]);
+      c = mixc(c, [122, 120, 62], sstep(0.58, 0.8, dry[i]) * 0.55);
+      const n = (rnd() - 0.5) * 14;
+      col[i * 3] = c[0] + n;
+      col[i * 3 + 1] = c[1] + n;
+      col[i * 3 + 2] = c[2] + n * 0.6;
+      hgt[i] = 0.27 + base[i] * 0.12;
+    }
+    const dot = (x, y, c, a, h) => {
+      const i = (((y | 0) % S + S) % S) * S + (((x | 0) % S + S) % S);
+      col[i * 3] += (c[0] - col[i * 3]) * a;
+      col[i * 3 + 1] += (c[1] - col[i * 3 + 1]) * a;
+      col[i * 3 + 2] += (c[2] - col[i * 3 + 2]) * a;
+      hgt[i] += (h - hgt[i]) * a;
+    };
+    const n = Math.round((S * S) / 22);
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * S;
+      const y = rnd() * S;
+      const len = (2.5 + rnd() * 6) * k;
+      const a = rnd() * TAU;
+      const ex = Math.cos(a);
+      const ey = Math.sin(a);
+      const lt = rnd();
+      let c = mixc([38, 66, 22], [128, 160, 64], lt);
+      if (rnd() < sstep(0.55, 0.85, dry[(y | 0) * S + (x | 0)]) * 0.6) c = mixc(c, [150, 140, 80], 0.6);
+      const al = 0.55 + rnd() * 0.35;
+      const h = 0.43 + lt * 0.57;
+      const wide = rnd() < 0.5 * k;
+      for (let t = 0; t <= len; t += 0.7) {
+        const fade = 1 - (t / len) * 0.4; // Spitze heller und dünner
+        dot(x + ex * t, y + ey * t, c, al * fade, h * fade);
+        if (wide && t < len * 0.6) dot(x + ex * t - ey, y + ey * t + ex, c, al * 0.6, h * 0.9);
+      }
+    }
+    // ein paar Kleeblätter und Erdkrümel
+    for (let i = 0; i < 160 * k * k; i++) {
+      const x = rnd() * S;
+      const y = rnd() * S;
+      if (rnd() < 0.35) {
+        dot(x, y, [70, 52, 30], 0.55, 0.1);
+        continue;
+      }
+      for (let j = 0; j < 3; j++) {
+        const cx = x + Math.cos(j * 2.1) * 2 * k;
+        const cy = y + Math.sin(j * 2.1) * 2 * k;
+        const r = 1.8 * k;
+        for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r) dot(cx + dx, cy + dy, [64, 104, 40], 0.85, 0.7);
+      }
+    }
+    const colC = paintPx(S, S, (x, y, i) => [col[i * 3], col[i * 3 + 1], col[i * 3 + 2]]);
+    const macro = fbm(128, 128, 3, 3, 4, rnd);
+    const macroC = paintPx(128, 128, (x, y, i) => [macro[i] * 255, macro[i] * 255, macro[i] * 255]);
+    return { map: texFrom(colC, true), normal: texFrom(normalFrom(hgt, S, S, 3.2 / k), false), macro: texFrom(macroC, false) };
+  }
+
+  // Holzdielen: Maserung längs, jede Diele etwas anders, Fugen dunkel, Stöße versetzt
+  function plankTextures(rnd, rows = 8) {
+    const W = texSize();
+    const Hh = W / 2;
+    const grain = fbm(W, Hh, 2, 64, 4, rnd);
+    const knots = fbm(W, Hh, 6, 3, 2, rnd);
+    const ph = Hh / rows;
+    const tone = [];
+    const joint = [];
+    for (let r = 0; r < rows; r++) {
+      tone.push(mixc([134, 92, 58], [178, 132, 88], rnd()));
+      joint.push(rnd() * W);
+    }
+    const hgt = new Float32Array(W * Hh);
+    const colC = paintPx(W, Hh, (x, y, i) => {
+      const r = Math.floor(y / ph);
+      const yy = y - r * ph;
+      const gv = grain[i];
+      const ring = Math.sin((gv * 30 + yy * 0.08 + r * 2) * 1.0) * 0.5 + 0.5;
+      let f = 0.78 + gv * 0.32 + ring * 0.08 - sstep(0.7, 0.9, knots[i]) * 0.12;
+      let h = 0.6 + gv * 0.25 + ring * 0.05;
+      const edge = Math.min(yy, ph - 1 - yy);
+      const jd = Math.abs(((x - joint[r] + W * 1.5) % W) - W / 2);
+      if (edge < 1.2 * (W / 512) || jd < 0.8 * (W / 512)) {
+        f = 0.28;
+        h = 0.05;
+      } else if (edge < 3 * (W / 512)) {
+        f *= 0.9;
+        h *= 0.8;
+      }
+      hgt[i] = h;
+      const t = tone[r];
+      return [t[0] * f, t[1] * f, t[2] * f];
+    });
+    return { map: texFrom(colC, true), normal: texFrom(normalFrom(hgt, W, Hh, 6), false) };
+  }
+
+  // Rinde: tiefe Längsfurchen, graubraun
+  function barkTextures(rnd) {
+    const W = Math.max(128, texSize() / 4);
+    const Hh = W * 2;
+    const f = fbm(W, Hh, 10, 3, 4, rnd);
+    const d = fbm(W, Hh, 3, 2, 3, rnd);
+    const hgt = new Float32Array(W * Hh);
+    const colC = paintPx(W, Hh, (x, y, i) => {
+      const ridge = 1 - Math.abs(f[i] * 2 - 1);
+      hgt[i] = ridge;
+      const c = mixc([58, 46, 36], [128, 114, 98], ridge * 0.8 + d[i] * 0.25);
+      return c;
+    });
+    return { map: texFrom(colC, true), normal: texFrom(normalFrom(hgt, W, Hh, 5), false) };
+  }
+
+  // Putz: fast weiß, leicht fleckig und körnig
+  function plasterTextures(rnd) {
+    const S = Math.max(128, texSize() / 2);
+    const f = fbm(S, S, 4, 4, 5, rnd);
+    const grainH = new Float32Array(S * S);
+    const colC = paintPx(S, S, (x, y, i) => {
+      const n = rnd();
+      grainH[i] = f[i] * 0.4 + n * 0.6;
+      const v = 0.9 + f[i] * 0.1 - n * 0.03;
+      return [236 * v, 228 * v, 212 * v];
+    });
+    return { map: texFrom(colC, true), normal: texFrom(normalFrom(grainH, S, S, 0.5), false) };
+  }
+
+  // Dachziegel: Reihen mit Schatten an der Unterkante
+  function roofTextures(rnd) {
+    const S = Math.max(128, texSize() / 2);
+    const rows = 4;
+    const cols = 5;
+    const f = fbm(S, S, 6, 6, 3, rnd);
+    const hgt = new Float32Array(S * S);
+    const tint = [];
+    for (let i = 0; i < rows * cols * 2; i++) tint.push(0.82 + rnd() * 0.3);
+    const colC = paintPx(S, S, (x, y, i) => {
+      const r = Math.floor((y / S) * rows);
+      const v = (y / S) * rows - r;
+      const off = r % 2 ? 0.5 : 0;
+      const cu = (x / S) * cols + off;
+      const cI = Math.floor(cu) % cols;
+      const u = cu - Math.floor(cu);
+      const round = Math.sin(u * Math.PI);
+      const h = round * 0.7 * (0.4 + v * 0.6) + (v > 0.92 ? -0.4 : 0);
+      hgt[i] = h;
+      const t = tint[r * cols + cI] * (0.7 + round * 0.3) * (v > 0.9 ? 0.55 : 0.85 + v * 0.2) * (0.92 + f[i] * 0.16);
+      return [168 * t, 72 * t, 46 * t];
+    });
+    return { map: texFrom(colC, true), normal: texFrom(normalFrom(hgt, S, S, 4), false) };
+  }
+
+  // Ein Blatt als Pixel in einen RGBA-Puffer stempeln (Float32, 0..255): Spitze in Richtung a, Länge L.
+  // Mittelrippe heller, Rand etwas dunkler; wrap: an den Kanten der Kachel weiterzeichnen. h: Höhe für die Normal-Map
+  function stampLeaf(buf, S, wrap, x, y, a, L, c, hgt, hv) {
+    const W = L * 0.42;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const R = Math.ceil(L) + 1;
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const u = dx * ca + dy * sa; // entlang des Blatts
+        const v = -dx * sa + dy * ca; // quer
+        if (u < 0 || u > L) continue;
+        const half = W * Math.sin((Math.PI * u) / L) * (1 - (u / L) * 0.25);
+        const av = Math.abs(v);
+        if (av > half) continue;
+        let px = Math.round(x + dx);
+        let py = Math.round(y + dy);
+        if (wrap) {
+          px = ((px % S) + S) % S;
+          py = ((py % S) + S) % S;
+        } else if (px < 0 || py < 0 || px >= S || py >= S) continue;
+        const i = py * S + px;
+        const edge = av / Math.max(half, 0.01);
+        const sh = (1.08 - edge * 0.28) * (av < 0.6 ? 1.15 : 1) * (0.85 + (u / L) * 0.2);
+        const aa = Math.min(1, (half - av) * 1.5); // weiche Kante
+        const o = i * 4;
+        buf[o] += (c[0] * sh - buf[o]) * aa;
+        buf[o + 1] += (c[1] * sh - buf[o + 1]) * aa;
+        buf[o + 2] += (c[2] * sh - buf[o + 2]) * aa;
+        buf[o + 3] += (255 - buf[o + 3]) * aa;
+        if (hgt) hgt[i] += (hv * (1 - edge * 0.4) - hgt[i]) * aa;
+      }
+    }
+  }
+  function leafColor(rnd, light) {
+    const c = new THREE.Color().setHSL((78 + rnd() * 34) / 360, (32 + rnd() * 26) / 100, ((light ? 26 : 14) + rnd() * (light ? 22 : 14)) / 100, THREE.LinearSRGBColorSpace);
+    return [c.r * 255, c.g * 255, c.b * 255];
+  }
+  function canvasRGBA(buf, S) {
+    const c = document.createElement("canvas");
+    c.width = c.height = S;
+    const g = c.getContext("2d");
+    const img = g.createImageData(S, S);
+    img.data.set(buf);
+    g.putImageData(img, 0, 0);
+    return c;
+  }
+
+  // Blätterzweig für die Karten der Baumkronen: viele Blätter um die Mitte, Rand ausgefranst, sonst durchsichtig
+  function leafAtlas(rnd) {
+    const S = Math.max(128, texSize() / 2);
+    const buf = new Float32Array(S * S * 4);
+    for (let i = 0; i < S * S; i++) buf.set([52, 72, 30, 0], i * 4); // durchsichtig, aber grün: keine dunklen Ränder beim Verkleinern
+    // Zweige
+    for (let i = 0; i < 6; i++) {
+      const a = rnd() * TAU;
+      for (let t = 0; t < S * 0.4; t += 0.5) {
+        const px = Math.round(S / 2 + Math.cos(a) * t);
+        const py = Math.round(S / 2 + Math.sin(a) * t);
+        const o = (py * S + px) * 4;
+        buf.set([70, 52, 34, 230], o);
+      }
+    }
+    const n = 230;
+    for (let i = 0; i < n; i++) {
+      const light = i > n * 0.45;
+      const r = Math.sqrt(rnd()) * S * 0.4;
+      const a = rnd() * TAU;
+      stampLeaf(buf, S, false, S / 2 + Math.cos(a) * r, S / 2 + Math.sin(a) * r, a + (rnd() - 0.5) * 1.2, S * (0.06 + rnd() * 0.05), leafColor(rnd, light));
+    }
+    const t = texFrom(canvasRGBA(new Uint8ClampedArray(buf), S), true);
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    return t;
+  }
+
+  // Dichte Hecke (gekachelt, deckend): dunkler Grund, darüber Schichten aus Blättern
+  function hedgeTextures(rnd) {
+    const S = Math.max(128, texSize() / 2);
+    const buf = new Float32Array(S * S * 4);
+    const hgt = new Float32Array(S * S);
+    for (let i = 0; i < S * S; i++) buf.set([20, 32, 15, 255], i * 4);
+    const n = Math.round((S * S) / 70);
+    for (let i = 0; i < n; i++) {
+      const layer = i / n;
+      stampLeaf(buf, S, true, rnd() * S, rnd() * S, rnd() * TAU, S * (0.035 + rnd() * 0.03), leafColor(rnd, layer > 0.4), hgt, 0.15 + layer * 0.85);
+    }
+    return { map: texFrom(canvasRGBA(new Uint8ClampedArray(buf), S), true), normal: texFrom(normalFrom(hgt, S, S, 4), false) };
+  }
+
+  // Weicher Schatten unter Figuren, Kugeln und Hindernissen (die Sonne wirft auf dem Rasen keine harten Schatten)
+  let blobTexCache = null;
+  function blobShadow(rx, ry = rx, opacity = 0.5) {
+    if (!blobTexCache) {
+      blobTexCache = canvasTex(64, 64, (g, w, h) => {
+        const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        gr.addColorStop(0, "rgba(0,0,0,1)");
+        gr.addColorStop(0.45, "rgba(0,0,0,0.6)");
+        gr.addColorStop(1, "rgba(0,0,0,0)");
+        g.fillStyle = gr;
+        g.fillRect(0, 0, w, h);
+      });
+    }
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(rx * 2, ry * 2), new THREE.MeshBasicMaterial({ map: blobTexCache, color: 0x0b1a06, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.008;
+    m.renderOrder = 1;
+    m.raycast = () => {};
+    m.userData.isBlob = true;
+    return m;
+  }
+
+  // Laub aus vielen Blattkarten. cards: [{ p: Mitte der Karte, c: Punkt, von dem die Normale wegzeigt, s: Größe, col: Farbe }]
+  // Die Normalen zeigen von der Kronenmitte weg: so wird die Krone wie eine echte oben hell und unten dunkel.
+  function foliageGeo(cards, rnd) {
+    const n = cards.length;
+    const pos = new Float32Array(n * 12);
+    const nor = new Float32Array(n * 12);
+    const uv = new Float32Array(n * 8);
+    const col = new Float32Array(n * 12);
+    const idx = new Uint32Array(n * 6);
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const v = new THREE.Vector3();
+    const nv = new THREE.Vector3();
+    const C = [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]];
+    cards.forEach((cd, k) => {
+      q.setFromEuler(e.set(rnd() * TAU, rnd() * TAU, rnd() * TAU));
+      for (let j = 0; j < 4; j++) {
+        v.set(C[j][0] * cd.s, C[j][1] * cd.s, 0).applyQuaternion(q).add(cd.p);
+        pos.set([v.x, v.y, v.z], (k * 4 + j) * 3);
+        nv.copy(v).sub(cd.c).normalize();
+        nv.y += 0.25;
+        nv.normalize();
+        nor.set([nv.x, nv.y, nv.z], (k * 4 + j) * 3);
+        uv.set([C[j][0] + 0.5, C[j][1] + 0.5], (k * 4 + j) * 2);
+        const sh = 0.72 + 0.38 * Math.max(0, Math.min(1, nv.y * 0.5 + 0.5));
+        col.set([cd.col.r * sh, cd.col.g * sh, cd.col.b * sh], (k * 4 + j) * 3);
+      }
+      idx.set([k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3], k * 6);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    return g;
+  }
+
+  // Karten für eine Krone um c mit den Halbachsen r = [rx, ry, rz]
+  function clumpCards(cards, rnd, c, r, n, s, tint) {
+    for (let i = 0; i < n; i++) {
+      const u = rnd() * 2 - 1;
+      const a = rnd() * TAU;
+      const sq = Math.sqrt(1 - u * u);
+      const d = 0.45 + 0.55 * Math.sqrt(rnd());
+      const p = new THREE.Vector3(c.x + Math.cos(a) * sq * r[0] * d, c.y + u * r[1] * d, c.z + Math.sin(a) * sq * r[2] * d);
+      const col = tint.clone().multiplyScalar(0.8 + rnd() * 0.35);
+      cards.push({ p, c, s: s * (0.8 + rnd() * 0.4), col });
+    }
+  }
+
+  let foliageMatCache = null;
+  function foliageMaterial() {
+    if (foliageMatCache) return foliageMatCache;
+    const m = new THREE.MeshStandardMaterial({ map: realTextures().leaves, alphaTest: 0.42, side: THREE.DoubleSide, vertexColors: true, roughness: 0.82 });
+    m.onBeforeCompile = (sh) => {
+      // Rückseiten der Karten nicht umdrehen: die Normale zeigt immer aus der Krone heraus
+      sh.fragmentShader = sh.fragmentShader.replace("#include <normal_fragment_begin>", THREE.ShaderChunk.normal_fragment_begin.replace(/normal \*= faceDirection;/g, ""));
+      // Sonne scheint durch die Blätter: an der Schattenseite ein warmes Durchleuchten
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "#include <opaque_fragment>",
+        `outgoingLight += diffuseColor.rgb * vec3(0.55, 0.62, 0.18) * pow(saturate(dot(normalize(vViewPosition), normalize((viewMatrix * vec4(${SUN_DIR.x.toFixed(3)}, ${SUN_DIR.y.toFixed(3)}, ${SUN_DIR.z.toFixed(3)}, 0.0)).xyz))), 4.0) * 0.6;\n#include <opaque_fragment>`
+      );
+    };
+    foliageMatCache = m;
+    return m;
+  }
+
+  const realTex = {}; // einmal gemalt, beim Look-Wechsel weiterbenutzt
+  function realTextures() {
+    if (realTex.q === Q) return realTex;
+    const rnd = seeded(99);
+    const t0 = performance.now();
+    Object.assign(realTex, { q: Q, lawn: lawnTextures(rnd), planks: plankTextures(rnd), bark: barkTextures(rnd), plaster: plasterTextures(rnd), roof: roofTextures(rnd), hedge: hedgeTextures(rnd), leaves: leafAtlas(seeded(77)) });
+    if (/[?&]debug/.test(location.search)) console.log(`Texturen gemalt in ${Math.round(performance.now() - t0)} ms (Stufe ${Q})`);
+    foliageMatCache = null;
+    return realTex;
+  }
+
   // --- Szene ---
 
   // Zwei Looks zum Umschalten (Knopf oben rechts im Spiel, gemerkt in localStorage "hr-look"):
@@ -363,6 +802,19 @@ window.Hodenritter3D = (() => {
   // damit es auf jedem Handy flüssig bleibt: Tonemapping-Belichtung, Weißabgleich über das Licht,
   // Split-Toning (warme Sonne, kühle Schatten vom Himmel), Dunst in der Horizontfarbe, Vignette per CSS.
   const LOOKS = {
+    // Echt: klarer Sommernachmittag. Himmel mit Streuung und Haufenwolken, weißes Sonnenlicht, Umgebungslicht vom Himmel,
+    // Rasen, Holz, Rinde, Putz und Ziegel mit Struktur, Bäume und Hecke aus einzelnen Blättern, weiche Bodenschatten.
+    echt: {
+      real: true,
+      sunDir: [-0.5, 0.66, -0.56],
+      exposure: 0.92,
+      sun: 0xfff2dc, sunI: 2.9,
+      sky: 0xb9d3ee, ground: 0x4d5a2c, hemiI: 0.55,
+      back: 0xd6e6ff, backI: 0.35,
+      fog: 0xc6d6e6, fogNear: 30, fogFar: 210,
+      rim: "0.85, 0.9, 1.0", rimK: 0.08,
+      envGround: 0x3b5226, envI: 1.0,
+    },
     comic: {
       comic: true,
       sunDir: [-0.66, 0.3, -0.56],
@@ -407,10 +859,15 @@ window.Hodenritter3D = (() => {
       rim: "1.0, 0.95, 0.88",
     },
   };
-  const LOOK_ORDER = ["comic", "nacht", "alt"];
-  const LOOK_LABEL = { comic: "Comic", nacht: "Nacht", alt: "Alt" };
-  const LOOK_ICON = { comic: "🖍️", nacht: "🌙", alt: "☀️" };
-  let lookName = LOOKS[store("hr-look")] ? store("hr-look") : "comic";
+  const LOOK_ORDER = ["echt", "comic", "nacht", "alt"];
+  const LOOK_LABEL = { echt: "Echt", comic: "Comic", nacht: "Nacht", alt: "Alt" };
+  const LOOK_ICON = { echt: "📷", comic: "🖍️", nacht: "🌙", alt: "☀️" };
+  // Seit 16.11.2026 startet jeder einmal im echten Look, danach zählt wieder die eigene Wahl
+  if (store("hr-look-echt") !== "1") {
+    store("hr-look-echt", "1");
+    store("hr-look", "echt");
+  }
+  let lookName = LOOKS[store("hr-look")] ? store("hr-look") : "echt";
   let LOOK = LOOKS[lookName];
   const SUN_DIR = new THREE.Vector3(...LOOK.sunDir).normalize(); // tief stehende Sonne links über dem Rasen
   const lookClass = () => {
@@ -481,6 +938,7 @@ window.Hodenritter3D = (() => {
     lookClass();
     lookShownAt = performance.now();
     outlineMat = null;
+    foliageMatCache = null;
     matCache.clear();
     rebuild(true);
     lookBtnText();
@@ -508,6 +966,7 @@ window.Hodenritter3D = (() => {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = LOOK.exposure;
+      anisoMax = renderer.capabilities.getMaxAnisotropy();
 
       const scene = new THREE.Scene();
       scene.fog = new THREE.Fog(LOOK.fog, LOOK.fogNear, LOOK.fogFar);
@@ -609,7 +1068,56 @@ window.Hodenritter3D = (() => {
     gl.addEventListener("webglcontextrestored", () => (lost = 0));
   }
 
+  // Echter Himmel: oben tiefblau, zum Horizont hin dunstig hell, Sonne mit Hof, Haufenwolken aus Rauschen, die langsam ziehen
+  const skyTime = { value: 0 };
+  let cloudTex = null;
+  function makeRealSky() {
+    if (!cloudTex) {
+      const r = seeded(31);
+      const S = 256;
+      const f = fbm(S, S, 5, 5, 6, r);
+      cloudTex = texFrom(paintPx(S, S, (x, y, i) => [f[i] * 255, f[i] * 255, f[i] * 255]), false);
+    }
+    const m = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+      uniforms: { sunDir: { value: SUN_DIR }, clouds: { value: cloudTex }, time: skyTime },
+      vertexShader: "varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: `varying vec3 vDir; uniform vec3 sunDir; uniform sampler2D clouds; uniform float time;
+        void main(){
+          vec3 d = normalize(vDir);
+          float y = d.y;
+          vec3 zen = vec3(0.085, 0.24, 0.62);
+          vec3 hor = vec3(0.62, 0.74, 0.86);
+          vec3 c = mix(hor, zen, pow(clamp(y, 0.0, 1.0), 0.42));
+          if (y < 0.0) c = mix(hor, vec3(0.30, 0.36, 0.30), smoothstep(0.0, -0.25, y));
+          float s = max(dot(d, sunDir), 0.0);
+          // Wolken als Decke in der Höhe: Rauschen in zwei Größen, Kanten weich, Unterseite grauer
+          if (y > 0.0) {
+            vec2 uv = d.xz / (y + 0.09) * 0.11 + vec2(time * 0.0012, time * 0.0004);
+            float n = texture2D(clouds, uv).r;
+            float n2 = texture2D(clouds, uv * 3.1 + 0.37).r;
+            float dens = n * 0.78 + n2 * 0.22;
+            float cov = smoothstep(0.5, 0.7, dens) * smoothstep(0.0, 0.16, y);
+            float thick = smoothstep(0.5, 0.86, dens);
+            vec3 cc = mix(vec3(1.0, 0.99, 0.96), vec3(0.58, 0.63, 0.70), thick * 0.75);
+            cc += vec3(1.0, 0.92, 0.75) * pow(s, 6.0) * (1.0 - thick) * 0.5;
+            c = mix(c, mix(cc, hor, smoothstep(0.25, 0.0, y) * 0.6), cov * 0.95);
+          }
+          c += vec3(1.0, 0.86, 0.62) * (pow(s, 12.0) * 0.22 + pow(s, 120.0) * 0.5);
+          c += vec3(1.0, 0.97, 0.9) * smoothstep(0.99955, 0.9997, s) * 8.0;
+          gl_FragColor = vec4(c, 1.0);
+          #include <colorspace_fragment>
+        }`,
+    });
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(220, 32, 16), m);
+    sky.renderOrder = -1;
+    return sky;
+  }
+
   function makeSky() {
+    if (LOOK.real) return makeRealSky();
     const m = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -638,7 +1146,37 @@ window.Hodenritter3D = (() => {
   }
 
   // Comic-Rasen: kräftiges Grün mit weichen hellen und dunklen Flecken statt Rauschen
+  // Echter Rasen: Halm-Textur mit Relief, dazu zweimal dieselbe Textur in anderer Größe, gemischt über großes Rauschen,
+  // damit sich nichts sichtbar wiederholt; ein paar hellere und trockenere Stellen
+  function addRealGround(scene, rnd) {
+    const T = realTextures().lawn;
+    const rep = 40;
+    for (const t of [T.map, T.normal]) t.repeat.set(rep, rep);
+    const m = new THREE.MeshStandardMaterial({ map: T.map, normalMap: T.normal, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.95 });
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.macro = { value: T.macro };
+      sh.fragmentShader = `uniform sampler2D macro;\n${sh.fragmentShader}`.replace(
+        "#include <map_fragment>",
+        `vec2 mu = vMapUv / ${rep}.0;
+        float mA = texture2D(macro, mu * 7.0).r;
+        float mB = texture2D(macro, mu * 23.0 + 0.37).r;
+        vec4 g1 = texture2D(map, vMapUv);
+        vec4 g2 = texture2D(map, vMapUv * 0.29 + vec2(0.31, 0.57));
+        vec3 gc = mix(g1.rgb, g2.rgb, smoothstep(0.35, 0.65, mA));
+        gc *= mix(0.8, 1.16, mB) * mix(0.9, 1.08, mA);
+        gc = mix(gc, gc * vec3(1.12, 1.05, 0.78), smoothstep(0.62, 0.82, mB) * 0.5);
+        diffuseColor.rgb *= gc;`
+      );
+    };
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), m);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.copy(P(0, 6));
+    ground.receiveShadow = false; // keine Schatten der Sonne auf dem Rasen (Lena), nur weiche Bodenschatten
+    scene.add(ground);
+  }
+
   function addGround(scene, renderer, rnd) {
+    if (LOOK.real) return addRealGround(scene, rnd);
     const grass = canvasTex(512, 512, (g, w, h) => {
       g.fillStyle = "#5fb53a";
       g.fillRect(0, 0, w, h);
@@ -745,8 +1283,8 @@ window.Hodenritter3D = (() => {
     scene.add(blades);
 
     // Gänseblümchen, Löwenzahn und ein paar bunte Blumen
-    const flowers = new THREE.InstancedMesh(new THREE.CircleGeometry(0.022, 8), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), 600);
-    const fcol = [0xffffff, 0xffffff, 0xffffff, 0xffd21f, 0xff7eb6, 0xb69cff];
+    const flowers = new THREE.InstancedMesh(new THREE.CircleGeometry(LOOK.real ? 0.012 : 0.022, 8), new THREE.MeshStandardMaterial({ roughness: 0.6, side: THREE.DoubleSide }), 600);
+    const fcol = LOOK.real ? [0xf4f2ea, 0xf4f2ea, 0xf4f2ea, 0xf4f2ea, 0xe8c22a] : [0xffffff, 0xffffff, 0xffffff, 0xffd21f, 0xff7eb6, 0xb69cff]; // echt: Gänseblümchen und Löwenzahn
     for (let i = 0; i < 600; i++) {
       const x = (rnd() - 0.5) * 14;
       const y = rnd() * 16;
@@ -798,8 +1336,87 @@ window.Hodenritter3D = (() => {
   }
   let BLOB = null;
 
+  // Echt: aus den runden Kronen-Kugeln werden Kronen aus Blattkarten mit dunklem Kern (wie das Innere eines Baums)
+  const fRnd = seeded(5); // eigener Zufall fürs Laub, damit Bäume und Beete in allen Looks gleich stehen
+  function crownsToFoliage(crowns, density = 1, tint) {
+    const cards = [];
+    const cores = [];
+    const pos = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    const qk = [0.45, 0.75, 1][Q];
+    for (const [, m] of crowns) {
+      m.decompose(pos, q, sc);
+      const s = (sc.x + sc.z) / 2;
+      const t = tint ?? new THREE.Color().setHSL(0.24 + fRnd() * 0.06, 0.35 + fRnd() * 0.2, 0.55 + fRnd() * 0.12);
+      const n = Math.round(Math.min(70, Math.max(10, 26 * s * density)) * qk);
+      clumpCards(cards, fRnd, pos.clone(), [sc.x * 1.05, sc.y * 1.0, sc.z * 1.05], n, s * 1.0, t);
+      const core = t.clone().multiplyScalar(0.16);
+      cores.push([BLOB, new THREE.Matrix4().compose(pos, q, sc.clone().multiplyScalar(0.6)), (p, nn) => core.clone().multiplyScalar(0.7 + 0.5 * Math.max(0, nn.y))]);
+    }
+    const g = new THREE.Group();
+    const leaves = new THREE.Mesh(foliageGeo(cards, fRnd), foliageMaterial());
+    const core = new THREE.Mesh(merge(cores), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    for (const o of [leaves, core]) {
+      o.castShadow = Q > 1;
+      o.receiveShadow = Q > 0;
+      g.add(o);
+    }
+    return g;
+  }
+
+  function barkMat(rep = [1, 2]) {
+    const B = realTextures().bark;
+    const map = B.map.clone();
+    const normal = B.normal.clone();
+    for (const t of [map, normal]) {
+      t.needsUpdate = true;
+      t.repeat.set(rep[0], rep[1]);
+    }
+    return new THREE.MeshStandardMaterial({ map, normalMap: normal, normalScale: new THREE.Vector2(1.2, 1.2), roughness: 0.95, color: 0xfff4e6 });
+  }
+
+  // Textur mit eigener Wiederholung (Kopie teilt das Bild)
+  function texRep(t, rx, ry) {
+    const c = t.clone();
+    c.needsUpdate = true;
+    c.repeat.set(rx, ry);
+    return c;
+  }
+
+  // Formschnitt-Hecke: ein Block mit Blätter-Textur und Relief, davor und obendrauf abstehende Blattkarten
+  function addRealHedge(scene, hy) {
+    const T = realTextures().hedge;
+    const W = 17.8;
+    const Hh = 1.9;
+    const D = 1.1;
+    const box = new THREE.BoxGeometry(W, Hh, D, 1, 1, 1);
+    const uv = box.attributes.uv;
+    const dims = [[D, Hh], [D, Hh], [W, D], [W, D], [W, Hh], [W, Hh]]; // +x, -x, +y, -y, +z, -z
+    for (let f = 0; f < 6; f++) for (let j = 0; j < 4; j++) uv.setXY(f * 4 + j, uv.getX(f * 4 + j) * dims[f][0] / 0.9, uv.getY(f * 4 + j) * dims[f][1] / 0.9);
+    const body = new THREE.Mesh(box, new THREE.MeshStandardMaterial({ map: T.map, normalMap: T.normal, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 0.9 }));
+    body.position.set(0, Hh / 2, -hy);
+    body.receiveShadow = true;
+    body.castShadow = Q > 1;
+    scene.add(body);
+    const cards = [];
+    const n = [250, 500, 800][Q];
+    const tint = new THREE.Color(0.85, 0.95, 0.8);
+    for (let i = 0; i < n; i++) {
+      const top = fRnd() < 0.35;
+      const x = (fRnd() - 0.5) * (W - 0.1);
+      const p = top ? new THREE.Vector3(x, Hh + 0.02, -hy + (fRnd() - 0.5) * D) : new THREE.Vector3(x, fRnd() * Hh, -hy + D / 2 + 0.03);
+      const out = top ? new THREE.Vector3(0, 0.6, 0.5) : new THREE.Vector3(0, 0.2, 1);
+      cards.push({ p, c: p.clone().sub(out.multiplyScalar(4)), s: 0.3 + fRnd() * 0.25, col: tint.clone().multiplyScalar((top ? 0.45 : 0.75) + fRnd() * 0.3) });
+    }
+    const fuzz = new THREE.Mesh(foliageGeo(cards, fRnd), foliageMaterial());
+    fuzz.receiveShadow = true;
+    scene.add(fuzz);
+  }
+
   function addGarden(scene, rnd) {
     BLOB = blobGeo(2);
+    const REAL = LOOK.real;
     // Terrasse aus Holzdielen unter den Stühlen
     const planks = canvasTex(256, 256, (g, w, h) => {
       for (let i = 0; i < 8; i++) {
@@ -821,7 +1438,11 @@ window.Hodenritter3D = (() => {
         }
       }
     }, [5, 2]);
-    const deck = new THREE.Mesh(slab(24, 4.2, 0.06, 0.15, 0.03), new THREE.MeshStandardMaterial({ map: planks, roughness: 0.7 }));
+    const PT = REAL && realTextures().planks;
+    const deck = new THREE.Mesh(
+      slab(24, 4.2, 0.06, 0.15, 0.03),
+      REAL ? new THREE.MeshStandardMaterial({ map: texRep(PT.map, 1 / 4, 1 / 1.12), normalMap: texRep(PT.normal, 1 / 4, 1 / 1.12), roughness: 0.78 }) : new THREE.MeshStandardMaterial({ map: planks, roughness: 0.7 })
+    );
     deck.rotation.x = -Math.PI / 2;
     deck.position.copy(P(0, -2.2, -0.045));
     deck.receiveShadow = true;
@@ -830,16 +1451,18 @@ window.Hodenritter3D = (() => {
 
     // Haus mit Terrassentür und Fenstern
     const house = new THREE.Group();
-    house.add(mesh(slab(24, 3.4, 0.3, 0.1, 0.04), mat(0xfbeedb, 0.85), 0, 1.7, 0));
+    const wallM = REAL ? new THREE.MeshStandardMaterial({ map: texRep(realTextures().plaster.map, 1 / 1.6, 1 / 1.6), normalMap: texRep(realTextures().plaster.normal, 1 / 1.6, 1 / 1.6), normalScale: new THREE.Vector2(0.5, 0.5), roughness: 0.92 }) : mat(0xfbeedb, 0.85);
+    house.add(mesh(slab(24, 3.4, 0.3, 0.1, 0.04), wallM, 0, 1.7, 0));
     const glassM = new THREE.MeshStandardMaterial({ color: 0x5aa0d8, roughness: 0.05, metalness: 0.4 });
     const frameM = mat(0xffffff, 0.5);
     for (const [x, w, h, y] of [[-2.2, 1.8, 2.2, 1.1], [-6.5, 1.2, 1.2, 1.8], [3.2, 1.2, 1.2, 1.8], [7.5, 1.2, 1.2, 1.8]]) {
       house.add(mesh(slab(w + 0.16, h + 0.16, 0.05, 0.05, 0.02), frameM, x, y, 0.17));
       house.add(mesh(new THREE.BoxGeometry(w, h, 0.07), glassM, x, y, 0.19, false));
       house.add(mesh(new THREE.BoxGeometry(0.05, h, 0.08), frameM, x, y, 0.2, false));
-      if (h < 2) for (const s of [-1, 1]) house.add(mesh(slab(0.42, h + 0.1, 0.04, 0.03, 0.01), mat(0x2f9e8f, 0.6), x + s * (w / 2 + 0.26), y, 0.18));
+      if (h < 2) for (const s of [-1, 1]) house.add(mesh(slab(0.42, h + 0.1, 0.04, 0.03, 0.01), mat(REAL ? 0x51685a : 0x2f9e8f, REAL ? 0.75 : 0.6), x + s * (w / 2 + 0.26), y, 0.18));
     }
-    const roof = mesh(slab(24.8, 1.7, 0.22, 0.1, 0.06), mat(0xd9502b, 0.6), 0, 3.55, 0.55);
+    const roofM = REAL ? new THREE.MeshStandardMaterial({ map: texRep(realTextures().roof.map, 1 / 1.5, 1 / 1.6), normalMap: texRep(realTextures().roof.normal, 1 / 1.5, 1 / 1.6), roughness: 0.8 }) : mat(0xd9502b, 0.6);
+    const roof = mesh(slab(24.8, 1.7, 0.22, 0.1, 0.06), roofM, 0, 3.55, 0.55);
     roof.rotation.x = Math.PI / 2 + 0.35;
     house.add(roof);
     house.position.copy(P(0, -4.45));
@@ -890,10 +1513,13 @@ window.Hodenritter3D = (() => {
       const x = -8.3 + (i / 23) * 16.6;
       hedgeParts.push([BLOB, M(x, 1.45 + rnd() * 0.2, -hy + (rnd() - 0.5) * 0.3, 0, rnd() * TAU, 0, 0.55 + rnd() * 0.2), hedgeShade]);
     }
-    const hedge = new THREE.Mesh(merge(hedgeParts), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
-    hedge.castShadow = Q > 1;
-    hedge.receiveShadow = true;
-    scene.add(hedge);
+    if (REAL) addRealHedge(scene, hy);
+    else {
+      const hedge = new THREE.Mesh(merge(hedgeParts), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
+      hedge.castShadow = Q > 1;
+      hedge.receiveShadow = true;
+      scene.add(hedge);
+    }
 
     // Holzzaun links und rechts, runde Latten
     const picket = merge([
@@ -901,7 +1527,7 @@ window.Hodenritter3D = (() => {
       [new THREE.SphereGeometry(0.05, 12, 6, 0, TAU, 0, Math.PI / 2), M(0, 1.05, 0, 0, 0, 0, 1, 0.8, 0.35)],
     ]);
     const nP = 90;
-    const fence = new THREE.InstancedMesh(picket, mat(0xe8b77c, 0.75), nP * 2);
+    const fence = new THREE.InstancedMesh(picket, mat(REAL ? 0xb4916a : 0xe8b77c, REAL ? 0.9 : 0.75), nP * 2);
     let fi = 0;
     for (const side of [-1, 1]) {
       for (let i = 0; i < nP; i++) {
@@ -909,7 +1535,7 @@ window.Hodenritter3D = (() => {
         fence.setMatrixAt(fi++, M(side * (H.FIELD.x + 0.45), 0, -y, 0, Math.PI / 2, (rnd() - 0.5) * 0.03));
       }
       for (const hgt of [0.3, 0.85]) {
-        const rail = mesh(new THREE.CapsuleGeometry(0.035, H.FIELD.y1 + 0.3, 4, 8), mat(0xc98f55, 0.8), 0, 0, 0);
+        const rail = mesh(new THREE.CapsuleGeometry(0.035, H.FIELD.y1 + 0.3, 4, 8), mat(REAL ? 0x8f6f4f : 0xc98f55, 0.85), 0, 0, 0);
         rail.rotation.x = Math.PI / 2;
         rail.position.copy(P(side * (H.FIELD.x + 0.41), (H.FIELD.y1 - 0.1) / 2, hgt));
         scene.add(rail);
@@ -935,8 +1561,8 @@ window.Hodenritter3D = (() => {
       }
       treeParts(rnd, 1.6 + rnd() * 1.3, x, y, rnd() * TAU, trunks, crowns);
     }
-    const trunkMesh = new THREE.Mesh(merge(trunks), mat(0x8a5634, 0.85));
-    const crownMesh = new THREE.Mesh(merge(crowns), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    const trunkMesh = new THREE.Mesh(merge(trunks), REAL ? barkMat([2, 3]) : mat(0x8a5634, 0.85));
+    const crownMesh = REAL ? crownsToFoliage(crowns, 1.1) : new THREE.Mesh(merge(crowns), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
     for (const m of [trunkMesh, crownMesh]) {
       m.castShadow = Q > 1;
       m.receiveShadow = Q > 0;
@@ -1042,7 +1668,7 @@ window.Hodenritter3D = (() => {
     };
     for (const sx of [-1, 1]) for (let i = 0; i < 26; i++) bed(sx * (H.FIELD.x + 0.95 + rnd() * 0.4), 0.3 + i * 0.6 + rnd() * 0.2);
     for (let i = 0; i < 22; i++) bed(-6.8 + i * 0.65 + rnd() * 0.2, H.FIELD.y1 + 0.05);
-    const bushMesh = new THREE.Mesh(merge(bushes), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    const bushMesh = LOOK.real ? crownsToFoliage(bushes, 3) : new THREE.Mesh(merge(bushes), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
     scene.add(bushMesh);
     const blooms = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.055, 1), mat(0xffffff, 0.5), bloomAt.length);
     bloomAt.forEach(([x, y, z], i) => {
@@ -1073,8 +1699,9 @@ window.Hodenritter3D = (() => {
     const crowns = [];
     treeParts(rnd, 1.0, 0, 0, 0, trunks, crowns);
     const tree = new THREE.Group();
-    const t = new THREE.Mesh(merge(trunks), mat(0x8a5634, 0.85));
-    const c = new THREE.Mesh(merge(crowns), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    const t = new THREE.Mesh(merge(trunks), LOOK.real ? barkMat([2, 2]) : mat(0x8a5634, 0.85));
+    const c = LOOK.real ? crownsToFoliage(crowns, 1.4, new THREE.Color().setHSL(0.25, 0.42, 0.55)) : new THREE.Mesh(merge(crowns), rim(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })));
+    if (LOOK.real) tree.add(blobShadow(1.5, 1.5, 0.45));
     for (const m of [t, c]) {
       m.castShadow = true;
       m.receiveShadow = true;
@@ -1104,6 +1731,10 @@ window.Hodenritter3D = (() => {
       const s = 28 + rnd() * 22;
       hills.push([new THREE.SphereGeometry(1, 40, 20, 0, TAU, 0, Math.PI / 2), M(Math.cos(a) * r * 1.3, -2, -Math.sin(a) * r + 5, 0, 0, 0, s * 1.6, s * (0.32 + rnd() * 0.18), s), hillShade]);
     }
+    if (LOOK.real) {
+      const hs = (p, n) => new THREE.Color("#4c6338").lerp(new THREE.Color("#7f9566"), Math.min(1, Math.max(0, n.y * 0.8)));
+      for (const h of hills) h[2] = hs;
+    }
     const hillMesh = new THREE.Mesh(merge(hills), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
     scene.add(hillMesh);
 
@@ -1116,8 +1747,8 @@ window.Hodenritter3D = (() => {
       const s = 3.5 + rnd() * 3.5;
       woods.push([small, M(Math.cos(a) * r * 1.3, s * 0.75, -6 - Math.sin(a) * r, 0, rnd() * 3, 0, s, s * 1.15, s), shade]);
     }
-    const woodMesh = new THREE.Mesh(merge(woods), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
-    scene.add(woodMesh);
+    if (LOOK.real) scene.add(crownsToFoliage(woods, 0.35, new THREE.Color().setHSL(0.26, 0.3, 0.45)));
+    else scene.add(new THREE.Mesh(merge(woods), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })));
 
     // Wolken: unten leicht bläulich, oben strahlend weiß
     const cloudShade = (p, n) => new THREE.Color(LOOK.cloudLow).lerp(new THREE.Color(LOOK.cloudHigh), Math.min(1, Math.max(0, n.y * 0.7 + 0.5)));
@@ -1138,7 +1769,7 @@ window.Hodenritter3D = (() => {
     }
     const clouds = new THREE.Mesh(merge(puffs), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
     clouds.onBeforeRender = () => (clouds.rotation.y = Math.sin(timeU.value * 0.004) * 0.08);
-    scene.add(clouds);
+    if (!LOOK.real) scene.add(clouds); // im echten Look stehen die Wolken im Himmel selbst
   }
 
   // --- Gartenstühle (weiße Plastikstühle), alle als ein Zeichenaufruf ---
@@ -1439,7 +2070,7 @@ window.Hodenritter3D = (() => {
 
   function buildFace(head, L, M) {
     const female = !!L.female;
-    const skinV = rim(new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.58, vertexColors: true, emissive: new THREE.Color(L.skin).multiplyScalar(0.1) }));
+    const skinV = LOOK.real ? realSkin(L.skin, true) : rim(new THREE.MeshStandardMaterial({ color: L.skin, roughness: 0.58, vertexColors: true, emissive: new THREE.Color(L.skin).multiplyScalar(0.1) }));
     const F = L.zug || NF;
     head.add(mesh(headGeo(female, F), skinV, 0, 0, 0));
     if (L.face3d) head.add(scannedFace(L, female));
@@ -1602,14 +2233,37 @@ window.Hodenritter3D = (() => {
 
   // Ein Mensch aus Gelenken: Becken → Wirbelsäule → Brust → Hals → Kopf, Schultern → Ellbogen → Hand,
   // Hüften → Knie → Knöchel. Gebaut für 1,78 m, dann auf die eigene Größe skaliert. Schaut nach +z.
+  // Echt-Look: Haut mit weichem Glanz und rötlichem Durchscheinen, Stoff mit Samtschimmer (Sheen), Haar mit Glanz
+  function realSkin(color, vertexColors = false) {
+    const c = new THREE.Color(color);
+    const m = new THREE.MeshPhysicalMaterial({ color: c, vertexColors, roughness: 0.52, sheen: 0.35, sheenRoughness: 0.5, sheenColor: c.clone().lerp(new THREE.Color(0xffe0d0), 0.5), emissive: c.clone().multiply(new THREE.Color(0.06, 0.015, 0.01)) });
+    m.onBeforeCompile = (sh) => {
+      // Licht, das unter der Haut weiterwandert: die Schattenseite wird rötlich statt grau
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "#include <opaque_fragment>",
+        `outgoingLight += diffuseColor.rgb * vec3(0.5, 0.16, 0.08) * (1.0 - saturate(dot(normal, normalize(vViewPosition)))) * 0.18;\n#include <opaque_fragment>`
+      );
+    };
+    return m;
+  }
+  function realCloth(color, map) {
+    const c = new THREE.Color(color ?? 0xffffff);
+    return new THREE.MeshPhysicalMaterial({ color: c, map, roughness: 0.9, sheen: 0.8, sheenRoughness: 0.75, sheenColor: (color ? c.clone() : new THREE.Color(0x9a9a9a)).lerp(new THREE.Color(0xffffff), 0.35) });
+  }
+  function realHair(color) {
+    const c = new THREE.Color(color);
+    return new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.48, sheen: 0.6, sheenRoughness: 0.35, sheenColor: c.clone().lerp(new THREE.Color(0xfff2d8), 0.45) });
+  }
+
   function makeHuman(name) {
     const L = lookOf(name);
     const sw = L.female ? 0.88 : 1.0 * L.build; // Schulterbreite
     const hw = L.female ? 1.08 : 0.98; // Hüftbreite
-    const skin = mat(L.skin, 0.55, { emissive: new THREE.Color(L.skin).multiplyScalar(0.12) }); // etwas Eigenleuchten: das grüne Licht vom Rasen färbt sonst Kinn und Hals
-    const shirtM = L.stripes ? rim(new THREE.MeshStandardMaterial({ map: stripeTex(L.shirt, L.shirt2), roughness: 0.8 })) : mat(L.shirt, 0.82);
-    const pantsM = L.bottom === "jeans" ? rim(new THREE.MeshStandardMaterial({ map: jeansTex(L.pants), roughness: 0.85 })) : mat(L.pants, 0.85);
-    const hairM = mat(L.hair, 0.75);
+    const R = LOOK.real;
+    const skin = R ? realSkin(L.skin) : mat(L.skin, 0.55, { emissive: new THREE.Color(L.skin).multiplyScalar(0.12) }); // etwas Eigenleuchten: das grüne Licht vom Rasen färbt sonst Kinn und Hals
+    const shirtM = R ? realCloth(L.stripes ? null : L.shirt, L.stripes ? stripeTex(L.shirt, L.shirt2) : null) : L.stripes ? rim(new THREE.MeshStandardMaterial({ map: stripeTex(L.shirt, L.shirt2), roughness: 0.8 })) : mat(L.shirt, 0.82);
+    const pantsM = R ? realCloth(L.bottom === "jeans" ? null : L.pants, L.bottom === "jeans" ? jeansTex(L.pants) : null) : L.bottom === "jeans" ? rim(new THREE.MeshStandardMaterial({ map: jeansTex(L.pants), roughness: 0.85 })) : mat(L.pants, 0.85);
+    const hairM = R ? realHair(L.hair) : mat(L.hair, 0.75);
     const shoeM = mat(L.shoes, 0.55);
     const soleM = mat("#f1f1f1", 0.6);
     const lipM = mat(new THREE.Color(L.skin).lerp(new THREE.Color("#7a2230"), 0.38).getStyle(), 0.5);
@@ -2053,6 +2707,11 @@ window.Hodenritter3D = (() => {
         const P = personOf(name);
         if (P?.kopf) loadHead(P.kopf, (scene) => applyHead(p, scene, P));
         G.scene.add(p.root);
+        if (LOOK.real) {
+          const b = blobShadow(0.32, 0.26, 0.42);
+          b.onBeforeRender = () => (b.position.y = 0.008 - p.root.position.y);
+          p.root.add(b);
+        }
         const seat = seatOf(name);
         p.pos = { x: seat.x, y: seat.y };
       }
@@ -2251,6 +2910,19 @@ window.Hodenritter3D = (() => {
     }
     m.userData.last = { x, y };
     m.position.copy(P(x, y, h));
+    if (LOOK.real) {
+      // weicher Bodenschatten: je höher die Kugel fliegt, desto größer und blasser
+      if (!m.userData.blob) {
+        m.userData.blob = blobShadow(r * 1.5, r * 1.5, 0.6);
+        G.scene.add(m.userData.blob);
+      }
+      const b = m.userData.blob;
+      const up = Math.max(0, h - r);
+      b.visible = m.visible;
+      b.position.copy(P(x, y, 0.006));
+      b.scale.setScalar(1 + up * 1.5);
+      b.material.opacity = 0.6 / (1 + up * 4);
+    }
   }
 
   // Position aller Kugeln jetzt (Animation oder Spielstand)
@@ -2278,6 +2950,7 @@ window.Hodenritter3D = (() => {
     const pos = ballPositions(now);
     const w = pos.get("@w");
     G.whiteBall.visible = !!w;
+    if (G.whiteBall.userData.blob) G.whiteBall.userData.blob.visible = !!w;
     G.whiteRing.visible = !!w && !w.air;
     if (w) {
       placeBall(G.whiteBall, w.x, w.y, w.h, H.W_R);
@@ -2286,7 +2959,10 @@ window.Hodenritter3D = (() => {
       G.whiteRing.scale.setScalar(pulse);
       G.whiteRing.material.opacity = 0.35 + 0.2 * Math.sin(now / 300);
     }
-    for (const [id, m] of G.balls) m.visible = pos.has(id);
+    for (const [id, m] of G.balls) {
+      m.visible = pos.has(id);
+      if (m.userData.blob) m.userData.blob.visible = m.visible;
+    }
     for (const [id, b] of pos) {
       if (id === "@w") continue;
       placeBall(ballMesh(id), b.x, b.y, b.h, H.B_R);
@@ -2556,6 +3232,14 @@ window.Hodenritter3D = (() => {
       let m = G.obstacles.get(o.id);
       if (!m) {
         m = makeObstacle(o.k, o.id);
+        if (LOOK.real) {
+          const bb = new THREE.Box3().setFromObject(m);
+          const sz = bb.getSize(new THREE.Vector3());
+          const b = blobShadow(Math.max(0.12, sz.x * 0.62), Math.max(0.12, sz.z * 0.62), 0.45);
+          b.position.set((bb.min.x + bb.max.x) / 2, 0.008, (bb.min.z + bb.max.z) / 2);
+          b.onBeforeRender = () => (b.position.y = 0.008 - m.position.y);
+          m.add(b);
+        }
         m.position.copy(P(o.x, o.y));
         m.rotation.y = o.rot;
         m.userData.born = o.id === S.lastPlaced && !firstObstacles ? now : 0;
@@ -3446,6 +4130,7 @@ window.Hodenritter3D = (() => {
     G.camera.fov = fov();
     G.camera.updateProjectionMatrix();
     G.timeU.value = now / 1000;
+    skyTime.value = now / 1000;
 
     // Zu langsam? Eine Stufe runter (erst nach dem Einschwingen, Hintergrund-Pausen zählen nicht)
     if (raw > 0 && raw < 0.5 && now - G.born > 4000) {

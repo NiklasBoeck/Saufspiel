@@ -1000,6 +1000,7 @@ html[data-game="hodenritter"] .hr-view { position: fixed; inset: 0; z-index: 0; 
 /* Vignette: Ränder leicht dunkler, der Blick geht zur Mitte vom Rasen */
 html.hr-look-comic[data-game="hodenritter"] .hr-view::after, html.hr-look-nacht[data-game="hodenritter"] .hr-view::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 85% 75% at 50% 55%, transparent 50%, rgb(70 30 12 / 0.38) 100%); }
 html.hr-look-nacht[data-game="hodenritter"] .hr-view::after { background: radial-gradient(ellipse 85% 75% at 50% 55%, transparent 45%, rgb(4 8 24 / 0.5) 100%); }
+html.hr-look-echt[data-game="hodenritter"] .hr-view::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse 90% 80% at 50% 55%, transparent 55%, rgb(10 14 20 / 0.28) 100%); }
 html[data-game="hodenritter"] .game-bar { position: fixed; z-index: 3; top: calc(6px + env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); pointer-events: none; }
 html[data-game="hodenritter"] .game-bar > * { pointer-events: auto; }
 html[data-game="hodenritter"] #screen-game .game-bar .btn {
