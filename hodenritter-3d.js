@@ -370,70 +370,9 @@ window.Hodenritter3D = (() => {
   }
   let anisoMax = 0;
 
-  // Rasen: Farbflecken in mehreren Größen, darüber Zehntausende kurze Halme in vielen Grüntönen, ein paar trockene Stellen.
-  // Die Halme werden direkt in Pixel-Puffer gezeichnet (Canvas-Linien wären auf dem Handy viel zu langsam).
   function lawnTextures(rnd) {
-    const S = texSize();
-    const base = fbm(S, S, 4, 4, 5, rnd);
-    const dry = fbm(S, S, 3, 3, 4, rnd);
-    const k = S / 512;
-    const col = new Float32Array(S * S * 3);
-    const hgt = new Float32Array(S * S);
-    for (let i = 0; i < S * S; i++) {
-      let c = mixc([46, 74, 26], [92, 124, 44], base[i]);
-      c = mixc(c, [122, 120, 62], sstep(0.58, 0.8, dry[i]) * 0.55);
-      const n = (rnd() - 0.5) * 14;
-      col[i * 3] = c[0] + n;
-      col[i * 3 + 1] = c[1] + n;
-      col[i * 3 + 2] = c[2] + n * 0.6;
-      hgt[i] = 0.27 + base[i] * 0.12;
-    }
-    const dot = (x, y, c, a, h) => {
-      const i = (((y | 0) % S + S) % S) * S + (((x | 0) % S + S) % S);
-      col[i * 3] += (c[0] - col[i * 3]) * a;
-      col[i * 3 + 1] += (c[1] - col[i * 3 + 1]) * a;
-      col[i * 3 + 2] += (c[2] - col[i * 3 + 2]) * a;
-      hgt[i] += (h - hgt[i]) * a;
-    };
-    const n = Math.round((S * S) / 22);
-    for (let i = 0; i < n; i++) {
-      const x = rnd() * S;
-      const y = rnd() * S;
-      const len = (2.5 + rnd() * 6) * k;
-      const a = rnd() * TAU;
-      const ex = Math.cos(a);
-      const ey = Math.sin(a);
-      const lt = rnd();
-      let c = mixc([38, 66, 22], [128, 160, 64], lt);
-      if (rnd() < sstep(0.55, 0.85, dry[(y | 0) * S + (x | 0)]) * 0.6) c = mixc(c, [150, 140, 80], 0.6);
-      const al = 0.55 + rnd() * 0.35;
-      const h = 0.43 + lt * 0.57;
-      const wide = rnd() < 0.5 * k;
-      for (let t = 0; t <= len; t += 0.7) {
-        const fade = 1 - (t / len) * 0.4; // Spitze heller und dünner
-        dot(x + ex * t, y + ey * t, c, al * fade, h * fade);
-        if (wide && t < len * 0.6) dot(x + ex * t - ey, y + ey * t + ex, c, al * 0.6, h * 0.9);
-      }
-    }
-    // ein paar Kleeblätter und Erdkrümel
-    for (let i = 0; i < 160 * k * k; i++) {
-      const x = rnd() * S;
-      const y = rnd() * S;
-      if (rnd() < 0.35) {
-        dot(x, y, [70, 52, 30], 0.55, 0.1);
-        continue;
-      }
-      for (let j = 0; j < 3; j++) {
-        const cx = x + Math.cos(j * 2.1) * 2 * k;
-        const cy = y + Math.sin(j * 2.1) * 2 * k;
-        const r = 1.8 * k;
-        for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r) dot(cx + dx, cy + dy, [64, 104, 40], 0.85, 0.7);
-      }
-    }
-    const colC = paintPx(S, S, (x, y, i) => [col[i * 3], col[i * 3 + 1], col[i * 3 + 2]]);
-    const macro = fbm(128, 128, 3, 3, 4, rnd);
-    const macroC = paintPx(128, 128, (x, y, i) => [macro[i] * 255, macro[i] * 255, macro[i] * 255]);
-    return { map: texFrom(colC, true), normal: texFrom(normalFrom(hgt, S, S, 3.2 / k), false), macro: texFrom(macroC, false) };
+    const L = window.EchtTex.lawn(texSize(), rnd);
+    return { map: texFrom(L.color, true), normal: texFrom(L.normal, false), macro: texFrom(L.macro, false) };
   }
 
   // Holzdielen: Maserung längs, jede Diele etwas anders, Fugen dunkel, Stöße versetzt
@@ -864,50 +803,8 @@ window.Hodenritter3D = (() => {
 
   // Echter Himmel: oben tiefblau, zum Horizont hin dunstig hell, Sonne mit Hof, Haufenwolken aus Rauschen, die langsam ziehen
   const skyTime = { value: 0 };
-  let cloudTex = null;
   function makeRealSky() {
-    if (!cloudTex) {
-      const r = seeded(31);
-      const S = 256;
-      const f = fbm(S, S, 5, 5, 6, r);
-      cloudTex = texFrom(paintPx(S, S, (x, y, i) => [f[i] * 255, f[i] * 255, f[i] * 255]), false);
-    }
-    const m = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      depthWrite: false,
-      fog: false,
-      uniforms: { sunDir: { value: SUN_DIR }, clouds: { value: cloudTex }, time: skyTime },
-      vertexShader: "varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-      fragmentShader: `varying vec3 vDir; uniform vec3 sunDir; uniform sampler2D clouds; uniform float time;
-        void main(){
-          vec3 d = normalize(vDir);
-          float y = d.y;
-          vec3 zen = vec3(0.085, 0.24, 0.62);
-          vec3 hor = vec3(0.62, 0.74, 0.86);
-          vec3 c = mix(hor, zen, pow(clamp(y, 0.0, 1.0), 0.42));
-          if (y < 0.0) c = mix(hor, vec3(0.30, 0.36, 0.30), smoothstep(0.0, -0.25, y));
-          float s = max(dot(d, sunDir), 0.0);
-          // Wolken als Decke in der Höhe: Rauschen in zwei Größen, Kanten weich, Unterseite grauer
-          if (y > 0.0) {
-            vec2 uv = d.xz / (y + 0.09) * 0.11 + vec2(time * 0.0012, time * 0.0004);
-            float n = texture2D(clouds, uv).r;
-            float n2 = texture2D(clouds, uv * 3.1 + 0.37).r;
-            float dens = n * 0.78 + n2 * 0.22;
-            float cov = smoothstep(0.5, 0.7, dens) * smoothstep(0.0, 0.16, y);
-            float thick = smoothstep(0.5, 0.86, dens);
-            vec3 cc = mix(vec3(1.0, 0.99, 0.96), vec3(0.58, 0.63, 0.70), thick * 0.75);
-            cc += vec3(1.0, 0.92, 0.75) * pow(s, 6.0) * (1.0 - thick) * 0.5;
-            c = mix(c, mix(cc, hor, smoothstep(0.25, 0.0, y) * 0.6), cov * 0.95);
-          }
-          c += vec3(1.0, 0.86, 0.62) * (pow(s, 12.0) * 0.22 + pow(s, 120.0) * 0.5);
-          c += vec3(1.0, 0.97, 0.9) * smoothstep(0.99955, 0.9997, s) * 8.0;
-          gl_FragColor = vec4(c, 1.0);
-          #include <colorspace_fragment>
-        }`,
-    });
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(220, 32, 16), m);
-    sky.renderOrder = -1;
-    return sky;
+    return window.EchtTex.daySky(SUN_DIR, skyTime, 220);
   }
 
   function makeSky() {
@@ -946,22 +843,7 @@ window.Hodenritter3D = (() => {
     const T = realTextures().lawn;
     const rep = 40;
     for (const t of [T.map, T.normal]) t.repeat.set(rep, rep);
-    const m = new THREE.MeshStandardMaterial({ map: T.map, normalMap: T.normal, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.95 });
-    m.onBeforeCompile = (sh) => {
-      sh.uniforms.macro = { value: T.macro };
-      sh.fragmentShader = `uniform sampler2D macro;\n${sh.fragmentShader}`.replace(
-        "#include <map_fragment>",
-        `vec2 mu = vMapUv / ${rep}.0;
-        float mA = texture2D(macro, mu * 7.0).r;
-        float mB = texture2D(macro, mu * 23.0 + 0.37).r;
-        vec4 g1 = texture2D(map, vMapUv);
-        vec4 g2 = texture2D(map, vMapUv * 0.29 + vec2(0.31, 0.57));
-        vec3 gc = mix(g1.rgb, g2.rgb, smoothstep(0.35, 0.65, mA));
-        gc *= mix(0.8, 1.16, mB) * mix(0.9, 1.08, mA);
-        gc = mix(gc, gc * vec3(1.12, 1.05, 0.78), smoothstep(0.62, 0.82, mB) * 0.5);
-        diffuseColor.rgb *= gc;`
-      );
-    };
+    const m = window.EchtTex.lawnMaterial(T, rep);
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), m);
     ground.rotation.x = -Math.PI / 2;
     ground.position.copy(P(0, 6));

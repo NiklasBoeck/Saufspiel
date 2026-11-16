@@ -924,24 +924,6 @@
     return tex;
   }
 
-  function paintGrass(g, w, h, rnd, base) {
-    g.fillStyle = base;
-    g.fillRect(0, 0, w, h);
-    const greens = ["#3f8a2e", "#5aa83f", "#6dbb4a", "#4c9a37", "#82c95a", "#356f27"];
-    for (let i = 0; i < (w * h) / 40; i++) {
-      const x = rnd() * w;
-      const y = rnd() * h;
-      g.strokeStyle = greens[Math.floor(rnd() * greens.length)];
-      g.globalAlpha = 0.35 + rnd() * 0.4;
-      g.lineWidth = 1;
-      g.beginPath();
-      g.moveTo(x, y);
-      g.lineTo(x + (rnd() - 0.5) * 3, y - 2 - rnd() * 4);
-      g.stroke();
-    }
-    g.globalAlpha = 1;
-  }
-
   const SKINS = ["#f6d3b3", "#e8b48f", "#c68863", "#8d5a3b", "#f2c9a0"];
   const HAIRS = ["#2b1d14", "#5a3a22", "#d9a441", "#1a1a1a", "#a0522d", "#e6e0d4"];
   const PANTS = ["#1f2a44", "#2d3a2a", "#3b3b3b", "#4a3426", "#24476b"];
@@ -972,20 +954,26 @@
       renderer.toneMappingExposure = 1.1;
 
       const scene = new THREE.Scene();
-      scene.background = canvasTexture(4, 256, (g, w, h) => {
-        const sky = g.createLinearGradient(0, 0, 0, h);
-        sky.addColorStop(0, "#1f6fe0");
-        sky.addColorStop(0.55, "#62b2ff");
-        sky.addColorStop(1, "#dff1ff");
-        g.fillStyle = sky;
-        g.fillRect(0, 0, w, h);
-      });
-      scene.fog = new THREE.Fog(0xcfe9ff, 2.5, 9);
+      // Echter Sommerhimmel mit ziehenden Wolken (echt-tex.js), Dunst in der Horizontfarbe
+      const E = window.EchtTex;
+      const sunDir = new THREE.Vector3(1.8, 2.6, -0.6).normalize();
+      const skyTime = { value: 0 };
+      scene.add(E.daySky(sunDir, skyTime, 40));
+      scene.fog = new THREE.Fog(0xc6d6e6, 5, 22);
+      const envScene = new THREE.Scene();
+      envScene.add(E.daySky(sunDir, skyTime, 40));
+      const envGround = new THREE.Mesh(new THREE.CircleGeometry(40, 24), new THREE.MeshBasicMaterial({ color: 0x3b5226 }));
+      envGround.rotation.x = -Math.PI / 2;
+      envGround.position.y = -0.5;
+      envScene.add(envGround);
+      const pm = new THREE.PMREMGenerator(renderer);
+      scene.environment = pm.fromScene(envScene, 0.02, 0.1, 100).texture;
+      pm.dispose();
 
       const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 60);
 
-      scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x3d6b2a, 1.1));
-      const sun = new THREE.DirectionalLight(0xfff0d0, 2.6);
+      scene.add(new THREE.HemisphereLight(0xb9d3ee, 0x4d5a2c, 0.55));
+      const sun = new THREE.DirectionalLight(0xfff2dc, 2.8);
       sun.position.set(1.8, 2.6, -0.6);
       sun.target.position.set(0.5, 0, FIELD_L / 2);
       sun.castShadow = true;
@@ -998,12 +986,12 @@
       const rnd = seeded(42);
       const maxAniso = renderer.capabilities.getMaxAnisotropy();
 
-      // Wiese rundherum
-      const grassTex = canvasTexture(256, 256, (g, w, h) => paintGrass(g, w, h, rnd, "#4b9636"));
-      grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
-      grassTex.repeat.set(140, 140);
-      grassTex.anisotropy = maxAniso;
-      const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.95 }));
+      // Wiese rundherum: echte Halm-Textur mit Relief, ohne sichtbare Wiederholung
+      const mobile = /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+      const L = E.lawn(mobile ? 512 : 1024);
+      const aniso = Math.min(8, maxAniso);
+      const lawnMat = E.lawnMaterial({ map: E.texture(L.color, { aniso }), normal: E.texture(L.normal, { color: false, aniso }), macro: E.texture(L.macro, { color: false, aniso: 1 }) }, 36);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), lawnMat);
       ground.rotation.x = -Math.PI / 2;
       ground.position.set(0.5, -0.001, FIELD_L / 2);
       ground.receiveShadow = true;
@@ -1012,7 +1000,7 @@
       // Spielfeld: hellere Mähstreifen als durchsichtige Schicht über der feinen Wiese
       const fieldTex = canvasTexture(4, 24, (g, w, h) => {
         for (let i = 0; i < 12; i++) {
-          g.fillStyle = i % 2 ? "rgba(190,255,150,0.22)" : "rgba(150,230,110,0.12)";
+          g.fillStyle = i % 2 ? "rgba(210,240,170,0.12)" : "rgba(30,60,20,0.06)"; // gemähte Bahnen, dezent
           g.fillRect(0, (i * h) / 12, w, h / 12);
         }
       });
@@ -1110,7 +1098,7 @@
       ball.castShadow = true;
       scene.add(ball);
 
-      G = { renderer, scene, camera, bottle, puddle, ball, crowd, people: new Map(), fall: 0, size: "" };
+      G = { renderer, scene, camera, bottle, puddle, ball, crowd, skyTime, people: new Map(), fall: 0, size: "" };
     } catch (err) {
       console.error(err);
       glFailed = true;
@@ -1121,47 +1109,45 @@
 
   // Bäume, Hügel, Bierkisten in Teamfarben und Fähnchen rund ums Feld
   function addScenery(scene, rnd) {
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.9 });
-    const leafColors = [0x2f7d32, 0x3c9a3f, 0x4caf50, 0x26663a, 0x6bb33e];
-    const leafGeo = new THREE.IcosahedronGeometry(1, 1);
+    // Bäume: Rinde mit Furchen, Kronen aus einzelnen Blattkarten (echt-tex.js)
+    const E = window.EchtTex;
+    const bark = E.wood({ w: 128, h: 256, rows: 1, tones: [[54, 42, 34], [96, 82, 70]], seed: 8, joints: false, gap: -9 });
+    const barkMap = E.texture(bark.color, { repeat: [1, 2] });
+    const barkN = E.texture(E.normalFrom(bark.height, bark.w, bark.h, 6), { color: false, repeat: [1, 2] });
+    barkMap.rotation = barkN.rotation = Math.PI / 2;
+    const trunkMat = new THREE.MeshStandardMaterial({ map: barkMap, normalMap: barkN, roughness: 0.95 });
     const trunkGeo = new THREE.CylinderGeometry(0.6, 0.8, 1, 8);
+    const cards = [];
+    const coreGeo = new THREE.IcosahedronGeometry(1, 1);
+    const coreMat = new THREE.MeshStandardMaterial({ color: 0x1d3016, roughness: 1 });
     for (let i = 0; i < 70; i++) {
       const a = rnd() * Math.PI * 2;
       const r = 2.2 + rnd() * 4;
       const x = 0.5 + Math.cos(a) * r * 0.9;
       const z = FIELD_L / 2 + Math.sin(a) * r;
       const s = 0.12 + rnd() * 0.14;
-      const tree = new THREE.Group();
       const trunk = new THREE.Mesh(trunkGeo, trunkMat);
       trunk.scale.set(s * 0.12, s * 0.9, s * 0.12);
-      trunk.position.y = s * 0.45;
-      const leaves = new THREE.Mesh(leafGeo, new THREE.MeshStandardMaterial({ color: leafColors[Math.floor(rnd() * leafColors.length)], roughness: 0.8, flatShading: true }));
-      leaves.scale.set(s * 0.55, s * 0.7, s * 0.55);
-      leaves.position.y = s * 1.15;
-      tree.add(trunk, leaves);
-      tree.position.set(x, 0, z);
-      tree.traverse((o) => (o.castShadow = true));
-      scene.add(tree);
-    }
-    // Wolken
-    const cloudTex = canvasTexture(128, 64, (g, w, h) => {
-      for (const [x, y, r] of [[40, 38, 22], [64, 28, 26], [90, 38, 20], [64, 42, 22]]) {
-        const grad = g.createRadialGradient(x, y, 2, x, y, r);
-        grad.addColorStop(0, "rgba(255,255,255,1)");
-        grad.addColorStop(1, "rgba(255,255,255,0)");
-        g.fillStyle = grad;
-        g.fillRect(0, 0, w, h);
+      trunk.position.set(x, s * 0.45, z);
+      trunk.castShadow = true;
+      scene.add(trunk);
+      const tint = new THREE.Color().setHSL(0.24 + rnd() * 0.06, 0.35 + rnd() * 0.2, 0.55 + rnd() * 0.1);
+      for (let k = 0; k < 3; k++) {
+        const c = new THREE.Vector3(x + (rnd() - 0.5) * s * 0.5, s * (1.05 + rnd() * 0.3), z + (rnd() - 0.5) * s * 0.5);
+        E.clumpCards(cards, rnd, c, [s * 0.45, s * 0.5, s * 0.45], 14, s * 0.45, tint);
       }
-    });
-    for (let i = 0; i < 14; i++) {
-      const a = rnd() * Math.PI * 2;
-      const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, fog: false, transparent: true, opacity: 0.9, depthWrite: false }));
-      const s = 2 + rnd() * 2;
-      cloud.scale.set(s, s / 2, 1);
-      cloud.position.set(0.5 + Math.cos(a) * 12, 1.4 + rnd() * 1.8, FIELD_L / 2 + Math.sin(a) * 12);
-      scene.add(cloud);
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.scale.set(s * 0.35, s * 0.42, s * 0.35);
+      core.position.set(x, s * 1.15, z);
+      scene.add(core);
     }
-    const hillMat = new THREE.MeshStandardMaterial({ color: 0x5f9e45, roughness: 1 });
+    const leafMap = E.texture(E.leafAtlas(256), { aniso: 1 });
+    leafMap.wrapS = leafMap.wrapT = THREE.ClampToEdgeWrapping;
+    const foliage = new THREE.Mesh(E.foliageGeo(cards, rnd), E.foliageMaterial(leafMap, new THREE.Vector3(1.8, 2.6, -0.6).normalize()));
+    foliage.castShadow = true;
+    scene.add(foliage);
+    // Wolken stehen im Himmel selbst (echt-tex.js daySky)
+    const hillMat = new THREE.MeshStandardMaterial({ color: 0x5b7840, roughness: 1 });
     for (let i = 0; i < 10; i++) {
       const a = (i / 10) * Math.PI * 2 + rnd() * 0.3;
       const hill = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 12), hillMat);
@@ -1473,6 +1459,7 @@
       g.ball.rotation.x = u * 25 * fwd;
     }
 
+    g.skyTime.value = performance.now() / 1000;
     g.renderer.render(g.scene, cam);
 
     // 2D-Overlay: Namen, Zielhilfe, Wind
