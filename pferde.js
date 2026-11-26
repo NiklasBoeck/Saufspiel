@@ -59,6 +59,23 @@
       .pr-flip .pc { animation: pr-flip .4s ease-out; }
       @keyframes pr-flip { from { transform: rotateY(90deg) scale(.9); } to { transform: none; } }
       .pr-cur-empty { flex: none; height: var(--ch); width: calc(var(--ch) / 1.448); border: 2px dashed rgba(255,255,255,.35); border-radius: 8px; }
+      /* Tribüne rechts (quer: unten) wie auf der echten Rennbahn, von oben gesehen: Ränge mit Zuschauern, gestreiftes Dach hinten */
+      .pr-stand { position: absolute; z-index: 1; right: 0; top: 0; width: calc(100cqw / 6); height: calc(500cqh / 8); display: flex; flex-direction: row;
+        background: #8d8d8d; box-shadow: -3px 0 0 #f4f1ea, -5px 0 6px rgba(0,0,0,.35); pointer-events: none; }
+      .pr-tier { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; overflow: hidden;
+        background: linear-gradient(90deg, rgba(0,0,0,.18), rgba(0,0,0,0) 30%, rgba(255,255,255,.08)); border-right: 1px solid rgba(0,0,0,.25); }
+      .pr-tier:nth-child(2) { background-color: #7d7d7d; }
+      .pr-tier:nth-child(3) { background-color: #6f6f6f; }
+      .pr-roof { flex: none; width: 22%; background: repeating-linear-gradient(180deg, #1f6f3f 0 7px, #f4f1ea 7px 14px); box-shadow: inset 2px 0 0 rgba(0,0,0,.25); opacity: .95; }
+      .pr-fan { --s: min(calc(100cqw / 6 / 3.9), calc(500cqh / 8 / 15 / 1.3)); flex: none; width: var(--s); height: calc(var(--s) * 1.25); position: relative; transform-origin: 50% 100%;
+        background: radial-gradient(circle calc(var(--s) * .25) at 50% 36%, var(--skin) 94%, transparent 100%), radial-gradient(circle calc(var(--s) * .27) at 50% 29%, var(--hair) 94%, transparent 100%),
+          radial-gradient(ellipse calc(var(--s) * .5) calc(var(--s) * .42) at 50% 100%, var(--shirt) 95%, transparent 100%);
+        animation: pr-bob 2.4s ease-in-out infinite; animation-delay: var(--d); }
+      .pr-fan.flag::after { content: ""; position: absolute; left: -12%; top: -20%; width: 34%; height: 40%; background: var(--shirt); border-radius: 1px; box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+      @keyframes pr-bob { 0%,100% { transform: none; } 50% { transform: translateY(-6%); } }
+      .pr-stand.cheer .pr-fan { animation: pr-cheer .35s ease-in-out 4 alternate; animation-delay: calc(var(--d) / 8); }
+      @keyframes pr-cheer { to { transform: translateY(-22%) scale(1.08); } }
+      @media (prefers-reduced-motion: reduce) { .pr-fan, .pr-stand.cheer .pr-fan { animation: none; } }
       /* Quer (breiter als hoch): Bahnen liegen untereinander, die Pferde laufen nach rechts, Karten liegen quer */
       @container pr (min-aspect-ratio: 1/1) {
         .pr-x { --ch: min(calc(100cqw / 8 * .9), calc(100cqh / 6 * .9 * 1.448)); left: calc((var(--row) + .5) * 100cqw / 8); top: calc((var(--lane) + .5) * 100cqh / 6);
@@ -73,6 +90,10 @@
         .pr-start { top: calc(100cqh / 6); height: calc(400cqh / 6); left: calc(100cqw / 8 - 1px); width: 2px; }
         .pr-row { top: 0; height: calc(100cqh / 6); left: calc(var(--row) * 100cqw / 8); width: calc(100cqw / 8); border-top: 0; border-left: 1px dashed rgba(255,255,255,.15); }
         .pr-cur { --ch: min(calc(100cqw / 8 * 1.3), calc(100cqh / 6 * .95 * 1.448)); }
+        .pr-stand { top: auto; bottom: 0; left: calc(300cqw / 8); right: 0; width: auto; height: calc(100cqh / 6); flex-direction: column; box-shadow: 0 -3px 0 #f4f1ea, 0 -5px 6px rgba(0,0,0,.35); }
+        .pr-tier { flex-direction: row; border-right: 0; border-bottom: 1px solid rgba(0,0,0,.25); background-image: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,0) 30%, rgba(255,255,255,.08)); }
+        .pr-roof { width: auto; height: 14%; background: repeating-linear-gradient(90deg, #1f6f3f 0 7px, #f4f1ea 7px 14px); box-shadow: inset 0 2px 0 rgba(0,0,0,.25); }
+        .pr-fan { --s: min(calc(100cqh / 6 * .86 / 3 / 1.25), calc(500cqw / 8 / 15 / 1.05)); }
       }
       .pr-bets { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 6px; margin: 0; padding: 0; list-style: none; font-size: clamp(.72rem, 1.8dvh, .95rem); }
       .pr-bets li { padding: 2px 9px; border-radius: 99px; background: var(--surface, rgba(255,255,255,.08)); white-space: nowrap; }
@@ -207,6 +228,7 @@
     for (let l = 1; l <= 4; l++) h += `<div class="pr-lane l${l}" style="--lane:${l}"></div>`;
     for (let r = 1; r <= SIDE; r++) h += `<div class="pr-row" style="--row:${r}"></div>`;
     h += `<div class="pr-start"></div><div class="pr-goal"></div>`;
+    h += standHtml();
     h += cell(0, GOAL, "", "", `<span class="pr-trophy">🏆</span>`);
     // Seitenkarten
     for (let r = 1; r <= SIDE; r++) {
@@ -232,6 +254,24 @@
     h += cell(5, 0.12, "pr-deck", pile, s.deck.length ? `<span class="pr-count">${s.deck.length}</span>` : "");
     h += cell(5, 1.75, `pr-cur ${s.last ? "pr-flip" : ""}`, s.last ? playingCardHtml(s.last) : `<div class="pr-cur-empty"></div>`, "", `data-flips="${s.flips}"`);
     return `<div class="pr-track">${h}</div>`;
+  }
+
+  const FAN_SHIRT = ["#e5484d", "#f0b429", "#2f80ed", "#16a34a", "#f4f1ea", "#9b51e0", "#ff7a1a", "#111", "#e86fa8", "#2bb3c0"];
+  const FAN_HAIR = ["#2a1d14", "#6b4423", "#d9a441", "#111", "#a33b1c", "#8a8a8a"];
+  const FAN_SKIN = ["#f1c7a3", "#e0a77c", "#b97a4f", "#7b4b2a", "#f5d5bb"];
+  let standCache = "";
+  function standHtml() {
+    if (standCache) return standCache;
+    let h = "";
+    for (let t = 0; t < 3; t++) {
+      let f = "";
+      for (let i = 0; i < 15; i++) {
+        const k = t * 15 + i, r = (k * 37 + 11) % 97;
+        f += `<i class="pr-fan${r % 9 === 0 ? " flag" : ""}" style="--shirt:${FAN_SHIRT[r % FAN_SHIRT.length]};--hair:${FAN_HAIR[(r * 7) % FAN_HAIR.length]};--skin:${FAN_SKIN[(r * 3) % FAN_SKIN.length]};--d:-${((r % 24) / 10).toFixed(1)}s"></i>`;
+      }
+      h += `<div class="pr-tier">${f}</div>`;
+    }
+    return (standCache = `<div class="pr-stand" aria-hidden="true">${h}<div class="pr-roof"></div></div>`);
   }
 
   function flipAct(s) {
@@ -357,6 +397,8 @@
       ms = 650;
     });
     if (same && prev.flips === s.flips) root.querySelector(".pr-cur")?.classList.remove("pr-flip");
+    // Tribüne jubelt, wenn ein Pferd vorläuft
+    if (same && prev.flips !== s.flips && s.moved && s.moved.dir > 0) root.querySelector(".pr-stand")?.classList.add("cheer");
     prev = { gid: s.gid, round: s.round, pos: [...(s.pos ?? [])], flips: s.flips };
     return ms;
   }
