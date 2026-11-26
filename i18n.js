@@ -181,6 +181,7 @@ const STRINGS = {
     Schwer: "Hard",
     "Die Bots treffen fast immer. Viel Glück.": "The bots almost never miss. Good luck.",
     Neu: "New",
+    Warm: "Warm",
     "Warme Kneipenfarben, gezeichnete Icons.": "Warm pub colours, hand-drawn icons.",
     Biergarten: "Beer garden",
     "Flaschengrün, Brezel-Orange, runde Sticker und Kacheln.": "Bottle green, pretzel orange, round stickers and tiles.",

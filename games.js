@@ -51,12 +51,12 @@ const BOT_LEVELS = {
 // --- Aussehen: neues Design oder das alte (klassisch) ---
 // boot.js liest das schon vor dem ersten Bild aus und setzt <html class="neu">.
 const DESIGNS = {
-  neu: { label: "Neu", emoji: "✏️", desc: "Warme Kneipenfarben, gezeichnete Icons.", swatch: ["#17130f", "#efe3c8", "#f0b429"] },
+  neu: { label: "Warm", emoji: "✏️", desc: "Warme Kneipenfarben, gezeichnete Icons.", swatch: ["#17130f", "#efe3c8", "#f0b429"] },
   garten: { label: "Biergarten", emoji: "🥨", desc: "Flaschengrün, Brezel-Orange, runde Sticker und Kacheln.", swatch: ["#0f2620", "#f6a04d", "#d9483b"] },
   wiesn: { label: "Wiesn", emoji: "🥨", desc: "Weiß-blaue Rauten, Wimpel und ein Lebkuchenherz. O’zapft is!", swatch: ["#0d2a52", "#ffffff", "#c8102e"] },
   klassisch: { label: "Klassisch", emoji: "🟣", desc: "Das alte Lila mit Emojis.", swatch: ["#1b1033", "#7c3aed", "#f59e0b"] },
 };
-// „Biergarten“ und „Wiesn“ bauen auf „Neu“ auf: <html class="neu garten"> bzw. <html class="neu wiesn">
+// „Biergarten“ und „Wiesn“ bauen auf „Warm“ (Schlüssel neu) auf: <html class="neu garten"> bzw. <html class="neu wiesn">
 const DESIGN_BG = { neu: "#17130f", garten: "#0f2620", wiesn: "#0d2a52", klassisch: "#1b1033" };
 function applyDesign(d) {
   document.documentElement.classList.toggle("neu", d !== "klassisch");

@@ -38,7 +38,7 @@ python3 -m http.server 8000
 - `info.html`: Verantwortung, Impressum und Datenschutz
 - `app.js`: Menü, Einstellungen (Stufe), Spielregeln, Spielerverwaltung, zeichnet das laufende Spiel und die Trink-Meldung. Die Spieler werden im Browser gespeichert.
 - `style.css`: Mobile-first Styling (Design „Klassisch“)
-- `design.css` + `icons.js`: Design „Neu“ (Kneipenfarben, gezeichnete SVG-Icons, Schrift Bricolage Grotesque in vendor/fonts). Design „Biergarten“ = `<html class="neu garten">` (Fraunces-Schrift). Umschalter in den Einstellungen, `<html class="neu">`
+- `design.css` + `icons.js`: Design „Warm“ (intern `neu`; Kneipenfarben, gezeichnete SVG-Icons, Schrift Bricolage Grotesque in vendor/fonts). Design „Biergarten“ = `<html class="neu garten">` (Fraunces-Schrift). Umschalter in den Einstellungen, `<html class="neu">`
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
 
 ## Neues Spiel hinzufügen

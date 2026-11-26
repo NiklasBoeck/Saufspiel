@@ -1,4 +1,4 @@
-// Gezeichnete Icons für das neue Design (Design „Neu“).
+// Gezeichnete Icons für das neue Design (Design „Warm“, intern neu).
 // Stil: wie gedruckt auf einem Bierdeckel. Eine Farbfläche (--spot), leicht versetzt wie beim Siebdruck,
 // darüber eine dunkle Tusche-Linie. Alles 48 × 48, Linien rund.
 //
