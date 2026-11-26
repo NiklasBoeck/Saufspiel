@@ -100,6 +100,13 @@ const DRAWN_ICONS = (() => {
       i: `<rect x="17" y="6" width="14" height="19" rx="2"/>
           <path d="M24 12l2.8 3.5L24 19l-2.8-3.5z"/>`,
     },
+    // Pferderennen: Pferdekopf mit Mähne, dahinter die Zielflagge
+    pferde: {
+      b: `<path d="M33 6v20"/><path d="M33 6h10v8H33z"/>`,
+      f: `<path d="M10 42c0-9 2-15 6-19l-3-7 6 4c4-3 9-3 12 0l6 8c1 2 0 4-2 4l-5-1-3 3c-1 4 0 6 1 8z"/>`,
+      i: `<path d="M10 42c0-9 2-15 6-19l-3-7 6 4c4-3 9-3 12 0l6 8c1 2 0 4-2 4l-5-1-3 3c-1 4 0 6 1 8"/><circle cx="25" cy="25" r="1.4"/>
+          <path d="M16 23c-2 2-3 5-3.5 8M19 21c-2.5 3-3.6 6-4 10M22 20.5c-2.2 3.4-3 6.4-3.2 9.5"/><path d="M35.5 31.5l.8 1"/><path d="M33 6v13"/><path d="M33 6h10v8H33"/><path d="M38 6v8M33 10h10"/>`,
+    },
     // Kartenstapel: verdeckter Stapel, oberste Karte halb aufgedeckt
     stapel: {
       b: `<rect x="9" y="15" width="20" height="28" rx="2.5"/>`,
@@ -221,7 +228,7 @@ const DRAWN_ICONS = (() => {
     flunky: "#e4572e", hodenritter: "#5b9e6d", kistenturm: "#e9a23b", flasche: "#4f8fbf",
     dealer: "#d94a3d", fenster: "#e9b949", randvoll: "#efb030", duell: "#c9573c",
     eher: "#8f7ac8", fussball: "#5b9e6d", busfahrer: "#e9b949", niewieder: "#e57a8f", pflicht: "#d94a3d",
-    triade: "#5b9e6d", promille: "#4fa3a5", stapel: "#d94a3d", deckel: "#c9814a", schiffe: "#4f8fbf",
+    triade: "#5b9e6d", promille: "#4fa3a5", stapel: "#d94a3d", pferde: "#5b9e6d", deckel: "#c9814a", schiffe: "#4f8fbf",
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",

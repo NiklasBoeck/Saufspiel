@@ -504,6 +504,19 @@ const GAME_TEXT = {
         "Bots play along: the harder the question, the more often they’re wrong. When shouting they sometimes abstain or guess.",
       ],
     },
+    pferde: {
+      label: "Horse Race",
+      description: "The four aces race each other. Bet sips on your horse.",
+      rules: [
+        "The four aces are the horses and stand at the start. Next to the track lie 6 face-down side cards, one per row.",
+        "Before the race everyone bets 1 to 5 sips on a horse (a suit). On one phone take turns, with several phones everyone on their own.",
+        "Then the deck is turned over card by card. The ace of the same suit moves one field forward.",
+        "Once all four horses have reached a row, that row's side card is turned over. The horse of its suit has to go back one field.",
+        "The first horse across the finish (after row 6) wins. Whoever bet on it hands out double their bet. Everyone else drinks their bet.",
+        "With the “Automatisch” (auto) button the app turns the cards on its own, you only have to cheer.",
+        "Bots bet by themselves, somewhere between 1 and 5 sips.",
+      ],
+    },
     stapel: {
       label: "Card Stack",
       description: "A shuffled deck, turn over the top card. You make up the rules.",
