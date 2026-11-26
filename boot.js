@@ -8,9 +8,9 @@
     if (design === "klassisch") {
       document.documentElement.classList.remove("neu");
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#1b1033");
-    } else if (design === "garten" || design === "wiesn") {
+    } else if (design === "garten" || design === "wiesn" || design === "spaeti") {
       document.documentElement.classList.add(design);
-      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", design === "garten" ? "#0f2620" : "#0d2a52");
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", { garten: "#0f2620", wiesn: "#0d2a52", spaeti: "#0e0e0e" }[design]);
     }
   } catch {
     // ohne Speicher bleibt es beim neuen Design

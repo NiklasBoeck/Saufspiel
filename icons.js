@@ -188,6 +188,11 @@ const DRAWN_ICONS = (() => {
           <path d="M24 36.5C16 31 10.5 25.5 10.5 19c0-4 2.5-6.5 5.5-6.5 3.5 0 6 2.5 8 6 2-3.5 4.5-6 8-6 3 0 5.5 2.5 5.5 6.5 0 6.5-5.5 12-13.5 17.5z" stroke-dasharray="0.1 3.2"/>
           <path d="M17 22c2 2.5 4.5 3.5 7 3.5s5-1 7-3.5"/>`,
     },
+    // Späti-Design: Preisschild
+    spaeti: {
+      f: `<path d="M5 24l11-12h27v24H16z"/>`,
+      i: `<path d="M5 24l11-12h27v24H16z"/><circle cx="14" cy="24" r="2.4"/><path d="M22 20h15M22 25.5h10M22 31h13"/>`,
+    },
     // Sprachen: Sprechblase mit Kürzel
     de: {
       f: `<path d="M8 10h32a3 3 0 0 1 3 3v17a3 3 0 0 1-3 3H21l-8 7v-7H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3z"/>`,
@@ -232,7 +237,7 @@ const DRAWN_ICONS = (() => {
     phone: "#e9b949", phones: "#e4572e", settings: "#e9b949",
     alkoholfrei: "#6fb6c8", mild: "#e9c46a", normal: "#efb030", hart: "#e4572e",
     leicht: "#9cc27a", mittel: "#6fa8d6", schwer: "#d94a3d",
-    neu: "#e9b949", garten: "#c9814a", wiesn: "#a0582c", de: "#e9b949", en: "#6fa8d6", klassisch: "#8f6fd8",
+    neu: "#e9b949", garten: "#c9814a", wiesn: "#a0582c", spaeti: "#ffd60a", de: "#e9b949", en: "#6fa8d6", klassisch: "#8f6fd8",
     ton: "#efb030", still: "#6fa8d6", aus: "#9cc27a",
   };
 

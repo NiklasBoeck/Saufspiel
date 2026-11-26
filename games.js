@@ -54,14 +54,16 @@ const DESIGNS = {
   neu: { label: "Warm", emoji: "✏️", desc: "Warme Kneipenfarben, gezeichnete Icons.", swatch: ["#17130f", "#efe3c8", "#f0b429"] },
   garten: { label: "Biergarten", emoji: "🥨", desc: "Flaschengrün, Brezel-Orange, runde Sticker und Kacheln.", swatch: ["#0f2620", "#f6a04d", "#d9483b"] },
   wiesn: { label: "Wiesn", emoji: "🥨", desc: "Weiß-blaue Rauten, Wimpel und ein Lebkuchenherz. O’zapft is!", swatch: ["#0d2a52", "#ffffff", "#c8102e"] },
+  spaeti: { label: "Späti", emoji: "🏪", desc: "Schwarz, Kiosk-Gelb und eckige Preisschilder. Wie der Späti um drei Uhr nachts.", swatch: ["#0e0e0e", "#f4f1ea", "#ffd60a"] },
   klassisch: { label: "Klassisch", emoji: "🟣", desc: "Das alte Lila mit Emojis.", swatch: ["#1b1033", "#7c3aed", "#f59e0b"] },
 };
-// „Biergarten“ und „Wiesn“ bauen auf „Warm“ (Schlüssel neu) auf: <html class="neu garten"> bzw. <html class="neu wiesn">
-const DESIGN_BG = { neu: "#17130f", garten: "#0f2620", wiesn: "#0d2a52", klassisch: "#1b1033" };
+// „Biergarten“, „Wiesn“ und „Späti“ bauen auf „Warm“ (Schlüssel neu) auf: <html class="neu garten"> bzw. <html class="neu wiesn">
+const DESIGN_BG = { neu: "#17130f", garten: "#0f2620", wiesn: "#0d2a52", spaeti: "#0e0e0e", klassisch: "#1b1033" };
 function applyDesign(d) {
   document.documentElement.classList.toggle("neu", d !== "klassisch");
   document.documentElement.classList.toggle("garten", d === "garten");
   document.documentElement.classList.toggle("wiesn", d === "wiesn");
+  document.documentElement.classList.toggle("spaeti", d === "spaeti");
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", DESIGN_BG[d] ?? DESIGN_BG.neu);
 }
 // --- Startanimation beim Öffnen (intro.js) ---

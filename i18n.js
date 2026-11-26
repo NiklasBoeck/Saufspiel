@@ -184,6 +184,8 @@ const STRINGS = {
     Warm: "Warm",
     "Warme Kneipenfarben, gezeichnete Icons.": "Warm pub colours, hand-drawn icons.",
     Biergarten: "Beer garden",
+    Späti: "Corner shop",
+    "Schwarz, Kiosk-Gelb und eckige Preisschilder. Wie der Späti um drei Uhr nachts.": "Black, kiosk yellow and square price tags. Like the corner shop at 3 a.m.",
     "Flaschengrün, Brezel-Orange, runde Sticker und Kacheln.": "Bottle green, pretzel orange, round stickers and tiles.",
     Wiesn: "Oktoberfest",
     "Weiß-blaue Rauten, Wimpel und ein Lebkuchenherz. O’zapft is!": "Blue and white diamonds, bunting and a gingerbread heart. O’zapft is!",

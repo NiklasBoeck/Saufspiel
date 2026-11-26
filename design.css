@@ -852,3 +852,117 @@ html.neu .bd-mat i {
   box-shadow: 0 0 0 1px rgb(80 50 20 / 0.35), 0 1px 0 #d8c296, 0 2px 0 #bfa477, 0 3px 0 #a88c60, 0 4px 6px rgb(0 0 0 / 0.35);
 }
 html.neu .bd-mat i span { color: #a8161c; font-family: "Fraunces", Georgia, serif; text-shadow: 0.5px 0.5px 0 rgb(168 22 28 / 0.35); }
+
+/* ==========================================================================
+   Design „Späti“: <html class="neu spaeti">
+   Der Kiosk um drei Uhr nachts: Schwarz, gebrochenes Weiß und ein einziges Kiosk-Gelb.
+   Flach und kantig statt Glanz und Verlauf: eckige Preisschilder, 24/7-Schild am Namen,
+   Spiele durchnummeriert wie auf der Preistafel, Schrift schmal und in Großbuchstaben.
+   ========================================================================== */
+
+html.neu.spaeti {
+  --bg: #0e0e0e;
+  --surface: #1a1a1a;
+  --surface-2: #242424;
+  --text: #f4f1ea;
+  --muted: #9c978d;
+  --primary: #ffd60a;
+  --primary-dark: #a88c00;
+  --paper: #f4f1ea;
+  --ink: #0e0e0e;
+  --rot: #ff4d2e;
+  --line: rgb(244 241 234 / 0.12);
+  --line-strong: rgb(244 241 234 / 0.3);
+  --radius: 4px;
+}
+html.neu.spaeti body::before { opacity: 0.04; }
+html.neu.spaeti body::after { display: none; }
+
+/* Name: schmal, groß, Großbuchstaben, dahinter ein schiefes 24/7-Schild */
+html.neu.spaeti .menu-head h1 {
+  text-transform: uppercase;
+  font-stretch: 75%;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+html.neu.spaeti .menu-head h1::after {
+  content: "24/7";
+  display: inline-block;
+  margin-left: 0.18em;
+  padding: 0.12em 0.3em 0.08em;
+  vertical-align: 0.95em;
+  font-size: 0.24em;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  background: var(--primary);
+  color: var(--ink);
+  transform: rotate(-6deg);
+}
+html.neu.spaeti .menu-head .hint {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+html.neu.spaeti :is(.settings-btn, .figur-btn) { border-radius: var(--radius); }
+
+/* Spiele wie auf der Preistafel: Nummer, Name, Pfeil */
+html.neu.spaeti .game-list { counter-reset: spaeti; border-top: 2px solid var(--text); }
+html.neu.spaeti .game-tile { counter-increment: spaeti; border-bottom: 1px solid var(--line); }
+html.neu.spaeti .game-tile:hover { background: var(--surface); }
+html.neu.spaeti .game-tile:active { background: var(--primary); }
+html.neu.spaeti .game-tile:active :is(.game-name, .game-desc, .game-arrow) { color: var(--ink); }
+html.neu.spaeti .game-list .game-name::before {
+  content: counter(spaeti, decimal-leading-zero);
+  display: inline-block;
+  min-width: 1.9em;
+  margin-right: 0.25em;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72em;
+  font-weight: 600;
+  font-stretch: normal;
+  letter-spacing: 0;
+  color: var(--primary);
+  vertical-align: 0.08em;
+}
+html.neu.spaeti .game-list .game-name { text-transform: uppercase; font-stretch: 78%; letter-spacing: 0; }
+html.neu.spaeti .game-arrow { color: var(--muted); font-weight: 400; }
+
+/* Icons als eckige Preisschilder, gerade aufgeklebt */
+html.neu.spaeti :is(.game-icon, .mode-icon) { border-radius: 3px; transform: none; }
+html.neu.spaeti .game-tile:active .game-icon { transform: scale(0.94); }
+html.neu.spaeti .sb-neu .ic { border-radius: 3px; }
+
+/* Knöpfe, Karten, Felder: kantig, Großbuchstaben, harte Kante statt Schatten */
+html.neu.spaeti .btn {
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: 0 3px 0 var(--primary-dark);
+}
+html.neu.spaeti .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--primary-dark); }
+html.neu.spaeti .btn.ghost { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+html.neu.spaeti :is(.mode-tile, .card, .rules-box, #player-input, .field input, .join-row input) { border-radius: var(--radius); }
+html.neu.spaeti .level-tile.picked { box-shadow: inset 0 0 0 2px var(--primary); }
+
+/* Trink-Meldung: großes gelbes Preisschild mit Lochung */
+html.neu.spaeti .da-box {
+  position: relative;
+  border-radius: 6px;
+  box-shadow: 0 5px 0 var(--primary-dark), 0 30px 70px rgb(0 0 0 / 0.6);
+}
+html.neu.spaeti .da-box::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+html.neu.spaeti .da-box h2 { text-transform: uppercase; font-stretch: 75%; }
+html.neu.spaeti #da-list li { border-radius: 3px; }
+html.neu.spaeti .da-box .btn { box-shadow: none; }
+html.neu.spaeti .toast { background: var(--ink); border-radius: var(--radius); }
