@@ -31,7 +31,7 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # Android-SDK ist auf ubuntu-latest schon installiert (ANDROID_HOME)
 
       - name: Web-App und Android-Projekt
         run: |
