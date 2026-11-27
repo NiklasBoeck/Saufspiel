@@ -1,0 +1,64 @@
+# Baut die Android-Beta (APK) und hängt sie an das GitHub-Release "beta".
+# Start: Tag "beta-<nummer>" pushen oder in GitHub unter Actions > Android-Beta > Run workflow.
+# Download-Link für Tester: https://github.com/NiklasBoeck/Saufspiel/releases/download/beta/saufomat-beta.apk
+name: Android-Beta
+
+on:
+  push:
+    tags: ["beta-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-beta
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Web-App und Android-Projekt
+        run: |
+          npm ci
+          npm run www
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#1b1033' --splashBackgroundColor '#1b1033'
+          # Kamera für „Gesicht scannen“
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET" />|<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />|' android/app/src/main/AndroidManifest.xml
+          # Versionsnummer aus der Lauf-Nummer, damit Updates sich über die alte Version installieren lassen
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"0.9.${{ github.run_number }}-beta\"/" android/app/build.gradle
+          npx cap sync android
+
+      - name: APK bauen
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Als Beta-Release veröffentlichen
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk saufomat-beta.apk
+          gh release delete beta --yes --cleanup-tag || true
+          gh release create beta saufomat-beta.apk --prerelease --title "Saufomat Beta" \
+            --notes "Android-Beta von Saufomat (ab 18). APK herunterladen, öffnen und Installation aus dieser Quelle erlauben. Stand: ${{ github.sha }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saufomat-beta-apk
+          path: saufomat-beta.apk
