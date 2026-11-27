@@ -9,7 +9,7 @@
 // Öffentliche Broker heben liegen gebliebene Nachrichten nicht ewig auf; eine Anfrage an jemanden, der
 // lange nicht online war, kann verloren gehen. Mit eigenem Server wird das später zuverlässig.
 const Freunde = (() => {
-  const ROOT = "saufspiel-freunde-v1";
+  const ROOT = "saufspiel-freunde-v2";
   const BROKERS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
   const KEY = "saufspiel-freunde";
   const ID_KEY = "saufspiel-id";
@@ -110,22 +110,44 @@ const Freunde = (() => {
     return b ? b.split(",").filter(Boolean) : BROKERS;
   }
 
-  const topic = (id, sub) => `${ROOT}/${id}/${sub}`;
+  // Topics und Inhalte sind verschlüsselt (secure.js): Im Topic steht ein Hash des Freundescodes,
+  // der Inhalt ist mit einem Schlüssel aus genau diesem Code verschlüsselt. Wer den Code nicht hat,
+  // kann nichts lesen und nichts einschleusen.
+  const topic = (id, sub) => ({ id, sub });
+  const owners = new Map(); // Topic-Hash → Freundescode
+  async function real(d) {
+    const k = await Secure.ident(ROOT, d.id);
+    owners.set(k.topic, d.id);
+    let sub = d.sub;
+    const m = /^post\/(.+)$/.exec(sub);
+    if (m && m[1] !== "+") sub = `post/${(await Secure.ident(ROOT, `von|${m[1]}`)).topic.slice(0, 16)}`;
+    return { name: `${ROOT}/${k.topic}/${sub}`, key: k.key };
+  }
+  async function subs(l, ds, off) {
+    const names = (await Promise.all(ds.map(real))).map((r) => r.name);
+    if (!l.up || !names.length) return;
+    if (off) l.c.unsubscribe(names);
+    else l.c.subscribe(names, { qos: 1 });
+  }
 
   function start() {
-    if (started || typeof mqtt === "undefined") return;
+    if (started || typeof mqtt === "undefined" || typeof Secure === "undefined" || !Secure.available()) return;
     started = true;
     links = brokerUrls().map((url) => {
       const l = { url, up: false, c: null };
       l.c = mqtt.connect(url, { clientId: `ssf_${myId}_${rnd(6)}`, clean: true, keepalive: 30, connectTimeout: 8000, reconnectPeriod: 5000 });
       l.c.on("connect", () => {
         l.up = true;
-        l.c.subscribe([topic(myId, "post/+"), topic(myId, "live"), ...data.list.map((f) => topic(f.id, "karte"))], { qos: 1 });
+        subs(l, [topic(myId, "post/+"), topic(myId, "live"), ...data.list.map((f) => topic(f.id, "karte"))]).catch(() => {});
         publishCard();
       });
       l.c.on("close", () => (l.up = false));
       l.c.on("error", () => {});
-      l.c.on("message", onMessage);
+      let inQ = Promise.resolve();
+      l.c.on("message", (tp, payload) => {
+        if (payload.length > Secure.MAX_BYTES) return;
+        inQ = inQ.then(() => onMessage(tp, payload)).catch(() => {});
+      });
       return l;
     });
     setInterval(() => document.visibilityState !== "hidden" && publishCard(), CARD_MS);
@@ -141,16 +163,24 @@ const Freunde = (() => {
     cardTimer = setTimeout(() => publishCard(), 1500);
   }
 
-  function publish(t, msg, retain) {
+  let outQ = Promise.resolve();
+  function publish(d, msg, retain) {
+    if (!links.length) return;
     const text = msg == null ? "" : JSON.stringify(msg);
-    for (const l of links) if (l.up) l.c.publish(t, text, { qos: 1, retain });
+    outQ = outQ
+      .then(async () => {
+        const r = await real(d);
+        const ct = text === "" ? "" : await Secure.seal(r.key, text);
+        for (const l of links) if (l.up) l.c.publish(r.name, ct, { qos: 1, retain });
+      })
+      .catch(() => {});
   }
 
   function subscribe(id) {
-    for (const l of links) if (l.up) l.c.subscribe(topic(id, "karte"), { qos: 1 });
+    for (const l of links) subs(l, [topic(id, "karte")]).catch(() => {});
   }
   function unsubscribe(id) {
-    for (const l of links) if (l.up) l.c.unsubscribe(topic(id, "karte"));
+    for (const l of links) subs(l, [topic(id, "karte")], true).catch(() => {});
   }
 
   function card(off = false) {
@@ -171,19 +201,26 @@ const Freunde = (() => {
     }
   }
 
-  function onMessage(tp, payload) {
+  async function onMessage(tp, payload) {
     const parts = tp.split("/");
-    const msg = parse(payload.toString());
-    if (parts[2] === "karte") return onCard(parts[1], msg);
+    const id = owners.get(parts[1]);
+    if (!id) return;
+    let msg = null;
+    if (payload.length) {
+      const text = await Secure.open((await Secure.ident(ROOT, id)).key, payload);
+      if (text === null) return; // gefälscht oder kaputt
+      msg = parse(text);
+    }
+    if (parts[2] === "karte") return onCard(id, msg);
     if (!msg || typeof msg.from !== "string" || msg.from === myId) return;
-    if (parts[1] === myId && parts[2] === "post") return onPost(msg);
-    if (parts[1] === myId && parts[2] === "live") return onLive(msg);
+    if (id === myId && parts[2] === "post") return onPost(msg);
+    if (id === myId && parts[2] === "live") return onLive(msg);
   }
 
   function clean(f, m) {
     if (typeof m.name === "string") f.name = m.name.slice(0, 20);
-    if (m.fig && typeof m.fig === "object") f.fig = m.fig;
-    if (m.stats && typeof m.stats === "object") f.stats = m.stats;
+    if (m.fig && typeof m.fig === "object" && JSON.stringify(m.fig).length < 60000) f.fig = m.fig;
+    if (m.stats && typeof m.stats === "object" && JSON.stringify(m.stats).length < 20000) f.stats = m.stats;
   }
 
   function onCard(id, m) {

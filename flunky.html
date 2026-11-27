@@ -2,6 +2,7 @@
 <html lang="de" class="neu">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob: wss://broker.emqx.io:8084 wss://broker.hivemq.com:8884 ws://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#17130f">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -45,7 +46,7 @@
 
     <div class="fb-card">
       <h2>Mitspielen</h2>
-      <input id="fb-code" class="fb-input code" type="text" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters">
+      <input id="fb-code" class="fb-input code" type="text" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters">
       <button id="fb-join" class="fb-btn">Beitreten</button>
     </div>
 
@@ -75,7 +76,7 @@
     </div>
     <div id="fb-qr" class="fb-qr"></div>
     <button id="fb-share" class="fb-btn secondary small">Link teilen</button>
-    <button id="fb-invite" class="fb-btn secondary small" onclick="Freunde.inviteSheet()">👥 Freunde einladen</button>
+    <button id="fb-invite" class="fb-btn secondary small">👥 Freunde einladen</button>
 
     <div id="fb-waiting">
       <h2 id="fb-count" class="fb-section"></h2>
@@ -163,10 +164,11 @@
   <script src="vendor/qrcode.js"></script>
   <script src="vendor/three.min.js"></script>
   <script src="echt-tex.js"></script>
+  <script src="secure.js"></script>
   <script src="net.js"></script>
   <script src="stats.js"></script>
   <script src="freunde.js"></script>
   <script src="flunky-game.js"></script>
-  <script>Freunde.boot();</script>
+  <script src="flunky-boot.js"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 <html lang="de" class="fit neu">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob: wss://broker.emqx.io:8084 wss://broker.hivemq.com:8884 ws://localhost:*; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#17130f">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -140,7 +141,7 @@
       <button id="room-create" class="btn">Raum erstellen</button>
       <p class="or">oder einem Raum beitreten</p>
       <div class="join-row">
-        <input id="room-code" type="text" maxlength="4" placeholder="Code" autocomplete="off" autocapitalize="characters" aria-label="Raumcode">
+        <input id="room-code" type="text" maxlength="5" placeholder="Code" autocomplete="off" autocapitalize="characters" aria-label="Raumcode">
         <button id="room-join" class="btn">Beitreten</button>
       </div>
       <p id="room-error" class="error" hidden></p>
@@ -231,6 +232,7 @@
   <script src="hodenritter.js"></script>
   <script src="flunky.js"></script>
   <script src="promille.js"></script>
+  <script src="secure.js"></script>
   <script src="net.js"></script>
   <script src="stats.js"></script>
   <script src="freunde.js"></script>

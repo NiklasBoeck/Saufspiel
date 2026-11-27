@@ -3,7 +3,7 @@
 // Die anderen Handys schicken nur ihre Aktionen. Funktioniert mit jedem Spiel mit setup/view/act.
 const Room = (() => {
   const BROKERS = ["wss://broker.hivemq.com:8884/mqtt", "wss://broker.emqx.io:8084/mqtt"];
-  const TOPIC_ROOT = "saufspiel-room-v1";
+  const TOPIC_ROOT = "saufspiel-room-v2";
   const SESSION_KEY = "saufspiel-room";
   const NAME_KEY = "saufspiel-name";
   const ID_KEY = "saufspiel-id";
@@ -192,16 +192,20 @@ const Room = (() => {
     return n;
   }
 
+  // Figur von einem anderen Handy: nur ein normales Objekt in vernünftiger Größe
+  const okFig = (f) => (f && typeof f === "object" && !Array.isArray(f) && JSON.stringify(f).length < 60000 ? f : undefined);
+
   function handle(a) {
+    if (!a || typeof a.from !== "string" || a.from.length > 40) return;
     const p = S.players.find((x) => x.id === a.from);
     switch (a.type) {
       case "join":
         if (p) {
           p.online = true;
           if (S.phase === "lobby") p.name = uniqueName(cleanName(a.name), p.id);
-          if (a.fig) p.fig = a.fig;
+          if (okFig(a.fig)) p.fig = okFig(a.fig);
         } else if (S.players.length < maxFor()) {
-          S.players.push({ id: a.from, name: uniqueName(cleanName(a.name), a.from), online: true, fig: a.fig || undefined });
+          S.players.push({ id: a.from, name: uniqueName(cleanName(a.name), a.from), online: true, fig: okFig(a.fig) });
         } else return;
         break;
       case "leave":
@@ -232,8 +236,8 @@ const Room = (() => {
         S.gseq++;
         break;
       case "play":
-        if (S.phase !== "play" || a.gseq !== S.gseq || !a.a) return;
-        S.g = applyAction(S.game, S.g, a.a, p?.name ?? null);
+        if (S.phase !== "play" || a.gseq !== S.gseq || !a.a || typeof a.a !== "object" || !p) return; // nur Mitspieler
+        S.g = applyAction(S.game, S.g, a.a, p.name);
         S.gseq++;
         break;
       default:
@@ -462,7 +466,7 @@ const Room = (() => {
   $("room-create").onclick = () => {
     const name = nameOrError();
     if (!name) return;
-    session = { code: randomString(CODE_CHARS, 4), id: myId, name, host: true, game: gameKey };
+    session = { code: randomString(CODE_CHARS, 5), id: myId, name, host: true, game: gameKey };
     startSession(session, newState());
   };
 
@@ -470,7 +474,7 @@ const Room = (() => {
     const name = nameOrError();
     if (!name) return;
     const code = $("room-code").value.trim().toUpperCase();
-    if (code.length !== 4) return showStart(t("Der Raumcode hat 4 Zeichen."));
+    if (code.length !== 5) return showStart(t("Der Raumcode hat 5 Zeichen."));
     startSession({ code, id: myId, name, host: false, game: gameKey }, null);
   };
   $("room-code").addEventListener("keydown", (e) => e.key === "Enter" && $("room-join").click());
@@ -507,7 +511,7 @@ const Room = (() => {
     boot() {
       const params = new URLSearchParams(location.search);
       const key = params.get("spiel");
-      const code = (params.get("raum") || "").toUpperCase().slice(0, 4);
+      const code = (params.get("raum") || "").toUpperCase().slice(0, 5);
       if (!GAMES[key]?.setup || !code) return;
       const saved = parseSaved();
       if (saved && saved.code === code) return resume(saved);

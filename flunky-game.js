@@ -5,7 +5,7 @@
   "use strict";
 
   const BROKERS = ["wss://broker.hivemq.com:8884/mqtt", "wss://broker.emqx.io:8084/mqtt"];
-  const TOPIC_ROOT = "saufspiel-flunky-v1";
+  const TOPIC_ROOT = "saufspiel-flunky-v2";
   const SESSION_KEY = "flunky-session";
   const NAME_KEY = "flunky-name";
   const ID_KEY = "flunky-id";
@@ -1919,7 +1919,7 @@
   $("fb-create").onclick = () => {
     const name = nameOrError();
     if (!name) return;
-    const s = { code: randomString(CODE_CHARS, 4), id: myId, name, host: true };
+    const s = { code: randomString(CODE_CHARS, 5), id: myId, name, host: true };
     session = s;
     startSession(s, newState(createMax));
   };
@@ -1928,7 +1928,7 @@
     const name = nameOrError();
     if (!name) return;
     const code = $("fb-code").value.trim().toUpperCase();
-    if (code.length !== 4) return showStart("Der Raumcode hat 4 Zeichen.");
+    if (code.length !== 5) return showStart("Der Raumcode hat 5 Zeichen.");
     startSession({ code, id: myId, name, host: false }, null);
   };
   $("fb-code").addEventListener("keydown", (e) => e.key === "Enter" && $("fb-join").click());
@@ -1985,7 +1985,7 @@
   // Einstieg
   const params = new URLSearchParams(location.search);
   $("fb-name").value = read(NAME_KEY) || "";
-  const urlCode = (params.get("raum") || "").toUpperCase().slice(0, 4);
+  const urlCode = (params.get("raum") || "").toUpperCase().slice(0, 5);
   if (urlCode) $("fb-code").value = urlCode;
   showStart();
   if (urlCode && !parseSaved()) setTimeout(() => ($("fb-name").value ? $("fb-join") : $("fb-name")).focus(), 50);

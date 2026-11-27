@@ -30,7 +30,7 @@ python3 -m http.server 8000
 - `kistenturm.js` + `kistenturm-3d.js`: Kistenturm, Bierkisten stapeln in 3D (three.js, wird erst beim Start geladen). Die nächste Kiste schwingt über dem Turm, Tippen lässt sie fallen. Liegt der Schwerpunkt oben drüber nicht mehr über der Kiste darunter, kippt der Turm: so viele Schlucke, wie Kisten fallen (höchstens 10).
 - `flasche.js` + `flasche-3d.js` + `flasche.css`: Flaschendrehen in 3D (three.js, wird erst beim Start geladen). Wischen dreht die Flasche auf dem Kneipentisch, der Hals bestimmt, wer eine Aufgabe bekommt (trinken, verteilen, Wahrheit, Pflicht, Regel), der Boden macht manchmal mit. Wer getroffen wurde, dreht als Nächstes.
 - `hodenritter.js` + `hodenritter-3d.js`: Hodenritter, Boule im Garten in 3D (three.js, wird erst beim Spielstart geladen). Wer am weitesten weg liegt oder die rote Kugel berührt, trinkt ein halbes Bier, macht eine Aufgabe und verbeugt sich vor allen, die sitzen. Der Host rechnet die Würfe aus und schickt die Kugelbahnen an alle Handys. Testen ohne Grafikkarte: `?lowgfx`, Kamera frei: `?debug` (`hrDebug.cam`).
-- `room.js`: Jeder sein Handy, Raum mit Code und QR-Code, Sync über MQTT wie bei Flunky Ball
+- `room.js`: Jeder sein Handy, Raum mit 5-stelligem Code und QR-Code, Sync über MQTT wie bei Flunky Ball (verschlüsselt, siehe Sicherheit)
 - `flunky.js`, `flunky.html`, `flunky-game.js`, `flunky.css`: Flunky Ball (siehe unten)
 - `vendor/`: mitgelieferte Bibliotheken (MQTT.js 5.16.1, qrcode-generator 2.0.4, three.js r159)
 - `boot.js`: läuft auf jeder Seite zuerst: Altersabfrage (18+) beim ersten Start und Offline-Modus
@@ -40,6 +40,12 @@ python3 -m http.server 8000
 - `style.css`: Mobile-first Styling (Design „Klassisch“)
 - `design.css` + `icons.js`: Design „Warm“ (intern `neu`; Kneipenfarben, gezeichnete SVG-Icons, Schrift Bricolage Grotesque in vendor/fonts). Design „Biergarten“ = `<html class="neu garten">` (Fraunces-Schrift). Umschalter in den Einstellungen, `<html class="neu">`
 - `manifest.webmanifest`: lässt sich auf dem Handy zum Startbildschirm hinzufügen
+
+## Sicherheit
+
+- `secure.js`: Alles, was über die öffentlichen MQTT-Server geht (Räume, Flunky Ball, Freunde), ist mit AES-GCM verschlüsselt und signiert. Das Topic ist ein Hash des Raum- bzw. Freundescodes, der Code selbst steht nirgends. Wer den Code nicht kennt, kann weder mitlesen noch etwas einschleusen; gefälschte oder veränderte Nachrichten werden verworfen. Raumcodes haben 5 Zeichen, ihr Schlüssel wird mit PBKDF2 (150 000 Runden) abgeleitet.
+- Content-Security-Policy in `index.html`, `flunky.html` und `info.html`: Skripte nur aus eigenen Dateien, keine Inline-Skripte, Verbindungen nur zu den zwei MQTT-Servern. Eingeschleustes HTML kann damit keinen Code ausführen. Neue Skripte deshalb immer als eigene Datei einbinden, nie inline oder mit `onclick="…"`.
+- Der Host nimmt Spielzüge nur von Mitspielern an und begrenzt Namen und Figuren in der Größe.
 
 ## Neues Spiel hinzufügen
 

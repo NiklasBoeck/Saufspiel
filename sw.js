@@ -1,6 +1,6 @@
 // Offline-Modus: Erst das Netz fragen (damit Updates sofort da sind), ohne Netz kommt die gespeicherte Version.
 // Neue Dateien unten in FILES eintragen, damit sie auch ohne Internet da sind.
-const CACHE = "saufomat-v61";
+const CACHE = "saufomat-v62";
 const FILES = [
   "./",
   "index.html",
@@ -48,6 +48,9 @@ const FILES = [
   "promille.css",
   "flunky-game.js",
   "net.js",
+  "secure.js",
+  "flunky-boot.js",
+  "info-theme.js",
   "room.js",
   "app.js",
   "stats.js",

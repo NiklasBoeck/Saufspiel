@@ -258,7 +258,7 @@ const STRINGS = {
     "Suche Raum…": "Looking for room…",
     "Zurück in Raum {code}": "Back to room {code}",
     "Gib zuerst deinen Namen ein.": "Enter your name first.",
-    "Der Raumcode hat 4 Zeichen.": "The room code has 4 characters.",
+    "Der Raumcode hat 5 Zeichen.": "The room code has 5 characters.",
 
     // Spiel
     "Du bist dran!": "Your turn!",

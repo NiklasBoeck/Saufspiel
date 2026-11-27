@@ -54,12 +54,26 @@ const RoomNet = (() => {
     let hiddenAt = 0;
     const timers = {};
 
-    const t = (sub) => `${o.root}/${o.code}/${sub}`;
+    let K = null; // { topic, key } aus Raumcode (secure.js): Topic verrät den Code nicht, Inhalt ist verschlüsselt
+    const t = (sub) => `${o.root}/${K.topic}/${sub}`;
+    let outQ = Promise.resolve(); // Reihenfolge beim Verschlüsseln behalten
     const isUp = () => links.some((l) => l.up);
     const epoch = (s) => s?.epoch || 0;
 
+    // Leerer Text bleibt leer (löscht den liegengebliebenen Spielstand), alles andere wird verschlüsselt.
+    function sealed(text) {
+      const p = outQ.then(() => (text === "" ? "" : Secure.seal(K.key, text)));
+      outQ = p.catch(() => {});
+      return p;
+    }
     function publish(sub, text, retain = false) {
-      for (const l of links) if (l.up) l.c.publish(t(sub), text, { qos: 1, retain });
+      if (!K) return;
+      sealed(text).then((ct) => {
+        for (const l of links) if (l.up) l.c.publish(t(sub), ct, { qos: 1, retain });
+      });
+    }
+    function publishTo(l, sub, text, retain = false) {
+      if (K) sealed(text).then((ct) => l.up && l.c.publish(t(sub), ct, { qos: 1, retain }));
     }
 
     function startLink(l) {
@@ -80,7 +94,7 @@ const RoomNet = (() => {
         // Alle hören alles: Gäste müssen auch Host werden können, Hosts merken, wenn sie abgelöst wurden.
         c.subscribe([t("act"), t("state"), t("ping")], { qos: 1 });
         if (host) {
-          if (cur) c.publish(t("state"), JSON.stringify(cur), { qos: 1, retain: true });
+          if (cur) publishTo(l, "state", JSON.stringify(cur), true);
           ping();
         } else {
           const queued = pending;
@@ -100,12 +114,19 @@ const RoomNet = (() => {
         o.onChange();
       });
       c.on("error", () => {}); // mqtt.js verbindet selbst neu
+      // Entschlüsseln ist asynchron: pro Verbindung eine Warteschlange, damit die Reihenfolge bleibt.
+      let inQ = Promise.resolve();
       c.on("message", (topic, payload) => {
-        if (closed || l.c !== c) return;
-        const text = payload.toString();
-        if (topic === t("act")) onAct(text);
-        else if (topic === t("state")) onStateText(text);
-        else if (topic === t("ping")) onPing(text);
+        if (closed || l.c !== c || payload.length > Secure.MAX_BYTES) return;
+        inQ = inQ
+          .then(async () => {
+            const text = payload.length ? await Secure.open(K.key, payload) : "";
+            if (text === null || closed || l.c !== c) return; // gefälscht, kaputt oder falscher Raum
+            if (topic === t("act")) onAct(text);
+            else if (topic === t("state")) onStateText(text);
+            else if (topic === t("ping")) onPing(text);
+          })
+          .catch(() => {});
       });
     }
 
@@ -217,7 +238,7 @@ const RoomNet = (() => {
     }
 
     function restart() {
-      if (closed) return;
+      if (closed || !K) return;
       lastHostSign = Date.now(); // dem Host nach dem Neuverbinden kurz Zeit geben
       links.forEach(startLink);
       o.onChange();
@@ -240,7 +261,15 @@ const RoomNet = (() => {
     window.addEventListener("online", restart);
     window.addEventListener("pageshow", onPageShow);
 
-    links.forEach(startLink);
+    if (!Secure.available()) {
+      setTimeout(() => o.onFail("Dieser Browser kann keine sichere Verbindung aufbauen."), 0);
+    } else {
+      Secure.room(o.root, o.code).then((k) => {
+        if (closed) return;
+        K = k;
+        links.forEach(startLink);
+      });
+    }
     timers.tick = setInterval(tick, PING_MS);
     timers.first = setTimeout(() => !closed && !everUp && o.onFail("Keine Verbindung zum Spielserver. Ist das Internet an?"), FIRST_CONNECT_MS);
 
